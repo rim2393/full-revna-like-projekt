@@ -22,6 +22,7 @@
       "lumen_vpn: bash ./scripts/secret-scan.sh .",
       "lumen_vpn: docker compose --env-file .env.example -f deploy/compose/lumen.yml config",
       "lumen_vpn: docker compose --env-file .env.example -f deploy/compose/lumen-node.yml config",
+      "lumen_vpn GitHub Actions: public-installer-validation success for c0b9def",
       "lumen-license-server: .venv/Scripts/python.exe -m pytest",
       "lumen-license-server: .venv/Scripts/python.exe -m ruff check .",
       "lumen-license-server/frontend: npm test -- --run",
@@ -32,7 +33,7 @@
       "rim2393-lumen-client: python -m compileall lumen_client_compat tests tools",
       "all repos: git diff --check"
     ],
-    "evidence": "Final sweep passed after signed entitlement fix: API 46 passed; node-agent 37 passed; web, package, public installer, license server, and client compatibility checks passed."
+    "evidence": "Final sweep passed after signed entitlement fix: API 46 passed; node-agent 37 passed; web, package, public installer, license server, and client compatibility checks passed. Public installer GitHub Actions passed after shellcheck cleanup commit c0b9def."
   },
   "codeReview": {
     "recommendation": "APPROVE",
