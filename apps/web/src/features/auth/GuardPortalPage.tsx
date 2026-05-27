@@ -12,8 +12,8 @@ export function GuardPortalPage() {
         <p className="eyebrow">Guard portal</p>
         <h2>Session ready</h2>
         <p>
-          The portal is the handoff between authentication and the admin control plane. Backend
-          session wiring is intentionally left as an integration TODO.
+          The portal is the handoff between authentication and the admin control plane. Continue
+          only after the current operator session has passed the required policy checks.
         </p>
       </div>
       <div className="portal-checks" aria-label="Portal readiness">
