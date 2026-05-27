@@ -32,6 +32,16 @@ test("loads runtime config from env without exposing secret env values", () => {
   assert.equal(JSON.stringify(config).includes("very-secret-value"), false);
 });
 
+test("loads runtime config from installer-compatible env aliases", () => {
+  const config = loadNodeAgentConfigFromEnv({
+    LUMEN_NODE_NAME: "manual-node",
+    LUMEN_PANEL_URL: "https://panel.example/"
+  });
+
+  assert.equal(config.nodeId, "manual-node");
+  assert.equal(config.controlPlaneBaseUrl, "https://panel.example");
+});
+
 test("builds heartbeat payload from config and provisioning state", () => {
   const config = loadNodeAgentConfigFromEnv({
     LUMEN_NODE_ID: "ams-1",

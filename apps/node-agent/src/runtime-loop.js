@@ -101,8 +101,8 @@ export function createNodeAgentRuntimeConfig(input = {}) {
 
 export function loadNodeAgentConfigFromEnv(env = {}) {
   return createNodeAgentRuntimeConfig({
-    nodeId: env.LUMEN_NODE_ID,
-    controlPlaneBaseUrl: env.LUMEN_CONTROL_PLANE_URL,
+    nodeId: env.LUMEN_NODE_ID ?? env.LUMEN_NODE_NAME,
+    controlPlaneBaseUrl: env.LUMEN_CONTROL_PLANE_URL ?? env.LUMEN_PANEL_URL,
     agentVersion: env.LUMEN_AGENT_VERSION ?? env.npm_package_version,
     heartbeatIntervalMs: env.LUMEN_HEARTBEAT_INTERVAL_MS,
     pollIntervalMs: env.LUMEN_POLL_INTERVAL_MS,

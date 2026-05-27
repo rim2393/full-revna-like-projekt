@@ -7,6 +7,7 @@ import {
   sendHeartbeat
 } from "./control-plane-client.js";
 import { buildNodeAgentDryRun, loadNodeAgentConfigFromEnv } from "./runtime-loop.js";
+import { readSecretFromEnv } from "./secret-input.js";
 
 function printHelp() {
   console.log([
@@ -29,7 +30,7 @@ async function main(argv, env) {
     const config = loadNodeAgentConfigFromEnv(env);
     const response = await exchangeInstallToken({
       controlPlaneBaseUrl: config.controlPlaneBaseUrl,
-      installToken: env.LUMEN_INSTALL_TOKEN
+      installToken: readSecretFromEnv(env, "LUMEN_INSTALL_TOKEN")
     });
     console.log(JSON.stringify(redactInstallTokenExchangeResponse(response), null, 2));
     return 0;
@@ -39,7 +40,7 @@ async function main(argv, env) {
     const config = loadNodeAgentConfigFromEnv(env);
     const response = await sendHeartbeat({
       config,
-      nodeToken: env.LUMEN_NODE_TOKEN,
+      nodeToken: readSecretFromEnv(env, "LUMEN_NODE_TOKEN"),
       heartbeatPath: env.LUMEN_HEARTBEAT_PATH
     });
     console.log(JSON.stringify(redactNodeResponse(response), null, 2));
