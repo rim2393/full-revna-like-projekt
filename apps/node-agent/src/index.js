@@ -58,3 +58,12 @@ export {
   createPortReservation,
   detectPortConflicts
 } from "./conflict-model.js";
+export {
+  HEARTBEAT_PAYLOAD_VERSION,
+  NODE_AGENT_DRY_RUN_REPORT_VERSION,
+  NODE_AGENT_RUNTIME_CONFIG_VERSION,
+  buildNodeAgentDryRun,
+  createHeartbeatPayload,
+  createNodeAgentRuntimeConfig,
+  loadNodeAgentConfigFromEnv
+} from "./runtime-loop.js";
