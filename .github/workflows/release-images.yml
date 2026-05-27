@@ -33,19 +33,19 @@ jobs:
           - name: api
             image: ghcr.io/rim2393/lumen-api
             context: apps/api
-            dockerfile: apps/api/Dockerfile
+            dockerfile: Dockerfile
           - name: web
             image: ghcr.io/rim2393/lumen-web
             context: apps/web
-            dockerfile: apps/web/Dockerfile
+            dockerfile: Dockerfile
           - name: node-agent
             image: ghcr.io/rim2393/lumen-node-agent
             context: apps/node-agent
-            dockerfile: apps/node-agent/Dockerfile
+            dockerfile: Dockerfile
           - name: subscription
             image: ghcr.io/rim2393/lumen-subscription-page
             context: apps/lumen-edge
-            dockerfile: apps/lumen-edge/Dockerfile
+            dockerfile: Dockerfile
 
     steps:
       - name: Validate release version
