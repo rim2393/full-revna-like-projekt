@@ -243,6 +243,7 @@ export function createMockLumenApiClient(): LumenApiClient {
         },
       ],
     }),
+    logout: async () => undefined,
     readProvisioningJob: async (jobId) =>
       buildMockProvisioningJob(
         {

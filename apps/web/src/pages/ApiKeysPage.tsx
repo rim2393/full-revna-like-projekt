@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { KeyRound, Plus, Search, Trash2 } from 'lucide-react'
+import { KeyRound, Plus, Trash2 } from 'lucide-react'
 import { useApiKeysPageData, useCreateApiKey, useRevokeApiKey } from '../shared/api/resourceHooks'
 import type { ApiKeyStatus } from '../shared/api/types'
 import { DataTable } from '../shared/components/DataTable'
@@ -60,11 +60,11 @@ export function ApiKeysPage() {
         description="Scoped token management with API-ready loading, error, and empty states. Secret values are never displayed."
         actions={
           <>
-            <button type="button" className="button button--secondary">
-              <Search size={18} aria-hidden="true" />
-              Filter
-            </button>
-            <button type="button" className="button button--primary">
+            <button
+              type="button"
+              className="button button--secondary"
+              onClick={() => document.getElementById('api-key-name')?.focus()}
+            >
               <Plus size={18} aria-hidden="true" />
               {spec.primaryAction}
             </button>
@@ -77,44 +77,46 @@ export function ApiKeysPage() {
       {query.isSuccess && keys.length === 0 ? (
         <EmptyState
           title="No API keys issued"
-          description="Create a scoped automation key once backend token issuance is enabled."
+          description="Create a scoped automation key below. Secret values are shown once."
         />
       ) : null}
-      {query.isSuccess && keys.length > 0 ? (
+      {query.isSuccess ? (
         <section className="resource-grid">
-          <article className="panel panel--wide">
-            <div className="panel__header">
-              <div>
-                <p className="eyebrow">Automation access</p>
-                <h2>Key inventory</h2>
+          {keys.length > 0 ? (
+            <article className="panel panel--wide">
+              <div className="panel__header">
+                <div>
+                  <p className="eyebrow">Automation access</p>
+                  <h2>Key inventory</h2>
+                </div>
+                <StatusBadge>{query.data.source}</StatusBadge>
               </div>
-              <StatusBadge>{query.data.source}</StatusBadge>
-            </div>
-            <DataTable
-              caption="API key inventory"
-              columns={['Name', 'Owner', 'Scopes', 'Fingerprint', 'Last used', 'Status', 'Actions']}
-              rows={keys.map((key) => ({
-                cells: [
-                  key.name,
-                  key.owner,
-                  key.scopes.join(', '),
-                  key.fingerprint,
-                  key.lastUsedAt ?? 'Never',
-                  <StatusBadge tone={statusTone[key.status]}>{key.status}</StatusBadge>,
-                  <button
-                    type="button"
-                    className="icon-button"
-                    aria-label={`Revoke ${key.name}`}
-                    disabled={key.status === 'revoked' || revokeApiKey.isPending}
-                    onClick={() => void revokeApiKey.mutateAsync(key.id)}
-                  >
-                    <Trash2 size={16} aria-hidden="true" />
-                  </button>,
-                ],
-                id: key.id,
-              }))}
-            />
-          </article>
+              <DataTable
+                caption="API key inventory"
+                columns={['Name', 'Owner', 'Scopes', 'Fingerprint', 'Last used', 'Status', 'Actions']}
+                rows={keys.map((key) => ({
+                  cells: [
+                    key.name,
+                    key.owner,
+                    key.scopes.join(', '),
+                    key.fingerprint,
+                    key.lastUsedAt ?? 'Never',
+                    <StatusBadge tone={statusTone[key.status]}>{key.status}</StatusBadge>,
+                    <button
+                      type="button"
+                      className="icon-button"
+                      aria-label={`Revoke ${key.name}`}
+                      disabled={key.status === 'revoked' || revokeApiKey.isPending}
+                      onClick={() => void revokeApiKey.mutateAsync(key.id)}
+                    >
+                      <Trash2 size={16} aria-hidden="true" />
+                    </button>,
+                  ],
+                  id: key.id,
+                }))}
+              />
+            </article>
+          ) : null}
           <article className="panel">
             <h2>Backend contract</h2>
             <ul className="feature-list">

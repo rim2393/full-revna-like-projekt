@@ -2,7 +2,7 @@ from enum import StrEnum
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import Depends, Header, status
+from fastapi import Cookie, Depends, Header, status
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -66,6 +66,7 @@ async def get_current_principal(
     session: Annotated[AsyncSession, Depends(get_db_session)],
     api_key: Annotated[str | None, Header(alias="X-Lumen-Api-Key")] = None,
     authorization: Annotated[str | None, Header(alias="Authorization")] = None,
+    lumen_access_token: Annotated[str | None, Cookie(alias="lumen_access_token")] = None,
 ) -> Principal:
     if api_key is not None:
         expected_api_key = (
@@ -85,7 +86,7 @@ async def get_current_principal(
         ):
             return await _principal_from_api_key(session, api_key=api_key, settings=settings)
 
-    bearer_token = _extract_bearer_token(authorization)
+    bearer_token = _extract_bearer_token(authorization) or lumen_access_token
     if bearer_token is not None and settings.session_hash_pepper is not None:
         return await _principal_from_session(session, token=bearer_token, settings=settings)
 

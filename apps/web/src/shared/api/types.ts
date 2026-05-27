@@ -395,6 +395,7 @@ export type LumenApiClient = {
   listSubscriptions: () => Promise<SubscriptionListResponse>
   listUsers: () => Promise<ResourceListResponse<AdminUserRecord>>
   login: (request: LoginRequest) => Promise<AuthSession | MfaChallenge>
+  logout: () => Promise<void>
   readProvisioningJob: (jobId: string) => Promise<ProvisioningJobResponse>
   readLicense: () => Promise<LicenseSummary | null>
   revokeApiKey: (apiKeyId: string) => Promise<void>

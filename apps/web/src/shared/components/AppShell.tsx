@@ -1,6 +1,8 @@
 import { Bell, CircleHelp, Languages, LogOut, Menu, Search, Settings, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { Link, NavLink, Outlet } from 'react-router-dom'
+import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { useAuthSession } from '../../features/auth/authSession'
+import { useApiClient } from '../api/apiClientContext'
 import { navigationGroups } from '../data/navigation'
 import { BrandMark } from './BrandMark'
 
@@ -21,9 +23,21 @@ const readInitialLanguage = (): AppLanguage => {
 }
 
 export function AppShell() {
+  const apiClient = useApiClient()
+  const navigate = useNavigate()
+  const { clearSession } = useAuthSession()
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [language, setLanguage] = useState<AppLanguage>(readInitialLanguage)
   const closeSidebar = () => setIsSidebarOpen(false)
+
+  async function handleSignOut() {
+    try {
+      await apiClient.logout()
+    } finally {
+      clearSession()
+      navigate('/guard/login', { replace: true })
+    }
+  }
 
   useEffect(() => {
     document.documentElement.lang = language
@@ -112,18 +126,18 @@ export function AppShell() {
                 ))}
               </select>
             </label>
-            <button type="button" className="icon-button" aria-label="Notifications">
+            <button type="button" className="icon-button" aria-label="Notifications" disabled>
               <Bell size={18} />
             </button>
-            <button type="button" className="icon-button" aria-label="Settings">
+            <Link to="/settings" className="icon-button" aria-label="Settings">
               <Settings size={18} />
-            </button>
-            <button type="button" className="icon-button" aria-label="Help">
-              <CircleHelp size={18} />
-            </button>
-            <Link to="/guard/login" className="icon-button" aria-label="Sign out">
-              <LogOut size={18} />
             </Link>
+            <Link to="/tools" className="icon-button" aria-label="Help">
+              <CircleHelp size={18} />
+            </Link>
+            <button type="button" className="icon-button" aria-label="Sign out" onClick={handleSignOut}>
+              <LogOut size={18} />
+            </button>
           </nav>
         </header>
         <main id="main-content" className="content" tabIndex={-1}>

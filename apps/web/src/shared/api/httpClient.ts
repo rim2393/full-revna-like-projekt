@@ -151,6 +151,7 @@ export function createHttpLumenApiClient({
         userId: 'verified-operator',
       }
     },
+    logout: () => request('/api/v1/auth/logout', { method: 'POST' }),
     updateSetting: (key: string, payload: SettingUpdateRequest) =>
       request(`/api/v1/settings/${encodeURIComponent(key)}`, { body: payload, method: 'PUT' }),
   }

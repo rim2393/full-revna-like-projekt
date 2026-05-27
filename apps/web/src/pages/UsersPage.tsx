@@ -1,4 +1,3 @@
-import { Plus, Search } from 'lucide-react'
 import { useUsersPageData } from '../shared/api/resourceHooks'
 import type { UserStatus } from '../shared/api/types'
 import { DataTable } from '../shared/components/DataTable'
@@ -25,18 +24,6 @@ export function UsersPage() {
         eyebrow={spec.eyebrow}
         title={spec.title}
         description={spec.description}
-        actions={
-          <>
-            <button type="button" className="button button--secondary">
-              <Search size={18} aria-hidden="true" />
-              Filter
-            </button>
-            <button type="button" className="button button--primary">
-              <Plus size={18} aria-hidden="true" />
-              {spec.primaryAction}
-            </button>
-          </>
-        }
       />
 
       {query.isLoading ? <LoadingState label="Loading users..." /> : null}

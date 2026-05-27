@@ -33,22 +33,28 @@ router = APIRouter()
 CurrentPrincipal = Annotated[Principal, Depends(get_current_principal)]
 DbSession = Annotated[AsyncSession, Depends(get_db_session)]
 AppSettings = Annotated[Settings, Depends(get_settings)]
+ACCESS_COOKIE_NAME = "lumen_access_token"  # noqa: S105 - cookie name, not secret material.
+REFRESH_COOKIE_NAME = "lumen_refresh_token"  # noqa: S105 - cookie name, not secret material.
 
 
 @router.post("/login", response_model=LoginResponse)
 async def login(
     request: LoginRequest,
+    response: Response,
     session: DbSession,
     settings: AppSettings,
 ) -> LoginResponse:
     token_pair = await login_user(session, request=request, settings=settings)
     await session.commit()
+    if isinstance(token_pair, TokenPairResponse):
+        _set_session_cookies(response, token_pair=token_pair, settings=settings)
     return token_pair
 
 
 @router.post("/mfa/challenge/verify", response_model=TokenPairResponse)
 async def verify_mfa_login_challenge(
     request: MfaChallengeVerifyRequest,
+    response: Response,
     session: DbSession,
     settings: AppSettings,
 ) -> TokenPairResponse:
@@ -60,12 +66,14 @@ async def verify_mfa_login_challenge(
         settings=settings,
     )
     await session.commit()
+    _set_session_cookies(response, token_pair=token_pair, settings=settings)
     return token_pair
 
 
 @router.post("/refresh", response_model=TokenPairResponse)
 async def refresh(
     request: RefreshRequest,
+    response: Response,
     session: DbSession,
     settings: AppSettings,
 ) -> TokenPairResponse:
@@ -75,6 +83,7 @@ async def refresh(
         settings=settings,
     )
     await session.commit()
+    _set_session_cookies(response, token_pair=token_pair, settings=settings)
     return token_pair
 
 
@@ -82,11 +91,14 @@ async def refresh(
 async def logout(
     principal: CurrentPrincipal,
     session: DbSession,
+    response: Response,
 ) -> Response:
     if principal.session_id is not None:
         await revoke_session(session, session_id=principal.session_id)
         await session.commit()
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
+    _clear_session_cookies(response)
+    response.status_code = status.HTTP_204_NO_CONTENT
+    return response
 
 
 @router.get("/me", response_model=PrincipalResponse)
@@ -161,3 +173,34 @@ def _principal_user_id(principal: Principal):
     from uuid import UUID
 
     return UUID(principal.subject)
+
+
+def _set_session_cookies(
+    response: Response,
+    *,
+    token_pair: TokenPairResponse,
+    settings: Settings,
+) -> None:
+    cookie_options = {
+        "httponly": True,
+        "path": "/",
+        "samesite": "lax",
+        "secure": settings.environment != "development",
+    }
+    response.set_cookie(
+        ACCESS_COOKIE_NAME,
+        token_pair.access_token,
+        max_age=settings.access_token_ttl_seconds,
+        **cookie_options,
+    )
+    response.set_cookie(
+        REFRESH_COOKIE_NAME,
+        token_pair.refresh_token,
+        max_age=settings.refresh_token_ttl_seconds,
+        **cookie_options,
+    )
+
+
+def _clear_session_cookies(response: Response) -> None:
+    for cookie_name in (ACCESS_COOKIE_NAME, REFRESH_COOKIE_NAME):
+        response.delete_cookie(cookie_name, path="/", samesite="lax")
