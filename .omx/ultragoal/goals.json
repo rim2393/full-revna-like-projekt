@@ -1,7 +1,7 @@
 {
   "version": 1,
   "createdAt": "2026-05-27T11:02:44.057Z",
-  "updatedAt": "2026-05-27T19:11:42.185Z",
+  "updatedAt": "2026-05-27T19:43:22.047Z",
   "briefPath": ".omx/ultragoal/brief.md",
   "goalsPath": ".omx/ultragoal/goals.json",
   "ledgerPath": ".omx/ultragoal/ledger.jsonl",
@@ -167,10 +167,13 @@
       "id": "G012-client-subscription-live-fixture",
       "title": "Client subscription live fixture",
       "objective": "Generate or fetch a live subscription manifest from deployed panel/subscription service, validate it with rim2393-lumen-client fixture validator, and document the panel-node-client acceptance evidence.",
-      "status": "pending",
-      "attempt": 0,
+      "status": "complete",
+      "attempt": 1,
       "createdAt": "2026-05-27T17:10:10.544Z",
-      "updatedAt": "2026-05-27T17:10:10.544Z"
+      "updatedAt": "2026-05-27T19:43:22.047Z",
+      "startedAt": "2026-05-27T19:12:06.568Z",
+      "completedAt": "2026-05-27T19:43:22.047Z",
+      "evidence": "v0.1.5 deployed on panel: doctor ok, api/web/subscription digest-pinned and healthy. Node-agent v0.1.5 digest-pinned and running. Public subscription URL https://sub.89-185-85-184.sslip.io/sub/lumen_sub_mewUPefwR9cpzoQYzy32fg/manifest returned 200 application/json with cache-control no-store; manifest saved to D:\\lumen-work\\.deploy-secrets\\g012-subdomain-manifest.json; client validator accepted it with --require-nodes and tcp-smoke endpoint 85.192.60.8:28771. Root sub-domain fallback returned 200 text/html."
     },
     {
       "id": "G013-final-live-stage-quality-gate",
