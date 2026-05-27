@@ -29,6 +29,9 @@ describe('Lumen admin routing scaffold', () => {
 
   it('renders graceful empty and error resource states', async () => {
     const emptyApiClient: LumenApiClient = {
+      createProvisioningJob: async () => {
+        throw new Error('Provisioning is unavailable')
+      },
       getSession: async () => null,
       listApiKeys: async () => ({
         generatedAt: '2026-05-27T00:00:00Z',
@@ -45,6 +48,9 @@ describe('Lumen admin routing scaffold', () => {
         source: 'mock',
         total: 0,
       }),
+      readProvisioningJob: async () => {
+        throw new Error('Provisioning job is unavailable')
+      },
       readLicense: async () => null,
     }
 

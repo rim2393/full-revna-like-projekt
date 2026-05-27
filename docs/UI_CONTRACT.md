@@ -10,7 +10,7 @@ The current web scaffold lives in `apps/web` and covers the Lumen Guard admin en
 - `/guard/mfa` - MFA challenge form.
 - `/guard/portal` - guarded handoff into the admin control plane.
 - `/dashboard` - overview shell with TanStack Query placeholder data.
-- `/users`, `/nodes`, `/license`, `/api-keys` - API-ready resource workspaces backed by typed hooks and mock data by default.
+- `/users`, `/nodes`, `/license`, `/api-keys` - API-ready resource workspaces backed by typed hooks and mock data by default. `/nodes` uses the `/api/v1/nodes` list shape and can create node provisioning jobs with `credentials_ref` only.
 - `/hosts`, `/profiles`, `/squads`, `/subscription` - placeholder resource workspaces.
 
 ## Structure
@@ -31,7 +31,8 @@ The Lumen look uses graphite surfaces, green safety accents, amber warning state
 ## Integration TODO
 
 - Set `VITE_LUMEN_API_BASE_URL` to enable the HTTP client. Leave it unset, or set `VITE_LUMEN_API_MODE=mock`, to keep local mock data active.
-- Current HTTP paths are `GET /api/auth/session`, `GET /api/admin/users`, `GET /api/admin/nodes`, `GET /api/admin/license`, and `GET /api/admin/api-keys`.
+- Current HTTP paths are `GET /api/auth/session`, `GET /api/admin/users`, `GET /api/admin/license`, `GET /api/admin/api-keys`, `GET /api/v1/nodes`, `POST /api/v1/nodes/provisioning-jobs`, and `GET /api/v1/nodes/provisioning-jobs/{jobId}`.
+- Node provisioning UI must never collect or render SSH passwords, private keys, install tokens, heartbeat tokens, subscription URLs, or generated runtime configs. It may show safe install-token issue/exchange timestamps and heartbeat endpoint placeholders.
 - Replace the hand-written HTTP client with a generated API client once backend contracts are stable.
 - Add auth/session guards around protected admin routes.
 - Add table state, pagination, filtering, optimistic mutations, and audit-safe notifications.

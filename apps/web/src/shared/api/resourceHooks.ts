@@ -1,10 +1,12 @@
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useApiClient } from './apiClientContext'
+import type { ProvisioningJobCreateRequest } from './types'
 
 export const resourceQueryKeys = {
   apiKeys: ['resource', 'api-keys'] as const,
   license: ['resource', 'license'] as const,
   nodes: ['resource', 'nodes'] as const,
+  provisioningJob: (jobId: string) => ['resource', 'nodes', 'provisioning-job', jobId] as const,
   session: ['auth', 'session'] as const,
   users: ['resource', 'users'] as const,
 }
@@ -33,6 +35,19 @@ export function useNodesPageData() {
   return useQuery({
     queryFn: apiClient.listNodes,
     queryKey: resourceQueryKeys.nodes,
+  })
+}
+
+export function useCreateNodeProvisioningJob() {
+  const apiClient = useApiClient()
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (request: ProvisioningJobCreateRequest) =>
+      apiClient.createProvisioningJob(request),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.nodes })
+    },
   })
 }
 
