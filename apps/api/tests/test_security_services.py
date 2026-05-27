@@ -1,7 +1,11 @@
+import base64
+import json
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from pydantic import SecretStr
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,7 +21,11 @@ from app.domains.api_keys.models import ApiKey
 from app.domains.api_keys.schemas import ApiKeyCreateRequest
 from app.domains.api_keys.service import create_api_key, verify_api_key
 from app.domains.licenses.models import License
-from app.domains.licenses.service import enforce_free_node_policy, get_effective_node_limit
+from app.domains.licenses.service import (
+    enforce_free_node_policy,
+    get_effective_node_limit,
+    hash_license_key,
+)
 from app.domains.nodes.models import Node
 from app.domains.users.models import User
 
@@ -165,15 +173,30 @@ async def test_active_license_can_raise_effective_node_limit(
     db_session: tuple[AsyncSession, Settings],
 ) -> None:
     session, settings = db_session
+    private_key = Ed25519PrivateKey.generate()
+    license_key_hash = hash_license_key("central-license-key")
+    starts_at = datetime.now(UTC) - timedelta(days=1)
+    expires_at = datetime.now(UTC) + timedelta(days=1)
+    entitlement_token = signed_entitlement_token(
+        private_key,
+        customer_ref="customer-1",
+        license_key_hash=license_key_hash,
+        max_devices=5,
+        starts_at=starts_at,
+        expires_at=expires_at,
+    )
+    settings = settings.model_copy(
+        update={"central_license_public_key_b64": public_key_b64(private_key)}
+    )
     session.add(
         License(
-            license_key_hash="hashed-license-key",
+            license_key_hash=license_key_hash,
             customer_ref="customer-1",
             status="active",
-            max_devices=5,
-            starts_at=datetime.now(UTC) - timedelta(days=1),
-            expires_at=datetime.now(UTC) + timedelta(days=1),
-            metadata_json={"authority": "central_license_server"},
+            max_devices=99,
+            starts_at=starts_at,
+            expires_at=expires_at,
+            metadata_json={"signed_entitlement": entitlement_token},
         )
     )
     for index in range(3):
@@ -192,10 +215,13 @@ async def test_active_license_can_raise_effective_node_limit(
     await enforce_free_node_policy(session, settings)
 
 
-async def test_locally_created_active_license_cannot_raise_effective_node_limit(
+async def test_forged_central_authority_cannot_raise_effective_node_limit(
     db_session: tuple[AsyncSession, Settings],
 ) -> None:
     session, settings = db_session
+    settings = settings.model_copy(
+        update={"central_license_public_key_b64": public_key_b64(Ed25519PrivateKey.generate())}
+    )
     session.add(
         License(
             license_key_hash="self-authorized-license-key",
@@ -204,9 +230,79 @@ async def test_locally_created_active_license_cannot_raise_effective_node_limit(
             max_devices=99,
             starts_at=datetime.now(UTC) - timedelta(days=1),
             expires_at=datetime.now(UTC) + timedelta(days=1),
-            metadata_json={"authority": "local_panel"},
+            metadata_json={"authority": "central_license_server"},
         )
     )
     await session.flush()
 
     assert await get_effective_node_limit(session, settings) == settings.free_license_node_limit
+
+
+async def test_forged_entitlement_signature_cannot_raise_effective_node_limit(
+    db_session: tuple[AsyncSession, Settings],
+) -> None:
+    session, settings = db_session
+    trusted_key = Ed25519PrivateKey.generate()
+    untrusted_key = Ed25519PrivateKey.generate()
+    license_key_hash = hash_license_key("forged-entitlement-license-key")
+    entitlement_token = signed_entitlement_token(
+        untrusted_key,
+        customer_ref="customer-1",
+        license_key_hash=license_key_hash,
+        max_devices=99,
+    )
+    settings = settings.model_copy(
+        update={"central_license_public_key_b64": public_key_b64(trusted_key)}
+    )
+    session.add(
+        License(
+            license_key_hash=license_key_hash,
+            customer_ref="customer-1",
+            status="active",
+            max_devices=99,
+            metadata_json={"signed_entitlement": entitlement_token},
+        )
+    )
+    await session.flush()
+
+    assert await get_effective_node_limit(session, settings) == settings.free_license_node_limit
+
+
+def signed_entitlement_token(
+    private_key: Ed25519PrivateKey,
+    *,
+    license_key_hash: str,
+    max_devices: int,
+    customer_ref: str | None = None,
+    starts_at: datetime | None = None,
+    expires_at: datetime | None = None,
+) -> str:
+    payload = json.dumps(
+        {
+            "customer_ref": customer_ref,
+            "expires_at": expires_at.isoformat() if expires_at else None,
+            "issued_at": datetime.now(UTC).isoformat(),
+            "key_id": "test-central-v1",
+            "license_key_hash": license_key_hash,
+            "max_devices": max_devices,
+            "schema_version": 1,
+            "starts_at": starts_at.isoformat() if starts_at else None,
+            "status": "active",
+        },
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("utf-8")
+    signature = private_key.sign(payload)
+    return f"{b64url(payload)}.{b64url(signature)}"
+
+
+def public_key_b64(private_key: Ed25519PrivateKey) -> str:
+    public_key = private_key.public_key().public_bytes(
+        encoding=serialization.Encoding.Raw,
+        format=serialization.PublicFormat.Raw,
+    )
+    return b64url(public_key)
+
+
+def b64url(value: bytes) -> str:
+    return base64.urlsafe_b64encode(value).rstrip(b"=").decode("ascii")

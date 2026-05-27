@@ -46,6 +46,7 @@ class Settings(BaseSettings):
     free_license_node_limit: int = 3
     central_license_sync_url: AnyUrl | None = None
     central_license_sync_secret: SecretStr | None = None
+    central_license_public_key_b64: str | None = None
 
     log_level: str = "INFO"
 

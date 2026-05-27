@@ -91,7 +91,6 @@ async def test_create_license_hashes_key_and_list_get_roundtrip(
     assert license_record.status == "pending_sync"
     assert license_record.max_devices == 0
     assert license_record.metadata_json == {
-        "authority": "central_license_server",
         "sync_status": "pending",
         "tier": "team",
     }

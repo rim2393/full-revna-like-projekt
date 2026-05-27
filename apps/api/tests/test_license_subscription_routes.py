@@ -108,7 +108,6 @@ async def test_license_routes_create_list_and_get(route_app: RouteTestApp) -> No
     assert created["status"] == "pending_sync"
     assert created["max_devices"] == 0
     assert created["metadata_json"] == {
-        "authority": "central_license_server",
         "sync_status": "pending",
         "tier": "enterprise",
     }

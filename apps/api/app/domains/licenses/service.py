@@ -1,8 +1,14 @@
+import base64
+import json
 from datetime import UTC, datetime
 from hashlib import sha256
+from typing import Literal
 from uuid import UUID
 
+from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from fastapi import status
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -11,6 +17,22 @@ from app.core.errors import APIError
 from app.domains.licenses.models import License
 from app.domains.licenses.schemas import LicenseCreateRequest
 from app.domains.nodes.models import Node
+
+SIGNED_ENTITLEMENT_METADATA_KEY = "signed_entitlement"
+
+
+class SignedLicenseEntitlementClaims(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: Literal[1] = 1
+    license_key_hash: str = Field(min_length=32, max_length=128)
+    customer_ref: str | None = Field(default=None, max_length=128)
+    status: str = Field(min_length=1, max_length=32)
+    max_devices: int = Field(ge=1, le=10000)
+    starts_at: datetime | None = None
+    expires_at: datetime | None = None
+    issued_at: datetime
+    key_id: str = Field(min_length=1, max_length=128)
 
 
 def utc_now() -> datetime:
@@ -23,21 +45,58 @@ def ensure_aware(value: datetime) -> datetime:
     return value
 
 
-def is_active_license(license_record: License, *, now: datetime | None = None) -> bool:
+def verify_signed_entitlement(
+    token: str,
+    *,
+    public_key_b64: str,
+) -> SignedLicenseEntitlementClaims:
+    payload, signature = token.split(".", maxsplit=1)
+    payload_bytes = _b64url_decode(payload)
+    signature_bytes = _b64url_decode(signature)
+    public_key = Ed25519PublicKey.from_public_bytes(_b64url_decode(public_key_b64))
+    try:
+        public_key.verify(signature_bytes, payload_bytes)
+    except InvalidSignature as exc:
+        raise ValueError("invalid license entitlement signature") from exc
+    return SignedLicenseEntitlementClaims.model_validate_json(payload_bytes)
+
+
+def verified_license_entitlement(
+    license_record: License,
+    *,
+    settings: Settings,
+    now: datetime | None = None,
+) -> SignedLicenseEntitlementClaims | None:
+    public_key = settings.central_license_public_key_b64
+    token = license_record.metadata_json.get(SIGNED_ENTITLEMENT_METADATA_KEY)
+    if not public_key or not isinstance(token, str) or token == "":
+        return None
+    try:
+        entitlement = verify_signed_entitlement(token, public_key_b64=public_key)
+    except (InvalidSignature, TypeError, ValueError, ValidationError, json.JSONDecodeError):
+        return None
+    if entitlement.license_key_hash != license_record.license_key_hash:
+        return None
+    if entitlement.customer_ref is not None and license_record.customer_ref is not None:
+        if entitlement.customer_ref != license_record.customer_ref:
+            return None
     checked_at = now or utc_now()
-    starts_at = (
-        ensure_aware(license_record.starts_at) if license_record.starts_at is not None else None
-    )
+    starts_at = ensure_aware(entitlement.starts_at) if entitlement.starts_at is not None else None
     expires_at = (
-        ensure_aware(license_record.expires_at) if license_record.expires_at is not None else None
+        ensure_aware(entitlement.expires_at) if entitlement.expires_at is not None else None
     )
-    if license_record.status != "active":
-        return False
-    if license_record.metadata_json.get("authority") != "central_license_server":
-        return False
+    if entitlement.status != "active":
+        return None
     if starts_at is not None and starts_at > checked_at:
-        return False
-    return not (expires_at is not None and expires_at <= checked_at)
+        return None
+    if expires_at is not None and expires_at <= checked_at:
+        return None
+    return entitlement
+
+
+def _b64url_decode(value: str) -> bytes:
+    padding = "=" * (-len(value) % 4)
+    return base64.urlsafe_b64decode(f"{value}{padding}")
 
 
 def hash_license_key(license_key: str) -> str:
@@ -85,7 +144,6 @@ async def create_license(
         expires_at=request.expires_at,
         metadata_json={
             **request.metadata_json,
-            "authority": "central_license_server",
             "sync_status": "pending",
         },
     )
@@ -97,9 +155,9 @@ async def create_license(
 async def get_effective_node_limit(session: AsyncSession, settings: Settings) -> int:
     result = await session.execute(select(License))
     active_limits = [
-        license_record.max_devices
+        entitlement.max_devices
         for license_record in result.scalars()
-        if is_active_license(license_record)
+        if (entitlement := verified_license_entitlement(license_record, settings=settings))
     ]
     return max([settings.free_license_node_limit, *active_limits])
 
