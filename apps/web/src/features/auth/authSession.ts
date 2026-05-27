@@ -1,11 +1,13 @@
 import { createContext, useContext } from 'react'
-import type { AuthSession } from '../../shared/api/types'
+import type { AuthSession, MfaChallenge } from '../../shared/api/types'
 
 export type AuthSessionStatus = 'anonymous' | 'authenticated'
 
 export type AuthSessionContextValue = {
   clearSession: () => void
+  mfaChallenge: MfaChallenge | null
   session: AuthSession | null
+  setMfaChallenge: (challenge: MfaChallenge | null) => void
   setSession: (session: AuthSession | null) => void
   status: AuthSessionStatus
 }

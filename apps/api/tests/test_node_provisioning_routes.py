@@ -1,5 +1,6 @@
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
+from uuid import UUID
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -179,3 +180,37 @@ async def test_manual_node_rejects_inline_secret_capability(
 
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "inline_secret_rejected"
+
+
+async def test_heartbeat_route_cannot_clear_paused_state(route_app: RouteTestApp) -> None:
+    create_response = await route_app.client.post(
+        "/api/v1/nodes/provisioning-jobs",
+        json={**provisioning_payload(), "idempotency_key": "route-provision-paused"},
+    )
+    job = create_response.json()
+    await route_app.client.post(
+        f"/api/v1/nodes/provisioning-jobs/{job['id']}/preflight",
+        json={"status": "passed", "checks": {"ssh": "ok"}},
+    )
+    token_response = await route_app.client.post(
+        f"/api/v1/nodes/provisioning-jobs/{job['id']}/install-token",
+    )
+    exchange_response = await route_app.client.post(
+        "/api/v1/nodes/install-token/exchange",
+        json={"install_token": token_response.json()["install_token"]},
+    )
+    exchanged = exchange_response.json()
+    async with route_app.sessionmaker() as session:
+        node = await session.get(Node, UUID(exchanged["node_id"]))
+        assert node is not None
+        node.status = "license_paused"
+        await session.commit()
+
+    heartbeat_response = await route_app.client.post(
+        exchanged["heartbeat_path"],
+        headers={"X-Lumen-Node-Token": exchanged["node_token"]},
+        json={"status": "active", "capabilities": {"service_manager": "systemd"}},
+    )
+
+    assert heartbeat_response.status_code == 200
+    assert heartbeat_response.json()["status"] == "license_paused"

@@ -173,7 +173,7 @@ async def test_active_license_can_raise_effective_node_limit(
             max_devices=5,
             starts_at=datetime.now(UTC) - timedelta(days=1),
             expires_at=datetime.now(UTC) + timedelta(days=1),
-            metadata_json={},
+            metadata_json={"authority": "central_license_server"},
         )
     )
     for index in range(3):
@@ -190,3 +190,23 @@ async def test_active_license_can_raise_effective_node_limit(
 
     assert await get_effective_node_limit(session, settings) == 5
     await enforce_free_node_policy(session, settings)
+
+
+async def test_locally_created_active_license_cannot_raise_effective_node_limit(
+    db_session: tuple[AsyncSession, Settings],
+) -> None:
+    session, settings = db_session
+    session.add(
+        License(
+            license_key_hash="self-authorized-license-key",
+            customer_ref="customer-1",
+            status="active",
+            max_devices=99,
+            starts_at=datetime.now(UTC) - timedelta(days=1),
+            expires_at=datetime.now(UTC) + timedelta(days=1),
+            metadata_json={"authority": "local_panel"},
+        )
+    )
+    await session.flush()
+
+    assert await get_effective_node_limit(session, settings) == settings.free_license_node_limit

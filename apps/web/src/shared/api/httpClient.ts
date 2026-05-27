@@ -3,6 +3,8 @@ import type {
   AuthSession,
   HostCreateRequest,
   LoginRequest,
+  LoginApiResponse,
+  MfaChallengeVerifyRequest,
   LumenApiClient,
   PortCheckRequest,
   ProtocolProfileCreateRequest,
@@ -102,10 +104,18 @@ export function createHttpLumenApiClient({
     listSubscriptions: () => request('/api/v1/subscriptions'),
     listUsers: () => request('/api/admin/users'),
     login: async (payload: LoginRequest) => {
-      const tokenPair = await request<TokenPairResponse>('/api/v1/auth/login', {
+      const loginResponse = await request<LoginApiResponse>('/api/v1/auth/login', {
         body: payload,
         method: 'POST',
       })
+      if ('mfa_required' in loginResponse && loginResponse.mfa_required) {
+        return {
+          challengeToken: loginResponse.challenge_token,
+          expiresAt: loginResponse.expires_at,
+          methods: loginResponse.methods,
+        }
+      }
+      const tokenPair = loginResponse
       return {
         accessToken: tokenPair.access_token,
         email: payload.email,
@@ -121,6 +131,26 @@ export function createHttpLumenApiClient({
     readLicense: () => request('/api/admin/license'),
     revokeApiKey: (apiKeyId: string) =>
       request(`/api/v1/api-keys/${apiKeyId}`, { method: 'DELETE' }),
+    verifyMfaChallenge: async (payload: MfaChallengeVerifyRequest) => {
+      const tokenPair = await request<TokenPairResponse>('/api/v1/auth/mfa/challenge/verify', {
+        body: {
+          challenge_token: payload.challengeToken,
+          code: payload.code,
+          method_id: payload.methodId,
+        },
+        method: 'POST',
+      })
+      return {
+        accessToken: tokenPair.access_token,
+        email: 'verified-operator@lumen.local',
+        expiresAt: tokenPair.expires_at,
+        name: 'Verified operator',
+        refreshToken: tokenPair.refresh_token,
+        role: 'admin',
+        scopes: [],
+        userId: 'verified-operator',
+      }
+    },
     updateSetting: (key: string, payload: SettingUpdateRequest) =>
       request(`/api/v1/settings/${encodeURIComponent(key)}`, { body: payload, method: 'PUT' }),
   }

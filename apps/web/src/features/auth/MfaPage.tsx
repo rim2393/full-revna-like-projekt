@@ -2,15 +2,39 @@ import { ArrowRight, ShieldCheck } from 'lucide-react'
 import type { FormEvent } from 'react'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { useApiClient } from '../../shared/api/apiClientContext'
+import { useAuthSession } from './authSession'
 
 export function MfaPage() {
+  const apiClient = useApiClient()
   const navigate = useNavigate()
+  const { mfaChallenge, setMfaChallenge, setSession } = useAuthSession()
   const [status, setStatus] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    setStatus('Challenge accepted. Portal session can begin.')
-    navigate('/guard/portal')
+    if (!mfaChallenge) {
+      setStatus('Start with username and password before entering an MFA code.')
+      return
+    }
+    setIsSubmitting(true)
+    const form = new FormData(event.currentTarget)
+    try {
+      const session = await apiClient.verifyMfaChallenge({
+        challengeToken: mfaChallenge.challengeToken,
+        code: String(form.get('code') ?? ''),
+        methodId: mfaChallenge.methods[0]?.id ?? '',
+      })
+      setSession(session)
+      setMfaChallenge(null)
+      setStatus('Challenge accepted. Portal session can begin.')
+      navigate('/guard/portal')
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'MFA verification failed.')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -34,8 +58,8 @@ export function MfaPage() {
           required
         />
       </label>
-      <button type="submit" className="button button--primary">
-        Open portal
+      <button type="submit" className="button button--primary" disabled={isSubmitting}>
+        {isSubmitting ? 'Verifying...' : 'Open portal'}
         <ArrowRight size={18} aria-hidden="true" />
       </button>
       <p className="auth-card__note" aria-live="polite">

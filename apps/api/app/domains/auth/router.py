@@ -8,6 +8,8 @@ from app.core.rbac import Principal, get_current_principal
 from app.db.session import get_db_session
 from app.domains.auth.schemas import (
     LoginRequest,
+    LoginResponse,
+    MfaChallengeVerifyRequest,
     MfaMethodListResponse,
     PrincipalResponse,
     RefreshRequest,
@@ -23,6 +25,7 @@ from app.domains.auth.service import (
     refresh_session,
     revoke_session,
     setup_totp_method,
+    verify_mfa_challenge,
     verify_totp_method,
 )
 
@@ -32,13 +35,30 @@ DbSession = Annotated[AsyncSession, Depends(get_db_session)]
 AppSettings = Annotated[Settings, Depends(get_settings)]
 
 
-@router.post("/login", response_model=TokenPairResponse)
+@router.post("/login", response_model=LoginResponse)
 async def login(
     request: LoginRequest,
     session: DbSession,
     settings: AppSettings,
-) -> TokenPairResponse:
+) -> LoginResponse:
     token_pair = await login_user(session, request=request, settings=settings)
+    await session.commit()
+    return token_pair
+
+
+@router.post("/mfa/challenge/verify", response_model=TokenPairResponse)
+async def verify_mfa_login_challenge(
+    request: MfaChallengeVerifyRequest,
+    session: DbSession,
+    settings: AppSettings,
+) -> TokenPairResponse:
+    token_pair = await verify_mfa_challenge(
+        session,
+        challenge_token=request.challenge_token,
+        method_id=request.method_id,
+        code=request.code,
+        settings=settings,
+    )
     await session.commit()
     return token_pair
 

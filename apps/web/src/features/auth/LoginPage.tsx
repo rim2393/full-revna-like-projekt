@@ -8,7 +8,7 @@ import { useAuthSession } from './authSession'
 export function LoginPage() {
   const navigate = useNavigate()
   const apiClient = useApiClient()
-  const { setSession } = useAuthSession()
+  const { setMfaChallenge, setSession } = useAuthSession()
   const [status, setStatus] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -18,13 +18,21 @@ export function LoginPage() {
     setStatus('')
     const form = new FormData(event.currentTarget)
     try {
-      const session = await apiClient.login({
+      const authResult = await apiClient.login({
         email: String(form.get('email') ?? ''),
         password: String(form.get('password') ?? ''),
       })
-      setSession(session)
-      setStatus('Credentials accepted. MFA challenge prepared.')
-      navigate('/guard/mfa')
+      if ('challengeToken' in authResult) {
+        setSession(null)
+        setMfaChallenge(authResult)
+        setStatus('Credentials accepted. MFA challenge prepared.')
+        navigate('/guard/mfa')
+        return
+      }
+      setSession(authResult)
+      setMfaChallenge(null)
+      setStatus('Credentials accepted. Portal session can begin.')
+      navigate('/guard/portal')
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'Sign in failed.')
     } finally {

@@ -230,9 +230,18 @@ export function createMockLumenApiClient(): LumenApiClient {
     }),
     listUsers: async () => asListResponse(userRecords),
     login: async () => ({
-      ...mockSession,
-      accessToken: 'mock-access-token',
-      refreshToken: 'mock-refresh-token',
+      challengeToken: 'mock-mfa-challenge',
+      expiresAt: '2026-05-27T00:05:00.000Z',
+      methods: [
+        {
+          confirmed_at: '2026-05-27T00:00:00.000Z',
+          id: 'mock-mfa-method',
+          kind: 'totp',
+          label: 'Authenticator',
+          last_used_at: null,
+          status: 'active',
+        },
+      ],
     }),
     readProvisioningJob: async (jobId) =>
       buildMockProvisioningJob(
@@ -261,6 +270,11 @@ export function createMockLumenApiClient(): LumenApiClient {
         record.status = 'revoked'
       }
     },
+    verifyMfaChallenge: async () => ({
+      ...mockSession,
+      accessToken: 'mock-access-token',
+      refreshToken: 'mock-refresh-token',
+    }),
     updateSetting: async (key: string, request: SettingUpdateRequest) =>
       updateSettingValue(key, request),
   }

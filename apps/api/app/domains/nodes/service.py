@@ -373,7 +373,16 @@ async def record_node_heartbeat(
         )
 
     now = utc_now()
-    node.status = request.status.value
+    previous_status = NodeStatus(node.status)
+    enforced_statuses = {
+        NodeStatus.PAUSED,
+        NodeStatus.LICENSE_PAUSED,
+        NodeStatus.QUARANTINED,
+    }
+    if previous_status in enforced_statuses and request.status != previous_status:
+        node.status = previous_status.value
+    else:
+        node.status = request.status.value
     node.capabilities = request.capabilities
     node.last_seen_at = now
 
@@ -388,7 +397,7 @@ async def record_node_heartbeat(
         .scalars()
         .first()
     )
-    if latest_job is not None and request.status == NodeStatus.ACTIVE:
+    if latest_job is not None and NodeStatus(node.status) == NodeStatus.ACTIVE:
         latest_job.status = ProvisioningJobStatus.ACTIVE.value
 
     await session.flush()

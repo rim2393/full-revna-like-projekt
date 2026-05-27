@@ -22,11 +22,18 @@ from app.core.security import (
     verify_password,
 )
 from app.domains.auth.models import UserMfaMethod, UserSession
-from app.domains.auth.schemas import LoginRequest, MfaMethodResponse, TokenPairResponse
+from app.domains.auth.schemas import (
+    LoginRequest,
+    LoginResponse,
+    MfaChallengeResponse,
+    MfaMethodResponse,
+    TokenPairResponse,
+)
 from app.domains.users.models import User
 
 ACCESS_TOKEN_PREFIX = "lumen_at"  # noqa: S105 - public token prefix, not secret material.
 REFRESH_TOKEN_PREFIX = "lumen_rt"  # noqa: S105 - public token prefix, not secret material.
+MFA_CHALLENGE_TOKEN_PREFIX = "lumen_mfa"  # noqa: S105 - public token prefix, not secret material.
 TOTP_PERIOD_SECONDS = 30
 TOTP_DIGITS = 6
 
@@ -52,7 +59,7 @@ async def login_user(
     *,
     request: LoginRequest,
     settings: Settings,
-) -> TokenPairResponse:
+) -> LoginResponse:
     require_secret(settings.session_hash_pepper, name="session_hash_pepper")
     result = await session.execute(select(User).where(User.email == request.email.lower()))
     user = result.scalar_one_or_none()
@@ -66,6 +73,23 @@ async def login_user(
             code="invalid_credentials",
             message="Email or password is incorrect.",
             status_code=status.HTTP_401_UNAUTHORIZED,
+        )
+
+    active_methods = await list_mfa_methods(session, user_id=user.id, status_filter="active")
+    if active_methods:
+        challenge_token, challenge_expires_at = await create_session_token(
+            session,
+            user_id=user.id,
+            prefix=MFA_CHALLENGE_TOKEN_PREFIX,
+            ttl_seconds=settings.mfa_challenge_ttl_seconds,
+            settings=settings,
+        )
+        user.last_login_at = utc_now()
+        await session.flush()
+        return MfaChallengeResponse(
+            challenge_token=challenge_token,
+            expires_at=challenge_expires_at,
+            methods=[mfa_method_response(method) for method in active_methods],
         )
 
     access_token, access_expires_at = await create_session_token(
@@ -105,7 +129,12 @@ async def refresh_session(
             status_code=status.HTTP_401_UNAUTHORIZED,
         )
 
-    refresh_record, user = await verify_session_token(session, token=token, settings=settings)
+    refresh_record, user = await verify_session_token(
+        session,
+        token=token,
+        settings=settings,
+        expected_prefix=REFRESH_TOKEN_PREFIX,
+    )
     await revoke_session(session, session_id=refresh_record.id)
     access_token, access_expires_at = await create_session_token(
         session,
@@ -154,7 +183,14 @@ async def verify_session_token(
     *,
     token: str,
     settings: Settings,
+    expected_prefix: str = ACCESS_TOKEN_PREFIX,
 ) -> tuple[UserSession, User]:
+    if not token.startswith(f"{expected_prefix}_"):
+        raise APIError(
+            code="invalid_session",
+            message="Session is invalid or has been revoked.",
+            status_code=status.HTTP_401_UNAUTHORIZED,
+        )
     token_hash = hash_session_token(token, settings)
     result = await session.execute(select(UserSession).where(UserSession.token_hash == token_hash))
     user_session = result.scalar_one_or_none()
@@ -181,6 +217,49 @@ async def verify_session_token(
         )
     Role(user.role)
     return user_session, user
+
+
+async def verify_mfa_challenge(
+    session: AsyncSession,
+    *,
+    challenge_token: SecretStr,
+    method_id: UUID,
+    code: SecretStr,
+    settings: Settings,
+) -> TokenPairResponse:
+    challenge_record, user = await verify_session_token(
+        session,
+        token=challenge_token.get_secret_value(),
+        settings=settings,
+        expected_prefix=MFA_CHALLENGE_TOKEN_PREFIX,
+    )
+    await verify_totp_method(
+        session,
+        user_id=user.id,
+        method_id=method_id,
+        code=code,
+        settings=settings,
+    )
+    await revoke_session(session, session_id=challenge_record.id)
+    access_token, access_expires_at = await create_session_token(
+        session,
+        user_id=user.id,
+        prefix=ACCESS_TOKEN_PREFIX,
+        ttl_seconds=settings.access_token_ttl_seconds,
+        settings=settings,
+    )
+    refresh_token, _ = await create_session_token(
+        session,
+        user_id=user.id,
+        prefix=REFRESH_TOKEN_PREFIX,
+        ttl_seconds=settings.refresh_token_ttl_seconds,
+        settings=settings,
+    )
+    return TokenPairResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        expires_at=access_expires_at,
+    )
 
 
 async def revoke_session(session: AsyncSession, *, session_id: UUID) -> UserSession:
@@ -308,12 +387,16 @@ async def verify_totp_method(
     return method
 
 
-async def list_mfa_methods(session: AsyncSession, *, user_id: UUID) -> list[UserMfaMethod]:
-    result = await session.execute(
-        select(UserMfaMethod)
-        .where(UserMfaMethod.user_id == user_id)
-        .order_by(UserMfaMethod.created_at.desc())
-    )
+async def list_mfa_methods(
+    session: AsyncSession,
+    *,
+    user_id: UUID,
+    status_filter: str | None = None,
+) -> list[UserMfaMethod]:
+    statement = select(UserMfaMethod).where(UserMfaMethod.user_id == user_id)
+    if status_filter is not None:
+        statement = statement.where(UserMfaMethod.status == status_filter)
+    result = await session.execute(statement.order_by(UserMfaMethod.created_at.desc()))
     return list(result.scalars().all())
 
 

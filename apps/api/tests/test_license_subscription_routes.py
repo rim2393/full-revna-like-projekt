@@ -105,8 +105,13 @@ async def test_license_routes_create_list_and_get(route_app: RouteTestApp) -> No
     assert create_response.status_code == 201
     created = create_response.json()
     assert created["customer_ref"] == "route-customer"
-    assert created["max_devices"] == 8
-    assert created["metadata_json"] == {"tier": "enterprise"}
+    assert created["status"] == "pending_sync"
+    assert created["max_devices"] == 0
+    assert created["metadata_json"] == {
+        "authority": "central_license_server",
+        "sync_status": "pending",
+        "tier": "enterprise",
+    }
     assert "license_key" not in created
     assert "license_key_hash" not in created
 

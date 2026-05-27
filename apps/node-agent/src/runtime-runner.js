@@ -85,6 +85,9 @@ function nodeStatusFromProvisioningState(state) {
   if (state.mode === NODE_PROVISIONING_MODES.PAUSED) {
     return "paused";
   }
+  if (state.mode === NODE_PROVISIONING_MODES.LICENSE_PAUSED) {
+    return "license_paused";
+  }
   if (state.mode === NODE_PROVISIONING_MODES.QUARANTINED) {
     return "quarantined";
   }
@@ -219,7 +222,8 @@ export function applyNodeCommand(command, currentState, input = {}) {
     switch (envelope.command) {
       case COMMAND_TYPES.NODE_PAUSE:
         nextState = transitionProvisioningState(state, PROVISIONING_EVENTS.PAUSE_REQUESTED, {
-          at: finishedAt
+          at: finishedAt,
+          mode: envelope.payload.status
         });
         outputs = { mode: nextState.mode, reason: envelope.payload.reason ?? null };
         break;

@@ -33,6 +33,8 @@ def is_active_license(license_record: License, *, now: datetime | None = None) -
     )
     if license_record.status != "active":
         return False
+    if license_record.metadata_json.get("authority") != "central_license_server":
+        return False
     if starts_at is not None and starts_at > checked_at:
         return False
     return not (expires_at is not None and expires_at <= checked_at)
@@ -77,11 +79,15 @@ async def create_license(
     license_record = License(
         license_key_hash=license_key_hash,
         customer_ref=request.customer_ref,
-        status="active",
-        max_devices=request.max_devices,
+        status="pending_sync",
+        max_devices=0,
         starts_at=request.starts_at,
         expires_at=request.expires_at,
-        metadata_json=request.metadata_json,
+        metadata_json={
+            **request.metadata_json,
+            "authority": "central_license_server",
+            "sync_status": "pending",
+        },
     )
     session.add(license_record)
     await session.flush()

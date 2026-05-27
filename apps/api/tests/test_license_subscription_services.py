@@ -88,8 +88,13 @@ async def test_create_license_hashes_key_and_list_get_roundtrip(
 
     assert license_record.license_key_hash == hash_license_key("plain-license-key")
     assert license_record.license_key_hash != "plain-license-key"
-    assert license_record.status == "active"
-    assert license_record.metadata_json == {"tier": "team"}
+    assert license_record.status == "pending_sync"
+    assert license_record.max_devices == 0
+    assert license_record.metadata_json == {
+        "authority": "central_license_server",
+        "sync_status": "pending",
+        "tier": "team",
+    }
 
     persisted = (await db_session.execute(select(License))).scalar_one()
     assert persisted.license_key_hash == license_record.license_key_hash

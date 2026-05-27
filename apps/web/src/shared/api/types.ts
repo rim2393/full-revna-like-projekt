@@ -18,17 +18,48 @@ export type AuthSession = {
   userId: string
 }
 
+export type MfaMethod = {
+  confirmed_at: string | null
+  id: string
+  kind: string
+  label: string
+  last_used_at: string | null
+  status: string
+}
+
+export type MfaChallenge = {
+  challengeToken: string
+  expiresAt: string
+  methods: MfaMethod[]
+}
+
 export type LoginRequest = {
   email: string
   password: string
 }
 
+export type MfaChallengeVerifyRequest = {
+  challengeToken: string
+  code: string
+  methodId: string
+}
+
 export type TokenPairResponse = {
+  mfa_required?: false
   access_token: string
   expires_at: string
   refresh_token: string
   token_type: 'Bearer'
 }
+
+export type MfaChallengeResponse = {
+  challenge_token: string
+  expires_at: string
+  methods: MfaMethod[]
+  mfa_required: true
+}
+
+export type LoginApiResponse = TokenPairResponse | MfaChallengeResponse
 
 export type ApiKeyStatus = 'active' | 'expiring' | 'revoked'
 
@@ -363,9 +394,10 @@ export type LumenApiClient = {
   listSquads: () => Promise<SquadListResponse>
   listSubscriptions: () => Promise<SubscriptionListResponse>
   listUsers: () => Promise<ResourceListResponse<AdminUserRecord>>
-  login: (request: LoginRequest) => Promise<AuthSession>
+  login: (request: LoginRequest) => Promise<AuthSession | MfaChallenge>
   readProvisioningJob: (jobId: string) => Promise<ProvisioningJobResponse>
   readLicense: () => Promise<LicenseSummary | null>
   revokeApiKey: (apiKeyId: string) => Promise<void>
+  verifyMfaChallenge: (request: MfaChallengeVerifyRequest) => Promise<AuthSession>
   updateSetting: (key: string, request: SettingUpdateRequest) => Promise<SettingRecord>
 }

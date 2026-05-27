@@ -197,3 +197,36 @@ async def test_install_token_exchange_is_one_time_and_heartbeat_updates_node(
             settings=settings,
         )
     assert heartbeat_error.value.code == "invalid_node_token"
+
+
+async def test_heartbeat_cannot_clear_license_pause(
+    db_session: tuple[AsyncSession, Settings],
+) -> None:
+    session, settings = db_session
+    job = await create_provisioning_job(session, request=build_job_request(), settings=settings)
+    await update_preflight_state(
+        session,
+        job_id=job.id,
+        request=PreflightUpdateRequest(status=PreflightStatus.PASSED, checks={"ssh": "ok"}),
+    )
+    issued = await issue_install_token(session, job_id=job.id, settings=settings)
+    exchanged = await exchange_install_token(
+        session,
+        request=InstallTokenExchangeRequest(install_token=SecretStr(issued.plaintext)),
+        settings=settings,
+    )
+    exchanged.node.status = NodeStatus.LICENSE_PAUSED.value
+
+    node = await record_node_heartbeat(
+        session,
+        node_id=exchanged.node.id,
+        node_token=SecretStr(exchanged.node_token),
+        request=NodeHeartbeatRequest(
+            status=NodeStatus.ACTIVE,
+            capabilities={"service_manager": "systemd"},
+        ),
+        settings=settings,
+    )
+
+    assert node.status == NodeStatus.LICENSE_PAUSED.value
+    assert node.last_seen_at is not None

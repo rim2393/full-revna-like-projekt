@@ -169,6 +169,97 @@ test("apply command pauses node and skips mutating command while paused", () => 
   assert.match(skippedResult.errorMessage, /paused/);
 });
 
+test("apply command persists license pause mode and reports it in heartbeat", async () => {
+  const active = createProvisioningState({
+    nodeId: "node-1",
+    updatedAt: "2026-05-27T00:00:00.000Z"
+  });
+  const pausedResult = applyNodeCommand(
+    {
+      id: "cmd-pause-license-1",
+      node_id: "node-1",
+      command_type: COMMAND_TYPES.NODE_PAUSE,
+      created_at: "2026-05-27T00:01:00.000Z",
+      payload_json: {
+        license_enforced: true,
+        reason: "license expired",
+        status: "license_paused"
+      }
+    },
+    active,
+    {
+      startedAt: "2026-05-27T00:01:01.000Z",
+      finishedAt: "2026-05-27T00:01:02.000Z"
+    }
+  );
+
+  assert.equal(pausedResult.status, "succeeded");
+  assert.equal(pausedResult.state.mode, NODE_PROVISIONING_MODES.LICENSE_PAUSED);
+
+  const skippedResult = applyNodeCommand(
+    {
+      id: "cmd-outbound-license-1",
+      node_id: "node-1",
+      command_type: COMMAND_TYPES.OUTBOUND_APPLY,
+      created_at: "2026-05-27T00:02:00.000Z",
+      payload_json: { outboundId: "outbound-1", credentialsRef: "vault://nodes/node-1/outbound-1" }
+    },
+    pausedResult.state,
+    {
+      startedAt: "2026-05-27T00:02:01.000Z",
+      finishedAt: "2026-05-27T00:02:02.000Z"
+    }
+  );
+
+  assert.equal(skippedResult.status, "skipped");
+  assert.match(skippedResult.errorMessage, /license-paused/);
+
+  const stateDir = mkdtempSync(join(tmpdir(), "lumen-agent-state-"));
+  try {
+    writeFileSync(join(stateDir, "node-token"), "persisted-node-token\n", { mode: 0o600 });
+    writeFileSync(join(stateDir, "heartbeat-path"), "/api/v1/nodes/node-1/heartbeat\n", { mode: 0o600 });
+    writeFileSync(
+      join(stateDir, "provisioning-state.json"),
+      `${JSON.stringify(pausedResult.state, null, 2)}\n`,
+      { mode: 0o600 }
+    );
+    const calls = [];
+
+    await runNodeAgentOnce({
+      env: {
+        LUMEN_CONTROL_PLANE_URL: "https://panel.example",
+        LUMEN_NODE_NAME: "node-1",
+        LUMEN_STATE_DIR: stateDir
+      },
+      fetchImpl: async (url, options) => {
+        calls.push({ url, options });
+        if (url.endsWith("/heartbeat")) {
+          return jsonResponse({
+            id: "node-1",
+            name: "node-1",
+            status: "license_paused",
+            last_seen_at: "2026-05-27T00:00:00Z",
+            capabilities: {}
+          });
+        }
+        if (url.endsWith("/commands/next")) {
+          return new Response(null, { status: 204 });
+        }
+        return jsonResponse({
+          id: "metric-1",
+          node_id: "node-1",
+          metric_kind: "runtime",
+          values_json: JSON.parse(options.body).values_json
+        });
+      }
+    });
+
+    assert.equal(JSON.parse(calls[0].options.body).status, "license_paused");
+  } finally {
+    rmSync(stateDir, { recursive: true, force: true });
+  }
+});
+
 test("run once polls command, completes it, persists state, and records metric", async () => {
   const stateDir = mkdtempSync(join(tmpdir(), "lumen-agent-state-"));
   try {

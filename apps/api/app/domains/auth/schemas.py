@@ -13,10 +13,21 @@ class LoginRequest(BaseModel):
 
 
 class TokenPairResponse(BaseModel):
+    mfa_required: Literal[False] = False
     access_token: str
     refresh_token: str
     token_type: Literal["Bearer"] = "Bearer"  # noqa: S105 - OAuth token type, not a secret.
     expires_at: datetime
+
+
+class MfaChallengeResponse(BaseModel):
+    mfa_required: Literal[True] = True
+    challenge_token: str
+    expires_at: datetime
+    methods: list["MfaMethodResponse"]
+
+
+type LoginResponse = TokenPairResponse | MfaChallengeResponse
 
 
 class PrincipalResponse(BaseModel):
@@ -42,6 +53,12 @@ class TotpSetupResponse(BaseModel):
 
 
 class TotpVerifyRequest(BaseModel):
+    method_id: UUID
+    code: SecretStr
+
+
+class MfaChallengeVerifyRequest(BaseModel):
+    challenge_token: SecretStr
     method_id: UUID
     code: SecretStr
 

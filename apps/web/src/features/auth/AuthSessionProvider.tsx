@@ -1,6 +1,6 @@
 import { type PropsWithChildren, useMemo, useState } from 'react'
 import { mockSession } from '../../shared/data/lumenData'
-import type { AuthSession } from '../../shared/api/types'
+import type { AuthSession, MfaChallenge } from '../../shared/api/types'
 import {
   AuthSessionContext,
   type AuthSessionContextValue,
@@ -13,16 +13,22 @@ type AuthSessionProviderProps = PropsWithChildren<{
 
 export function AuthSessionProvider({ children, initialSession = mockSession }: AuthSessionProviderProps) {
   const [session, setSession] = useState<AuthSession | null>(initialSession)
+  const [mfaChallenge, setMfaChallenge] = useState<MfaChallenge | null>(null)
   const status: AuthSessionStatus = session ? 'authenticated' : 'anonymous'
 
   const value = useMemo<AuthSessionContextValue>(
     () => ({
-      clearSession: () => setSession(null),
+      clearSession: () => {
+        setMfaChallenge(null)
+        setSession(null)
+      },
+      mfaChallenge,
       session,
+      setMfaChallenge,
       setSession,
       status,
     }),
-    [session, status],
+    [mfaChallenge, session, status],
   )
 
   return <AuthSessionContext.Provider value={value}>{children}</AuthSessionContext.Provider>

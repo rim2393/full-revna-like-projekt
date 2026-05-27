@@ -10,6 +10,7 @@ import app.db.models  # noqa: F401
 from app.core.config import Settings, get_settings
 from app.db.base import Base
 from app.db.session import create_engine, get_db_session
+from app.domains.auth.service import generate_totp_code
 from app.main import create_app
 
 
@@ -95,6 +96,74 @@ def test_user_login_refresh_me_logout_flow(tmp_path) -> None:
         )
         assert after_logout.status_code == 401
         assert after_logout.json()["error"]["code"] == "invalid_session"
+
+
+def test_login_requires_mfa_challenge_when_totp_is_active(tmp_path) -> None:
+    with app_client(tmp_path) as client:
+        created = client.post(
+            "/api/v1/users",
+            headers={"X-Lumen-Api-Key": "lumen_sk_test_bootstrap"},
+            json={
+                "email": "mfa-owner@example.com",
+                "password": "correct horse battery staple",
+                "role": "owner",
+            },
+        )
+        assert created.status_code == 201
+
+        first_login = client.post(
+            "/api/v1/auth/login",
+            json={"email": "mfa-owner@example.com", "password": "correct horse battery staple"},
+        )
+        access_token = first_login.json()["access_token"]
+
+        setup = client.post(
+            "/api/v1/auth/mfa/totp/setup",
+            headers={"Authorization": f"Bearer {access_token}"},
+            json={"label": "Authenticator"},
+        )
+        assert setup.status_code == 201
+        setup_body = setup.json()
+        confirm = client.post(
+            "/api/v1/auth/mfa/totp/verify",
+            headers={"Authorization": f"Bearer {access_token}"},
+            json={
+                "method_id": setup_body["method_id"],
+                "code": generate_totp_code(setup_body["secret"]),
+            },
+        )
+        assert confirm.status_code == 200
+
+        challenged = client.post(
+            "/api/v1/auth/login",
+            json={"email": "mfa-owner@example.com", "password": "correct horse battery staple"},
+        )
+        assert challenged.status_code == 200
+        challenge_body = challenged.json()
+        assert challenge_body["mfa_required"] is True
+        assert "access_token" not in challenge_body
+
+        verified = client.post(
+            "/api/v1/auth/mfa/challenge/verify",
+            json={
+                "challenge_token": challenge_body["challenge_token"],
+                "method_id": setup_body["method_id"],
+                "code": generate_totp_code(setup_body["secret"]),
+            },
+        )
+        assert verified.status_code == 200
+        assert verified.json()["mfa_required"] is False
+        assert verified.json()["access_token"].startswith("lumen_at_")
+
+        reused = client.post(
+            "/api/v1/auth/mfa/challenge/verify",
+            json={
+                "challenge_token": challenge_body["challenge_token"],
+                "method_id": setup_body["method_id"],
+                "code": generate_totp_code(setup_body["secret"]),
+            },
+        )
+        assert reused.status_code == 401
 
 
 def test_api_key_routes_issue_scope_and_revoke_keys(tmp_path) -> None:

@@ -35,6 +35,7 @@ class Settings(BaseSettings):
     jwt_public_key: SecretStr | None = None
     access_token_ttl_seconds: int = 900
     refresh_token_ttl_seconds: int = 2_592_000
+    mfa_challenge_ttl_seconds: int = 300
 
     api_key_hash_pepper: SecretStr | None = None
     bootstrap_admin_api_key: SecretStr | None = None
@@ -43,6 +44,8 @@ class Settings(BaseSettings):
     node_install_token_ttl_seconds: int = 900
 
     free_license_node_limit: int = 3
+    central_license_sync_url: AnyUrl | None = None
+    central_license_sync_secret: SecretStr | None = None
 
     log_level: str = "INFO"
 
