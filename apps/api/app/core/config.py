@@ -39,6 +39,8 @@ class Settings(BaseSettings):
     api_key_hash_pepper: SecretStr | None = None
     session_hash_pepper: SecretStr | None = None
 
+    free_license_node_limit: int = 3
+
     log_level: str = "INFO"
 
     @property
@@ -49,4 +51,3 @@ class Settings(BaseSettings):
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
     return Settings()
-

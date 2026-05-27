@@ -14,3 +14,4 @@ Status values: `pending`, `in_progress`, `blocked`, `done`.
 | T008 | done | main | Integrate agent outputs | Local checks pass |
 | T009 | pending | main | Commit and push initial repositories | Remotes contain initial commits |
 | T010 | pending | main | Prepare encrypted server inventory | No plaintext secrets committed |
+| T011 | done | backend-security | Implement API key hash/verify and free node policy slice | API pytest/ruff pass |

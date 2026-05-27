@@ -2,7 +2,7 @@
 
 ## Current Phase
 
-Initial implementation kickoff.
+Phase 2 backend security hardening.
 
 ## Completed
 
@@ -27,6 +27,8 @@ Initial implementation kickoff.
 - License server scaffold completed with FastAPI API, React cabinet placeholder,
   signed offline license model, TOTP/recovery skeleton, Docker/Compose, docs,
   and passing backend/frontend tests.
+- Backend Phase 2 security slice completed with API key one-time generation,
+  HMAC-at-rest verification, scope checks, and a free 3-node license policy.
 
 ## In Progress
 
@@ -44,6 +46,8 @@ Initial implementation kickoff.
   Compose config pass.
 - Client compatibility repo: JSON fixtures parse and `git diff --check` passes.
 - Plaintext VPS passwords were not found in `D:\lumen-work`.
+- Backend API Phase 2 security slice: `.venv\Scripts\python.exe -m pytest`
+  and `.venv\Scripts\python.exe -m ruff check .` pass in `apps\api`.
 
 ## Blockers
 
@@ -56,3 +60,4 @@ Initial implementation kickoff.
 2. Run basic local validation.
 3. Commit and push initial scaffold.
 4. Prepare encrypted server inventory for the two available VPS hosts.
+5. Continue backend auth/session/RBAC/audit endpoint hardening.
