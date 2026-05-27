@@ -10,8 +10,13 @@ import { LicensePage } from '../pages/LicensePage'
 import { NodesPage } from '../pages/NodesPage'
 import { NotFoundPage } from '../pages/NotFoundPage'
 import { ProfilesPage } from '../pages/ProfilesPage'
+import { ResponseRulesPage } from '../pages/ResponseRulesPage'
+import { SettingsPage } from '../pages/SettingsPage'
 import { SquadsPage } from '../pages/SquadsPage'
+import { SubscriptionPublicPage } from '../pages/SubscriptionPublicPage'
 import { SubscriptionPage } from '../pages/SubscriptionPage'
+import { TemplatesPage } from '../pages/TemplatesPage'
+import { ToolsPage } from '../pages/ToolsPage'
 import { UsersPage } from '../pages/UsersPage'
 import { AppShell } from '../shared/components/AppShell'
 
@@ -38,8 +43,13 @@ export const appRoutes: RouteObject[] = [
       { path: 'profiles', element: <ProfilesPage /> },
       { path: 'squads', element: <SquadsPage /> },
       { path: 'subscription', element: <SubscriptionPage /> },
+      { path: 'templates', element: <TemplatesPage /> },
+      { path: 'response-rules', element: <ResponseRulesPage /> },
+      { path: 'subscription-page', element: <SubscriptionPublicPage /> },
+      { path: 'settings', element: <SettingsPage /> },
       { path: 'license', element: <LicensePage /> },
       { path: 'api-keys', element: <ApiKeysPage /> },
+      { path: 'tools', element: <ToolsPage /> },
       { path: '*', element: <NotFoundPage /> },
     ],
   },

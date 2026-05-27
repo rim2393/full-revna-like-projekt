@@ -2,15 +2,34 @@ import { ArrowRight, LockKeyhole } from 'lucide-react'
 import type { FormEvent } from 'react'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { useApiClient } from '../../shared/api/apiClientContext'
+import { useAuthSession } from './authSession'
 
 export function LoginPage() {
   const navigate = useNavigate()
+  const apiClient = useApiClient()
+  const { setSession } = useAuthSession()
   const [status, setStatus] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    setStatus('Credentials accepted. MFA challenge prepared.')
-    navigate('/guard/mfa')
+    setIsSubmitting(true)
+    setStatus('')
+    const form = new FormData(event.currentTarget)
+    try {
+      const session = await apiClient.login({
+        email: String(form.get('email') ?? ''),
+        password: String(form.get('password') ?? ''),
+      })
+      setSession(session)
+      setStatus('Credentials accepted. MFA challenge prepared.')
+      navigate('/guard/mfa')
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'Sign in failed.')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -21,7 +40,7 @@ export function LoginPage() {
       <div>
         <p className="eyebrow">Lumen Guard</p>
         <h2>Sign in</h2>
-        <p>Use an operator account. This scaffold does not store credentials.</p>
+        <p>Use an operator account. Credentials are sent to the auth API and are not stored.</p>
       </div>
       <label>
         Email
@@ -31,12 +50,12 @@ export function LoginPage() {
         Password
         <input name="password" type="password" autoComplete="current-password" required />
       </label>
-      <button type="submit" className="button button--primary">
-        Continue
+      <button type="submit" className="button button--primary" disabled={isSubmitting}>
+        {isSubmitting ? 'Checking...' : 'Continue'}
         <ArrowRight size={18} aria-hidden="true" />
       </button>
       <p className="auth-card__note" aria-live="polite">
-        {status || 'Demo flow: submit to continue to MFA.'}
+        {status || 'Submit to continue to MFA.'}
       </p>
       <Link to="/guard/portal" className="text-link">
         View guarded portal preview

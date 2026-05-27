@@ -1,4 +1,16 @@
-import type { AuthSession, LumenApiClient, ProvisioningJobCreateRequest } from './types'
+import type {
+  ApiKeyCreateRequest,
+  AuthSession,
+  HostCreateRequest,
+  LoginRequest,
+  LumenApiClient,
+  PortCheckRequest,
+  ProtocolProfileCreateRequest,
+  ProvisioningJobCreateRequest,
+  SettingUpdateRequest,
+  SquadCreateRequest,
+  TokenPairResponse,
+} from './types'
 
 type HttpClientOptions = {
   baseUrl: string
@@ -23,11 +35,16 @@ export function createHttpLumenApiClient({
 }: HttpClientOptions): LumenApiClient {
   async function request<TResponse>(
     path: string,
-    options: { body?: unknown; method?: 'GET' | 'POST' } = {},
+    options: { body?: unknown; method?: 'DELETE' | 'GET' | 'POST' | 'PUT' } = {},
   ): Promise<TResponse> {
+    const session = getSession()
     const headers: Record<string, string> = {
       Accept: 'application/json',
-      'X-Lumen-User': getSession()?.userId ?? 'anonymous',
+      'X-Lumen-User': session?.userId ?? 'anonymous',
+    }
+
+    if (session?.accessToken) {
+      headers.Authorization = `Bearer ${session.accessToken}`
     }
 
     if (options.body !== undefined) {
@@ -54,17 +71,57 @@ export function createHttpLumenApiClient({
       throw new LumenApiError(message, response.status)
     }
 
+    if (response.status === 204) {
+      return undefined as TResponse
+    }
+
     return (await response.json()) as TResponse
   }
 
   return {
+    checkPortConflicts: (payload: PortCheckRequest) =>
+      request('/api/v1/protocols/port-check', { body: payload, method: 'POST' }),
+    createApiKey: (payload: ApiKeyCreateRequest) =>
+      request('/api/v1/api-keys', { body: payload, method: 'POST' }),
+    createHost: (payload: HostCreateRequest) =>
+      request('/api/v1/hosts', { body: payload, method: 'POST' }),
+    createProfile: (payload: ProtocolProfileCreateRequest) =>
+      request('/api/v1/profiles', { body: payload, method: 'POST' }),
     createProvisioningJob: (payload: ProvisioningJobCreateRequest) =>
       request('/api/v1/nodes/provisioning-jobs', { body: payload, method: 'POST' }),
+    createSquad: (payload: SquadCreateRequest) =>
+      request('/api/v1/squads', { body: payload, method: 'POST' }),
     getSession: () => request('/api/auth/session'),
     listApiKeys: () => request('/api/admin/api-keys'),
+    listHosts: () => request('/api/v1/hosts'),
     listNodes: () => request('/api/v1/nodes'),
+    listProfiles: () => request('/api/v1/profiles'),
+    listProtocolAdapters: () => request('/api/v1/protocols/adapters'),
+    listSettings: () => request('/api/v1/settings'),
+    listSquads: () => request('/api/v1/squads'),
+    listSubscriptions: () => request('/api/v1/subscriptions'),
     listUsers: () => request('/api/admin/users'),
+    login: async (payload: LoginRequest) => {
+      const tokenPair = await request<TokenPairResponse>('/api/v1/auth/login', {
+        body: payload,
+        method: 'POST',
+      })
+      return {
+        accessToken: tokenPair.access_token,
+        email: payload.email,
+        expiresAt: tokenPair.expires_at,
+        name: payload.email,
+        refreshToken: tokenPair.refresh_token,
+        role: 'admin',
+        scopes: [],
+        userId: payload.email,
+      }
+    },
     readProvisioningJob: (jobId: string) => request(`/api/v1/nodes/provisioning-jobs/${jobId}`),
     readLicense: () => request('/api/admin/license'),
+    revokeApiKey: (apiKeyId: string) =>
+      request(`/api/v1/api-keys/${apiKeyId}`, { method: 'DELETE' }),
+    updateSetting: (key: string, payload: SettingUpdateRequest) =>
+      request(`/api/v1/settings/${encodeURIComponent(key)}`, { body: payload, method: 'PUT' }),
   }
 }

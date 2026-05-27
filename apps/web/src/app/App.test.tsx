@@ -1,5 +1,6 @@
 import { screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
+import { createMockLumenApiClient } from '../shared/api/mockClient'
 import type { LumenApiClient } from '../shared/api/types'
 import { renderWithRouter } from '../test/renderWithRouter'
 
@@ -29,6 +30,7 @@ describe('Lumen admin routing scaffold', () => {
 
   it('renders graceful empty and error resource states', async () => {
     const emptyApiClient: LumenApiClient = {
+      ...createMockLumenApiClient(),
       createProvisioningJob: async () => {
         throw new Error('Provisioning is unavailable')
       },

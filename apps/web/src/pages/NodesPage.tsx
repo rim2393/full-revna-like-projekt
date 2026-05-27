@@ -300,7 +300,7 @@ export function NodesPage() {
   const [form, setForm] = useState<ProvisioningFormState>(initialFormState)
   const [formError, setFormError] = useState<string | null>(null)
   const [latestJob, setLatestJob] = useState<ProvisioningJobResponse | null>(null)
-  const nodes = query.data?.items ?? []
+  const nodes = useMemo(() => query.data?.items ?? [], [query.data?.items])
   const nodeStateSummary = useMemo(
     () => ({
       heartbeatMissing: nodes.filter(hasMissingHeartbeat).length,

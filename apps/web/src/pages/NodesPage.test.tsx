@@ -1,6 +1,7 @@
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
+import { createMockLumenApiClient } from '../shared/api/mockClient'
 import type {
   LumenApiClient,
   NodeResponse,
@@ -11,6 +12,7 @@ import { renderWithRouter } from '../test/renderWithRouter'
 
 function createTestClient(overrides: Partial<LumenApiClient> = {}): LumenApiClient {
   return {
+    ...createMockLumenApiClient(),
     createProvisioningJob: async () => {
       throw new Error('Provisioning is unavailable')
     },

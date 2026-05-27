@@ -18,8 +18,14 @@ import type {
   AdminUserRecord,
   ApiKeyRecord,
   AuthSession,
+  HostRecord,
   LicenseSummary,
   NodeRecord,
+  ProtocolAdapterRecord,
+  ProtocolProfileRecord,
+  SettingRecord,
+  SquadRecord,
+  SubscriptionRecord,
 } from '../api/types'
 
 export type MetricTone = 'danger' | 'good' | 'info' | 'neutral' | 'watch'
@@ -278,6 +284,141 @@ export const nodeRecords: NodeRecord[] = [
     status: 'offline',
     transports: ['xhttp'],
     version: '2026.04.8',
+  },
+]
+
+export const protocolAdapters: ProtocolAdapterRecord[] = [
+  {
+    capabilities: ['tcp', 'tls', 'reality', 'xhttp'],
+    display_name: 'VLESS Reality',
+    protocol: 'vless',
+    required_credential_refs: ['client.uuid', 'reality.private_key'],
+    status: 'ready',
+  },
+  {
+    capabilities: ['tcp', 'tls', 'websocket'],
+    display_name: 'Trojan TLS',
+    protocol: 'trojan',
+    required_credential_refs: ['password'],
+    status: 'ready',
+  },
+  {
+    capabilities: ['native', '2022-blake3'],
+    display_name: 'Shadowsocks Native',
+    protocol: 'shadowsocks',
+    required_credential_refs: ['method', 'password'],
+    status: 'scaffold',
+  },
+]
+
+export const squadRecords: SquadRecord[] = [
+  {
+    id: 'squad_default',
+    kind: 'internal',
+    metadata_json: { channel: 'stable', hwid_limit: '5' },
+    name: 'Default-Squad',
+    status: 'active',
+  },
+  {
+    id: 'squad_external_trial',
+    kind: 'external',
+    metadata_json: { channel: 'trial', hwid_limit: '2' },
+    name: 'External trial',
+    status: 'active',
+  },
+]
+
+export const profileRecords: ProtocolProfileRecord[] = [
+  {
+    adapter: 'vless',
+    config_json: { flow: 'xtls-rprx-vision', transport: 'tcp', security: 'reality' },
+    credentials_ref: 'vault://lumen/profiles/stealconfig',
+    id: 'profile_stealconfig',
+    name: 'StealConfig',
+    node_id: 'node_mow_02',
+    port_reservations: [{ address: '0.0.0.0', exclusive: true, port: 443, protocol: 'tcp' }],
+    squad_id: 'squad_default',
+    status: 'active',
+  },
+  {
+    adapter: 'trojan',
+    config_json: { transport: 'xhttp', security: 'tls' },
+    credentials_ref: 'vault://lumen/profiles/trojanxhttp',
+    id: 'profile_trojan_xhttp',
+    name: 'Trojan XHTTP TLS',
+    node_id: 'node_fra_01',
+    port_reservations: [{ address: '0.0.0.0', exclusive: true, port: 8443, protocol: 'tcp' }],
+    squad_id: 'squad_external_trial',
+    status: 'active',
+  },
+]
+
+export const hostRecords: HostRecord[] = [
+  {
+    hostname: 'auto.lumen.local',
+    id: 'host_auto_wifi',
+    name: 'Auto WiFi',
+    node_id: 'node_mow_02',
+    protocol_profile_id: 'profile_stealconfig',
+    squad_id: 'squad_default',
+    status: 'active',
+    tags: ['auto-wifi', 'balancer'],
+  },
+  {
+    hostname: 'de.lumen.local',
+    id: 'host_germany_wifi',
+    name: 'Germany WiFi',
+    node_id: 'node_fra_01',
+    protocol_profile_id: 'profile_trojan_xhttp',
+    squad_id: 'squad_external_trial',
+    status: 'active',
+    tags: ['lte', 'reality'],
+  },
+]
+
+export const subscriptionRecords: SubscriptionRecord[] = [
+  {
+    config_hash: 'sha256:demo-subscription',
+    delivery_profile: {
+      client: 'happ',
+      hwid_limit: '5',
+      traffic_limit_gb: '300',
+    },
+    expires_at: '2026-09-30T00:00:00Z',
+    id: 'sub_default',
+    license_id: 'license_business',
+    node_id: 'node_mow_02',
+    public_id: 'sub_pub_default',
+    revoked_at: null,
+    status: 'active',
+    user_id: 'usr_mira',
+  },
+]
+
+export const settingRecords: SettingRecord[] = [
+  {
+    id: 'setting_subscription_info',
+    key: 'subscription.info',
+    updated_at: '2026-05-27T00:00:00Z',
+    updated_by: mockSession.userId,
+    value_json: {
+      auto_update_hours: '2',
+      support_url: 'https://t.me/lumentech_support_bot',
+      title: 'LUMEN',
+    },
+  },
+  {
+    id: 'setting_auth_providers',
+    key: 'auth.providers',
+    updated_at: '2026-05-27T00:00:00Z',
+    updated_by: mockSession.userId,
+    value_json: {
+      generic_oauth2: 'disabled',
+      github: 'disabled',
+      google: 'disabled',
+      passkey: 'planned',
+      telegram: 'disabled',
+    },
   },
 ]
 

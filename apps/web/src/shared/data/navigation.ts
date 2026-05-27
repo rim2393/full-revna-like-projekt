@@ -1,10 +1,14 @@
 import {
   BadgeCheck,
+  Cog,
+  Folder,
   Globe2,
+  ListChecks,
   KeyRound,
   LayoutDashboard,
   Layers3,
   Network,
+  Radar,
   RadioTower,
   Rss,
   ShieldCheck,
@@ -39,6 +43,10 @@ export const navigationGroups: NavigationGroup[] = [
       { label: 'Profiles', to: '/profiles', icon: Layers3 },
       { label: 'Squads', to: '/squads', icon: RadioTower },
       { label: 'Subscription', to: '/subscription', icon: Rss },
+      { label: 'Templates', to: '/templates', icon: Folder },
+      { label: 'Response rules', to: '/response-rules', icon: ListChecks },
+      { label: 'Subscription Page', to: '/subscription-page', icon: ShieldCheck },
+      { label: 'Settings', to: '/settings', icon: Cog },
     ],
   },
   {
@@ -48,5 +56,9 @@ export const navigationGroups: NavigationGroup[] = [
       { label: 'API keys', to: '/api-keys', icon: KeyRound },
       { label: 'Guard portal', to: '/guard/portal', icon: ShieldCheck },
     ],
+  },
+  {
+    label: 'Tools',
+    items: [{ label: 'Tools', to: '/tools', icon: Radar }],
   },
 ]

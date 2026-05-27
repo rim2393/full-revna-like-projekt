@@ -1,7 +1,7 @@
 {
   "version": 1,
   "createdAt": "2026-05-27T11:02:44.057Z",
-  "updatedAt": "2026-05-27T12:05:59.887Z",
+  "updatedAt": "2026-05-27T12:38:51.671Z",
   "briefPath": ".omx/ultragoal/brief.md",
   "goalsPath": ".omx/ultragoal/goals.json",
   "ledgerPath": ".omx/ultragoal/ledger.jsonl",
@@ -35,10 +35,13 @@
       "id": "G003-admin-ui-in-same-repo-remna-like-but",
       "title": "Admin UI in same repo: Remna-like but Lumen-branded full functional s...",
       "objective": "Admin UI in same repo: Remna-like but Lumen-branded full functional screens wired to backend: dashboard, users, internal/external squads, profiles, hosts, nodes, Remnawave settings, subscription settings/templates/rules/page, tools, API tokens, auth providers, warnings/errors.",
-      "status": "pending",
-      "attempt": 0,
+      "status": "complete",
+      "attempt": 1,
       "createdAt": "2026-05-27T11:02:44.057Z",
-      "updatedAt": "2026-05-27T11:02:44.057Z"
+      "updatedAt": "2026-05-27T12:38:51.671Z",
+      "startedAt": "2026-05-27T12:06:30.291Z",
+      "completedAt": "2026-05-27T12:38:51.671Z",
+      "evidence": "Admin UI G003 implemented: API-backed Remna-like Lumen screens for login, API keys, hosts, profiles, squads, subscriptions, settings, templates, response rules, subscription page, and tools. Verification: apps/web npm test (9 passed), npm run build, npm run lint, git diff --check, secret scan, Vite HTTP smoke GET /subscription-page -> 200."
     },
     {
       "id": "G004-public-installer-docs-repo-d-lumen-w",

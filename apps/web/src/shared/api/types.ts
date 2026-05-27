@@ -8,12 +8,26 @@ export type ResourceListResponse<TItem> = {
 }
 
 export type AuthSession = {
+  accessToken?: string
+  refreshToken?: string
   email: string
   expiresAt: string
   name: string
   role: 'owner' | 'admin' | 'operator' | 'auditor'
   scopes: string[]
   userId: string
+}
+
+export type LoginRequest = {
+  email: string
+  password: string
+}
+
+export type TokenPairResponse = {
+  access_token: string
+  expires_at: string
+  refresh_token: string
+  token_type: 'Bearer'
 }
 
 export type ApiKeyStatus = 'active' | 'expiring' | 'revoked'
@@ -132,6 +146,168 @@ export type ProvisioningJobCreateRequest = {
   }
 }
 
+export type ProtocolAdapterRecord = {
+  capabilities: string[]
+  display_name: string
+  protocol: string
+  required_credential_refs: string[]
+  status: string
+}
+
+export type ProtocolAdapterListResponse = {
+  items: ProtocolAdapterRecord[]
+}
+
+export type PortReservation = {
+  address?: string
+  exclusive?: boolean
+  port: number
+  protocol?: 'tcp' | 'udp'
+}
+
+export type PortConflict = {
+  address: string
+  message: string
+  port: number
+  profile_id: string
+  profile_name: string
+  protocol: string
+  suggested_port: number | null
+}
+
+export type PortCheckRequest = {
+  exclude_profile_id?: string | null
+  node_id: string
+  reservations: PortReservation[]
+}
+
+export type PortCheckResponse = {
+  allowed: boolean
+  conflicts: PortConflict[]
+}
+
+export type SquadKind = 'internal' | 'external'
+
+export type SquadRecord = {
+  id: string
+  kind: SquadKind | (string & {})
+  metadata_json: Record<string, string>
+  name: string
+  status: string
+}
+
+export type SquadCreateRequest = {
+  kind?: SquadKind
+  metadata_json?: Record<string, string>
+  name: string
+  status?: string
+}
+
+export type SquadListResponse = {
+  items: SquadRecord[]
+}
+
+export type ProtocolProfileRecord = {
+  adapter: string
+  config_json: Record<string, unknown>
+  credentials_ref: string | null
+  id: string
+  name: string
+  node_id: string
+  port_reservations: Array<Record<string, unknown>>
+  squad_id: string | null
+  status: string
+}
+
+export type ProtocolProfileCreateRequest = {
+  adapter: string
+  allow_port_conflicts?: boolean
+  config_json?: Record<string, unknown>
+  credentials_ref?: string | null
+  name: string
+  node_id: string
+  port_reservations?: PortReservation[]
+  squad_id?: string | null
+  status?: string
+}
+
+export type ProtocolProfileListResponse = {
+  items: ProtocolProfileRecord[]
+}
+
+export type HostRecord = {
+  hostname: string
+  id: string
+  name: string
+  node_id: string
+  protocol_profile_id: string | null
+  squad_id: string | null
+  status: string
+  tags: string[]
+}
+
+export type HostCreateRequest = {
+  hostname: string
+  name: string
+  node_id: string
+  protocol_profile_id?: string | null
+  squad_id?: string | null
+  status?: string
+  tags?: string[]
+}
+
+export type HostListResponse = {
+  items: HostRecord[]
+}
+
+export type SubscriptionRecord = {
+  config_hash: string | null
+  delivery_profile: Record<string, string>
+  expires_at: string | null
+  id: string
+  license_id: string
+  node_id: string | null
+  public_id: string
+  revoked_at: string | null
+  status: string
+  user_id: string
+}
+
+export type SubscriptionListResponse = {
+  items: SubscriptionRecord[]
+}
+
+export type SettingRecord = {
+  id?: string
+  key: string
+  updated_at: string
+  updated_by: string | null
+  value_json: Record<string, string>
+}
+
+export type SettingListResponse = {
+  items: SettingRecord[]
+}
+
+export type SettingUpdateRequest = {
+  value_json: Record<string, string>
+}
+
+export type ApiKeyCreateRequest = {
+  expires_at?: string | null
+  name: string
+  owner_user_id?: string | null
+  scopes: string[]
+}
+
+export type ApiKeyCreateResponse = {
+  api_key: string
+  expires_at: string | null
+  id: string
+  key_prefix: string
+  name: string
+}
+
 export type ProvisioningJobResponse = {
   created_at: string
   error_code: string | null
@@ -169,13 +345,27 @@ export type InstallTokenExchangeResponse = {
 }
 
 export type LumenApiClient = {
+  checkPortConflicts: (request: PortCheckRequest) => Promise<PortCheckResponse>
+  createApiKey: (request: ApiKeyCreateRequest) => Promise<ApiKeyCreateResponse>
+  createHost: (request: HostCreateRequest) => Promise<HostRecord>
+  createProfile: (request: ProtocolProfileCreateRequest) => Promise<ProtocolProfileRecord>
   createProvisioningJob: (
     request: ProvisioningJobCreateRequest,
   ) => Promise<ProvisioningJobResponse>
+  createSquad: (request: SquadCreateRequest) => Promise<SquadRecord>
   getSession: () => Promise<AuthSession | null>
   listApiKeys: () => Promise<ResourceListResponse<ApiKeyRecord>>
+  listHosts: () => Promise<HostListResponse>
   listNodes: () => Promise<NodeListResponse>
+  listProfiles: () => Promise<ProtocolProfileListResponse>
+  listProtocolAdapters: () => Promise<ProtocolAdapterListResponse>
+  listSettings: () => Promise<SettingListResponse>
+  listSquads: () => Promise<SquadListResponse>
+  listSubscriptions: () => Promise<SubscriptionListResponse>
   listUsers: () => Promise<ResourceListResponse<AdminUserRecord>>
+  login: (request: LoginRequest) => Promise<AuthSession>
   readProvisioningJob: (jobId: string) => Promise<ProvisioningJobResponse>
   readLicense: () => Promise<LicenseSummary | null>
+  revokeApiKey: (apiKeyId: string) => Promise<void>
+  updateSetting: (key: string, request: SettingUpdateRequest) => Promise<SettingRecord>
 }
