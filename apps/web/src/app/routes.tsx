@@ -1,0 +1,48 @@
+import { createBrowserRouter, Navigate, type RouteObject } from 'react-router-dom'
+import { AuthLayout } from '../features/auth/AuthLayout'
+import { GuardPortalPage } from '../features/auth/GuardPortalPage'
+import { LoginPage } from '../features/auth/LoginPage'
+import { MfaPage } from '../features/auth/MfaPage'
+import { ApiKeysPage } from '../pages/ApiKeysPage'
+import { DashboardPage } from '../pages/DashboardPage'
+import { HostsPage } from '../pages/HostsPage'
+import { LicensePage } from '../pages/LicensePage'
+import { NodesPage } from '../pages/NodesPage'
+import { NotFoundPage } from '../pages/NotFoundPage'
+import { ProfilesPage } from '../pages/ProfilesPage'
+import { SquadsPage } from '../pages/SquadsPage'
+import { SubscriptionPage } from '../pages/SubscriptionPage'
+import { UsersPage } from '../pages/UsersPage'
+import { AppShell } from '../shared/components/AppShell'
+
+export const appRoutes: RouteObject[] = [
+  {
+    path: '/guard',
+    element: <AuthLayout />,
+    children: [
+      { index: true, element: <Navigate to="/guard/login" replace /> },
+      { path: 'login', element: <LoginPage /> },
+      { path: 'mfa', element: <MfaPage /> },
+      { path: 'portal', element: <GuardPortalPage /> },
+    ],
+  },
+  {
+    path: '/',
+    element: <AppShell />,
+    children: [
+      { index: true, element: <Navigate to="/dashboard" replace /> },
+      { path: 'dashboard', element: <DashboardPage /> },
+      { path: 'users', element: <UsersPage /> },
+      { path: 'nodes', element: <NodesPage /> },
+      { path: 'hosts', element: <HostsPage /> },
+      { path: 'profiles', element: <ProfilesPage /> },
+      { path: 'squads', element: <SquadsPage /> },
+      { path: 'subscription', element: <SubscriptionPage /> },
+      { path: 'license', element: <LicensePage /> },
+      { path: 'api-keys', element: <ApiKeysPage /> },
+      { path: '*', element: <NotFoundPage /> },
+    ],
+  },
+]
+
+export const appRouter = createBrowserRouter(appRoutes)

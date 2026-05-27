@@ -1,0 +1,34 @@
+# Secrets and local runtime state
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.csr
+secrets/
+runtime/
+support-bundles/
+
+# Python
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+dist/
+build/
+*.egg-info/
+
+# Node
+node_modules/
+.vite/
+coverage/
+
+# IDE and OS
+.idea/
+.vscode/
+Thumbs.db
+.DS_Store
