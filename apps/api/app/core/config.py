@@ -38,6 +38,8 @@ class Settings(BaseSettings):
 
     api_key_hash_pepper: SecretStr | None = None
     session_hash_pepper: SecretStr | None = None
+    node_token_hash_pepper: SecretStr | None = None
+    node_install_token_ttl_seconds: int = 900
 
     free_license_node_limit: int = 3
 

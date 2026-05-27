@@ -48,6 +48,32 @@ Initial job kinds:
 
 Jobs must be idempotent by `idempotencyKey`. Results preserve `jobId`, `nodeId`, terminal status, outputs, conflicts, and error state. Outputs are checked for secret-like inline fields.
 
+## Backend Control Plane Surface
+
+Source: `apps/api/app/domains/nodes`
+
+The backend now owns the minimal durable provisioning surface:
+
+- `POST /api/v1/nodes/provisioning-jobs` creates an idempotent `node.provision`
+  job and an associated node in `provisioning` state.
+- `POST /api/v1/nodes/provisioning-jobs/{jobId}/preflight` records preflight
+  state: `pending`, `running`, `passed`, or `failed`.
+- `POST /api/v1/nodes/provisioning-jobs/{jobId}/install-token` issues a
+  one-time install token only after preflight passes.
+- `POST /api/v1/nodes/install-token/exchange` exchanges the install token once
+  for a node heartbeat token.
+- `POST /api/v1/nodes/{nodeId}/heartbeat` updates `last_seen_at`, status, and
+  capabilities using `X-Lumen-Node-Token`.
+
+Provisioning job states are `queued`, `preflight_running`, `preflight_passed`,
+`install_token_issued`, `installing`, `active`, `failed`, and `cancelled`.
+
+The backend accepts SSH connection metadata (`host`, `port`, `username`) plus
+`credentials_ref`. It does not accept or persist inline SSH passwords, private
+keys, access tokens, subscription URLs, or generated runtime configs. Install
+tokens and node heartbeat tokens are returned once and persisted only as HMAC
+hashes using `LUMEN_NODE_TOKEN_HASH_PEPPER`.
+
 ## System Capabilities
 
 Source: `apps/node-agent/src/system-capabilities.js`

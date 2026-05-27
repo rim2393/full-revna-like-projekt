@@ -33,8 +33,18 @@ filesystem paths, SQL, tokens, private keys, subscription URLs, or generated run
 | `/api-keys` | API key lifecycle | `api_key:manage` |
 | `/licenses` | License lifecycle | `license:manage` |
 | `/nodes` | Node registry | `node:manage` |
+| `POST /nodes/provisioning-jobs` | Create idempotent node provisioning job with SSH credential reference | `node:manage` |
+| `GET /nodes/provisioning-jobs/{jobId}` | Read provisioning job state | `node:manage` |
+| `POST /nodes/provisioning-jobs/{jobId}/preflight` | Record provisioning preflight state/checks | `node:manage` |
+| `POST /nodes/provisioning-jobs/{jobId}/install-token` | Issue one-time install token after preflight pass | `node:manage` |
+| `POST /nodes/install-token/exchange` | Exchange one-time install token for node heartbeat token | Install token |
+| `POST /nodes/{nodeId}/heartbeat` | Update node liveness/capabilities | `X-Lumen-Node-Token` |
 | `/subscriptions` | Subscription lifecycle and delivery metadata | `subscription:*` |
 
 The checked-in OpenAPI seed lives at `packages/shared-openapi/openapi.yaml`.
 Runtime OpenAPI is available at `/openapi.json` while enabled by configuration.
 
+Node provisioning stores SSH `credentials_ref` values only. Plaintext SSH passwords,
+private keys, access tokens, generated runtime configs, and subscription URLs are
+rejected or omitted from persistence. Install tokens and node heartbeat tokens are
+returned once and stored only as HMAC hashes.

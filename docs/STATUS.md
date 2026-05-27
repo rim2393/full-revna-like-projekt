@@ -2,7 +2,7 @@
 
 ## Current Phase
 
-Phase 2 backend security hardening.
+Phase 3 backend node provisioning API.
 
 ## Completed
 
@@ -29,6 +29,9 @@ Phase 2 backend security hardening.
   and passing backend/frontend tests.
 - Backend Phase 2 security slice completed with API key one-time generation,
   HMAC-at-rest verification, scope checks, and a free 3-node license policy.
+- Backend Phase 3 node provisioning slice completed with idempotent provisioning
+  jobs, SSH credential references only, preflight states, one-time install token
+  exchange, node heartbeat token hashing, and route/service tests.
 
 ## In Progress
 
@@ -47,6 +50,8 @@ Phase 2 backend security hardening.
 - Client compatibility repo: JSON fixtures parse and `git diff --check` passes.
 - Plaintext VPS passwords were not found in `D:\lumen-work`.
 - Backend API Phase 2 security slice: `.venv\Scripts\python.exe -m pytest`
+  and `.venv\Scripts\python.exe -m ruff check .` pass in `apps\api`.
+- Backend API Phase 3 node provisioning slice: `.venv\Scripts\python.exe -m pytest`
   and `.venv\Scripts\python.exe -m ruff check .` pass in `apps\api`.
 
 ## Blockers

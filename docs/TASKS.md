@@ -15,3 +15,4 @@ Status values: `pending`, `in_progress`, `blocked`, `done`.
 | T009 | pending | main | Commit and push initial repositories | Remotes contain initial commits |
 | T010 | pending | main | Prepare encrypted server inventory | No plaintext secrets committed |
 | T011 | done | backend-security | Implement API key hash/verify and free node policy slice | API pytest/ruff pass |
+| T012 | done | backend-node-provisioning | Implement node provisioning jobs, one-time install token exchange, and heartbeat | API pytest/ruff pass |
