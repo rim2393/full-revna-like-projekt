@@ -2,19 +2,30 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from app.api.compat_router import compat_router
 from app.api.v1.router import api_v1_router
 from app.core.config import Settings, get_settings
 from app.core.errors import register_error_handlers
 from app.core.logging import configure_logging
+from app.db.session import create_engine
+from app.domains.users.bootstrap import bootstrap_first_admin
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    settings = get_settings()
+    settings = app.state.settings
     configure_logging(settings)
-    yield
+    engine = create_engine(settings)
+    sessionmaker = async_sessionmaker(engine, expire_on_commit=False, autoflush=False)
+    try:
+        async with sessionmaker() as session:
+            await bootstrap_first_admin(session, settings)
+            await session.commit()
+        yield
+    finally:
+        await engine.dispose()
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:

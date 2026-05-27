@@ -1,7 +1,7 @@
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import AnyUrl, SecretStr
+from pydantic import AliasChoices, AnyUrl, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 Environment = Literal["local", "test", "staging", "production"]
@@ -13,6 +13,7 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         extra="ignore",
+        populate_by_name=True,
     )
 
     app_name: str = "Lumen API"
@@ -42,6 +43,19 @@ class Settings(BaseSettings):
     session_hash_pepper: SecretStr | None = None
     node_token_hash_pepper: SecretStr | None = None
     node_install_token_ttl_seconds: int = 900
+
+    first_admin_email: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("FIRST_ADMIN_EMAIL", "LUMEN_FIRST_ADMIN_EMAIL"),
+    )
+    first_admin_username: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("FIRST_ADMIN_USERNAME", "LUMEN_FIRST_ADMIN_USERNAME"),
+    )
+    first_admin_password: SecretStr | None = Field(
+        default=None,
+        validation_alias=AliasChoices("FIRST_ADMIN_PASSWORD", "LUMEN_FIRST_ADMIN_PASSWORD"),
+    )
 
     free_license_node_limit: int = 3
     central_license_sync_url: AnyUrl | None = None
