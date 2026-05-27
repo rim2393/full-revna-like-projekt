@@ -59,6 +59,16 @@ export {
   detectPortConflicts
 } from "./conflict-model.js";
 export {
+  CONTROL_PLANE_CLIENT_VERSION,
+  NODE_API_STATUS,
+  createHeartbeatRequestBody,
+  createInstallTokenExchangeRequest,
+  exchangeInstallToken,
+  redactInstallTokenExchangeResponse,
+  redactNodeResponse,
+  sendHeartbeat
+} from "./control-plane-client.js";
+export {
   HEARTBEAT_PAYLOAD_VERSION,
   NODE_AGENT_DRY_RUN_REPORT_VERSION,
   NODE_AGENT_RUNTIME_CONFIG_VERSION,
