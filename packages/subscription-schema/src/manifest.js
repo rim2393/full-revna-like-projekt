@@ -29,6 +29,7 @@ const SUPPORTED_FINGERPRINTS = new Set([
   "randomized",
   "none"
 ]);
+const VAULT_REF_PATTERN = /^vault:\/\/[A-Za-z0-9][A-Za-z0-9._~:/@-]*$/;
 
 const FORBIDDEN_INLINE_SECRET_KEYS = new Set([
   "secret",
@@ -97,6 +98,13 @@ function requireString(value, path, errors) {
 function requirePort(value, path, errors) {
   if (!Number.isInteger(value) || value < 1 || value > 65535) {
     errors.push(`${path} must be an integer TCP/UDP port`);
+  }
+}
+
+function requireVaultRef(value, path, errors) {
+  requireString(value, path, errors);
+  if (typeof value === "string" && !VAULT_REF_PATTERN.test(value)) {
+    errors.push(`${path} must be a vault:// reference`);
   }
 }
 
@@ -235,7 +243,7 @@ export function validateSubscriptionManifest(manifest) {
           optionalString(protocol.id, `${protocolPath}.id`, errors);
           requireString(protocol.type, `${protocolPath}.type`, errors);
           requireString(protocol.adapter, `${protocolPath}.adapter`, errors);
-          requireString(protocol.credentialsRef, `${protocolPath}.credentialsRef`, errors);
+          requireVaultRef(protocol.credentialsRef, `${protocolPath}.credentialsRef`, errors);
           requireString(protocol.endpoint?.host, `${protocolPath}.endpoint.host`, errors);
           requirePort(protocol.endpoint?.port, `${protocolPath}.endpoint.port`, errors);
 

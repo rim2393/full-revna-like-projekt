@@ -160,6 +160,19 @@ test("rejects inline VLESS credential material by key name", () => {
   assert.match(result.errors.join("\n"), /inline secret-like fields/);
 });
 
+test("rejects plaintext credential references", () => {
+  const result = validateSubscriptionManifest(createUncheckedManifest({
+    type: "tcp-smoke",
+    adapter: "tcp-smoke-listener",
+    endpoint: { host: "smoke.example.invalid", port: 18081 },
+    security: { type: "none", alpn: [], allowInsecure: false },
+    credentialsRef: "plain-password-token"
+  }));
+
+  assert.equal(result.ok, false);
+  assert.match(result.errors.join("\n"), /credentialsRef must be a vault:\/\/ reference/);
+});
+
 function createUncheckedManifest(protocol) {
   return {
     schemaVersion: SUBSCRIPTION_MANIFEST_SCHEMA_VERSION,
