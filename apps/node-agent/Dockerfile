@@ -10,4 +10,4 @@ COPY --chown=node:node src ./src
 USER node
 
 ENTRYPOINT ["node", "/srv/lumen-node-agent/src/cli.js"]
-CMD ["--dry-run"]
+CMD ["--run"]

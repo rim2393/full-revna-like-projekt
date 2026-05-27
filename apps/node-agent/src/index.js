@@ -77,4 +77,5 @@ export {
   createNodeAgentRuntimeConfig,
   loadNodeAgentConfigFromEnv
 } from "./runtime-loop.js";
+export { enrollNodeAgent, runNodeAgentLoop, runNodeAgentOnce } from "./runtime-runner.js";
 export { readSecretFromEnv } from "./secret-input.js";

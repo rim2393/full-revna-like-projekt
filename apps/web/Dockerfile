@@ -60,7 +60,7 @@ RUN printf '%s\n' \
     'set -eu' \
     '' \
     'PORT="${PORT:-3000}"' \
-    'LUMEN_API_UPSTREAM="${LUMEN_API_UPSTREAM:-http://api:${LUMEN_API_INTERNAL_PORT:-8080}}"' \
+    'LUMEN_API_UPSTREAM="${LUMEN_API_UPSTREAM:-http://api:${LUMEN_API_INTERNAL_PORT:-8000}}"' \
     'export PORT LUMEN_API_UPSTREAM' \
     '' \
     'placeholder="__LUMEN_WEB_API_BASE_URL__"' \

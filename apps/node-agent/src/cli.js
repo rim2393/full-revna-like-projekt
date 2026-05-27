@@ -7,13 +7,16 @@ import {
   sendHeartbeat
 } from "./control-plane-client.js";
 import { buildNodeAgentDryRun, loadNodeAgentConfigFromEnv } from "./runtime-loop.js";
+import { runNodeAgentLoop } from "./runtime-runner.js";
 import { readSecretFromEnv } from "./secret-input.js";
 
 function printHelp() {
   console.log([
-    "Usage: lumen-node-agent --dry-run | --exchange-install-token | --heartbeat-once",
+    "Usage: lumen-node-agent --run | --run-once | --dry-run | --exchange-install-token | --heartbeat-once",
     "",
     "Commands:",
+    "  --run                    Enroll if needed, then send heartbeat forever.",
+    "  --run-once               Enroll if needed, then send one heartbeat.",
     "  --dry-run                 Print config and heartbeat payload without network calls.",
     "  --exchange-install-token  Exchange LUMEN_INSTALL_TOKEN for node enrollment.",
     "  --heartbeat-once          Send one heartbeat using LUMEN_NODE_TOKEN."
@@ -23,6 +26,15 @@ function printHelp() {
 async function main(argv, env) {
   if (argv.includes("--help") || argv.includes("-h")) {
     printHelp();
+    return 0;
+  }
+
+  if (argv.includes("--run") || argv.includes("--run-once")) {
+    const result = await runNodeAgentLoop({
+      env,
+      once: argv.includes("--run-once")
+    });
+    console.log(JSON.stringify(result, null, 2));
     return 0;
   }
 
