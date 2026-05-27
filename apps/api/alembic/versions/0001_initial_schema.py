@@ -137,7 +137,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(
             ["provisioning_job_id"],
             ["node_provisioning_jobs.id"],
-            name="fk_node_install_tokens_provisioning_job_id_node_provisioning_jobs",
+            name="fk_node_install_tokens_job_id_node_provisioning_jobs",
             ondelete="CASCADE",
         ),
         sa.PrimaryKeyConstraint("id", name="pk_node_install_tokens"),
