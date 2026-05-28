@@ -18,21 +18,23 @@ import {
 import { PageHeader } from '../shared/components/PageHeader'
 import { StatusBadge } from '../shared/components/StatusBadge'
 import { placeholderSpecs } from '../shared/data/lumenData'
+import { useI18n } from '../shared/i18n/I18nProvider'
 import { toneForStatus } from '../shared/utils/resourceFormat'
 
 function formatUserName(user: UserRecord): string {
   return user.display_name || user.username || user.email
 }
 
-function formatLimit(user: UserRecord): string {
+function formatLimit(user: UserRecord, t: (value: string) => string): string {
   const used = `${user.traffic_used_gb.toFixed(2)} GB`
   if (user.traffic_limit_gb === null) {
-    return `${used} / unlimited`
+    return `${used} / ${t('unlimited')}`
   }
   return `${used} / ${user.traffic_limit_gb.toFixed(0)} GB`
 }
 
 export function UsersPage() {
+  const { t } = useI18n()
   const spec = placeholderSpecs.users
   const query = useUsersPageData()
   const createUser = useCreateUser()
@@ -69,7 +71,7 @@ export function UsersPage() {
       (parsedTrafficLimit !== null && !Number.isFinite(parsedTrafficLimit)) ||
       (parsedDeviceLimit !== null && !Number.isInteger(parsedDeviceLimit))
     ) {
-      setFormError('Traffic and device limits must be valid numbers.')
+      setFormError(t('Traffic and device limits must be valid numbers.'))
       return
     }
     try {
@@ -86,13 +88,13 @@ export function UsersPage() {
       setUsername('')
       setDisplayName('')
     } catch (error) {
-      setFormError(error instanceof Error ? error.message : 'User could not be created.')
+      setFormError(error instanceof Error ? error.message : t('User could not be created.'))
     }
   }
 
   async function runBulk(action: string, status?: string) {
     if (selectedIds.size === 0) {
-      setFormError('Select at least one user first.')
+      setFormError(t('Select at least one user first.'))
       return
     }
     setFormError(null)
@@ -107,27 +109,27 @@ export function UsersPage() {
       <PageHeader
         eyebrow={spec.eyebrow}
         title={spec.title}
-        description="Real VPN customer accounts with traffic, device limits, expiry, status and bulk controls."
+        description={t('Real VPN customer accounts with traffic, device limits, expiry, status and bulk controls.')}
         actions={
           <button
             type="button"
             className="button button--secondary"
-            aria-label="Refresh users"
+            aria-label={t('Refresh users')}
             disabled={query.isFetching}
             onClick={() => void query.refetch()}
           >
             <RefreshCw size={18} aria-hidden="true" />
-            Refresh
+            {t('Refresh')}
           </button>
         }
       />
 
-      {query.isLoading ? <LoadingState label="Loading users..." /> : null}
-      {query.isError ? <ErrorState title="Users unavailable" error={query.error} /> : null}
+      {query.isLoading ? <LoadingState label={t('Loading users...')} /> : null}
+      {query.isError ? <ErrorState title={t('Users unavailable')} error={query.error} /> : null}
       {query.isSuccess && users.length === 0 ? (
         <EmptyState
-          title="No users found"
-          description="Create the first VPN customer account to issue subscriptions and assign squads."
+          title={t('No users found')}
+          description={t('Create the first VPN customer account to issue subscriptions and assign squads.')}
         />
       ) : null}
 
@@ -135,10 +137,10 @@ export function UsersPage() {
         <article className="panel panel--wide">
           <div className="panel__header">
             <div>
-              <p className="eyebrow">Identity registry</p>
-              <h2>User directory</h2>
+              <p className="eyebrow">{t('Identity registry')}</p>
+              <h2>{t('User directory')}</h2>
             </div>
-            <StatusBadge>{`${users.length} real users`}</StatusBadge>
+            <StatusBadge>{t('users.count', { count: users.length })}</StatusBadge>
           </div>
           <div className="inline-actions">
             <button
@@ -147,7 +149,7 @@ export function UsersPage() {
               onClick={() => void runBulk('status', 'active')}
             >
               <Save size={16} aria-hidden="true" />
-              Enable selected
+              {t('Enable selected')}
             </button>
             <button
               type="button"
@@ -155,7 +157,7 @@ export function UsersPage() {
               onClick={() => void runBulk('status', 'disabled')}
             >
               <Ban size={16} aria-hidden="true" />
-              Disable selected
+              {t('Disable selected')}
             </button>
             <button
               type="button"
@@ -163,11 +165,11 @@ export function UsersPage() {
               onClick={() => void runBulk('reset-traffic')}
             >
               <RotateCcw size={16} aria-hidden="true" />
-              Reset traffic
+              {t('Reset traffic')}
             </button>
           </div>
           <DataTable
-            caption="User directory"
+            caption={t('User directory')}
             columns={['Select', 'User', 'Role', 'Devices', 'Traffic', 'Tags', 'Status', 'Actions']}
             rows={users.map((user) => ({
               cells: [
@@ -179,9 +181,9 @@ export function UsersPage() {
                 />,
                 `${formatUserName(user)} (${user.email})`,
                 user.role,
-                user.device_limit === null ? 'unlimited' : user.device_limit,
-                formatLimit(user),
-                user.tags.length > 0 ? user.tags.join(', ') : 'none',
+                user.device_limit === null ? t('unlimited') : user.device_limit,
+                formatLimit(user, t),
+                user.tags.length > 0 ? user.tags.join(', ') : t('none'),
                 <StatusBadge tone={toneForStatus(user.status)}>{user.status}</StatusBadge>,
                 <div className="inline-actions">
                   <button
@@ -213,12 +215,12 @@ export function UsersPage() {
         </article>
         <ScreenForm onSubmit={handleCreate}>
           <div>
-            <p className="eyebrow">Create user</p>
-            <h2>VPN account</h2>
-            <p>Limits are stored in the backend and used by subscription delivery.</p>
+            <p className="eyebrow">{t('Create user')}</p>
+            <h2>{t('VPN account')}</h2>
+            <p>{t('Limits are stored in the backend and used by subscription delivery.')}</p>
           </div>
           <label htmlFor="user-email">
-            Email
+            {t('Email')}
             <input
               id="user-email"
               required
@@ -228,7 +230,7 @@ export function UsersPage() {
             />
           </label>
           <label htmlFor="user-username">
-            Username
+            {t('Username')}
             <input
               id="user-username"
               value={username}
@@ -236,7 +238,7 @@ export function UsersPage() {
             />
           </label>
           <label htmlFor="user-display-name">
-            Display name
+            {t('Display name')}
             <input
               id="user-display-name"
               value={displayName}
@@ -244,7 +246,7 @@ export function UsersPage() {
             />
           </label>
           <label htmlFor="user-traffic-limit">
-            Traffic limit GB
+            {t('Traffic limit GB')}
             <input
               id="user-traffic-limit"
               inputMode="decimal"
@@ -253,7 +255,7 @@ export function UsersPage() {
             />
           </label>
           <label htmlFor="user-device-limit">
-            Device limit
+            {t('Device limit')}
             <input
               id="user-device-limit"
               inputMode="numeric"
@@ -262,7 +264,7 @@ export function UsersPage() {
             />
           </label>
           <FormError message={formError} />
-          <SubmitButton pending={createUser.isPending}>Create user</SubmitButton>
+          <SubmitButton pending={createUser.isPending}>{t('Create user')}</SubmitButton>
         </ScreenForm>
       </section>
     </section>

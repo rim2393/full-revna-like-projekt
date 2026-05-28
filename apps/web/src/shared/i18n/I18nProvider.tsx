@@ -5,7 +5,7 @@ export type AppLanguage = 'en' | 'ru'
 type I18nContextValue = {
   language: AppLanguage
   setLanguage: (language: AppLanguage) => void
-  t: (value: string) => string
+  t: (value: string, params?: Record<string, string | number>) => string
 }
 
 const ru: Record<string, string> = {
@@ -181,6 +181,39 @@ const ru: Record<string, string> = {
   disabled: 'выключена',
   expired: 'истекла',
   limited: 'ограничена',
+  Devices: 'Устройства',
+  'Device limit': 'Лимит устройств',
+  'Disable selected': 'Отключить выбранных',
+  'Display name': 'Отображаемое имя',
+  Email: 'Email',
+  'Enable selected': 'Включить выбранных',
+  'Identity registry': 'Реестр пользователей',
+  'Limits are stored in the backend and used by subscription delivery.':
+    'Лимиты хранятся в backend и используются при выдаче подписок.',
+  'Loading users...': 'Загрузка пользователей...',
+  'No users found': 'Пользователи не найдены',
+  none: 'нет',
+  'Real VPN customer accounts with traffic, device limits, expiry, status and bulk controls.':
+    'Реальные VPN-аккаунты клиентов с трафиком, лимитом устройств, сроком, статусом и массовыми действиями.',
+  'Refresh users': 'Обновить пользователей',
+  'Reset traffic': 'Сбросить трафик',
+  Select: 'Выбор',
+  'Select at least one user first.': 'Сначала выберите хотя бы одного пользователя.',
+  Tags: 'Теги',
+  Traffic: 'Трафик',
+  'Traffic and device limits must be valid numbers.':
+    'Лимит трафика и устройств должен быть корректным числом.',
+  'Traffic limit GB': 'Лимит трафика, ГБ',
+  unlimited: 'без лимита',
+  Username: 'Имя пользователя',
+  'User could not be created.': 'Не удалось создать пользователя.',
+  'User directory': 'Каталог пользователей',
+  'Users unavailable': 'Пользователи недоступны',
+  'Create user': 'Создать пользователя',
+  'Create the first VPN customer account to issue subscriptions and assign squads.':
+    'Создайте первый VPN-аккаунт клиента, чтобы выдавать подписки и назначать сквады.',
+  'VPN account': 'VPN-аккаунт',
+  'users.count': '{count} реальных пользователей',
 }
 
 const I18nContext = createContext<I18nContextValue | undefined>(undefined)
@@ -193,7 +226,13 @@ export function I18nProvider({
   language: AppLanguage
   setLanguage: (language: AppLanguage) => void
 }>) {
-  const t = (value: string) => (language === 'ru' ? ru[value] ?? value : value)
+  const t = (value: string, params?: Record<string, string | number>) => {
+    const template = language === 'ru' ? ru[value] ?? value : value
+    return Object.entries(params ?? {}).reduce(
+      (result, [key, entry]) => result.replaceAll(`{${key}}`, String(entry)),
+      template,
+    )
+  }
 
   return <I18nContext.Provider value={{ language, setLanguage, t }}>{children}</I18nContext.Provider>
 }
