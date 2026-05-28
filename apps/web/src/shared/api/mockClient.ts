@@ -35,8 +35,11 @@ import type {
   SettingRecord,
   SettingUpdateRequest,
   SquadCreateRequest,
+  SquadDetailResponse,
   SquadListResponse,
   SquadRecord,
+  SquadUpdateRequest,
+  SquadUserMutationRequest,
   SubscriptionCreateRequest,
   SubscriptionListResponse,
   SubscriptionRecord,
@@ -348,6 +351,79 @@ export function createMockLumenApiClient(): LumenApiClient {
         user,
       }
     },
+    getSquadDetail: async (squadId: string): Promise<SquadDetailResponse> => {
+      const squad = squads.find((item) => item.id === squadId)
+      if (!squad) {
+        throw new Error('Squad not found')
+      }
+      const memberIds = Array.isArray(squad.metadata_json.user_ids)
+        ? squad.metadata_json.user_ids.map(String)
+        : []
+      const squadProfiles = profiles.filter((profile) => profile.squad_id === squad.id)
+      const squadHosts = hosts.filter((host) => host.squad_id === squad.id)
+      const nodeIds = new Set([
+        ...squadProfiles.map((profile) => profile.node_id),
+        ...squadHosts.map((host) => host.node_id),
+      ])
+      const nodes = asNodeListResponse().items.filter((node) => nodeIds.has(node.id))
+      return {
+        hosts: squadHosts.map((host) => ({
+          hostname: host.hostname,
+          id: host.id,
+          inbound_tag: host.inbound_tag,
+          name: host.name,
+          node_id: host.node_id,
+          port: host.port,
+          protocol_profile_id: host.protocol_profile_id,
+          status: host.status,
+        })),
+        inbound_matrix: squadProfiles.flatMap((profile) =>
+          profile.port_reservations.map((reservation, index) => ({
+            adapter: profile.adapter,
+            config_json: profile.config_json,
+            credentials_ref: profile.credentials_ref,
+            hosts: squadHosts.filter((host) => host.protocol_profile_id === profile.id),
+            listen: String(reservation.address ?? '0.0.0.0'),
+            node_id: profile.node_id,
+            node_name: nodes.find((node) => node.id === profile.node_id)?.name ?? profile.node_id,
+            port: Number(reservation.port),
+            profile_id: profile.id,
+            profile_name: profile.name,
+            protocol: profile.adapter.split('-', 1)[0],
+            security: profile.adapter.includes('reality') ? 'reality' : 'none',
+            status: profile.status,
+            tag: String(profile.config_json.tag ?? `${profile.adapter}-${index}`),
+            transport: String(profile.config_json.transport ?? 'tcp'),
+          })),
+        ),
+        nodes: nodes.map((node) => ({
+          id: node.id,
+          name: node.name,
+          public_address: node.public_address,
+          region: node.region,
+          status: node.status,
+        })),
+        profiles: squadProfiles.map((profile) => ({
+          adapter: profile.adapter,
+          id: profile.id,
+          inbounds: profile.port_reservations.map((_reservation, index) => `${profile.adapter}-${index}`),
+          name: profile.name,
+          node_id: profile.node_id,
+          status: profile.status,
+        })),
+        squad,
+        users: users
+          .filter((user) => memberIds.includes(user.id))
+          .map((user) => ({
+            display_name: user.display_name,
+            email: user.email,
+            id: user.id,
+            status: user.status,
+            tags: user.tags,
+            username: user.username,
+          })),
+      }
+    },
     getSession: async () => mockSession,
     listApiKeys: async () => asListResponse(apiKeys),
     listHosts: async (): Promise<HostListResponse> => ({ items: hosts }),
@@ -413,6 +489,37 @@ export function createMockLumenApiClient(): LumenApiClient {
       subscription.revoked_at = new Date().toISOString()
       return subscription
     },
+    addSquadUsers: async (squadId: string, request: SquadUserMutationRequest) => {
+      const squad = squads.find((item) => item.id === squadId)
+      if (!squad) {
+        throw new Error('Squad not found')
+      }
+      const current = Array.isArray(squad.metadata_json.user_ids)
+        ? squad.metadata_json.user_ids.map(String)
+        : []
+      for (const userId of request.user_ids) {
+        if (!current.includes(userId)) {
+          current.push(userId)
+        }
+      }
+      squad.metadata_json = { ...squad.metadata_json, user_ids: current }
+      return squad
+    },
+    removeSquadUsers: async (squadId: string, request: SquadUserMutationRequest) => {
+      const squad = squads.find((item) => item.id === squadId)
+      if (!squad) {
+        throw new Error('Squad not found')
+      }
+      const removeIds = new Set(request.user_ids)
+      const current = Array.isArray(squad.metadata_json.user_ids)
+        ? squad.metadata_json.user_ids.map(String)
+        : []
+      squad.metadata_json = {
+        ...squad.metadata_json,
+        user_ids: current.filter((userId) => !removeIds.has(userId)),
+      }
+      return squad
+    },
     reorderHosts: async (ids: string[]) => {
       const ordered = ids
         .map((id) => hosts.find((host) => host.id === id))
@@ -421,6 +528,17 @@ export function createMockLumenApiClient(): LumenApiClient {
       hosts.splice(0, hosts.length, ...ordered, ...remainder)
       ordered.forEach((host, order) => {
         host.metadata_json = { ...host.metadata_json, order }
+      })
+      return { updated: ordered.length }
+    },
+    reorderSquads: async (ids: string[]) => {
+      const ordered = ids
+        .map((id) => squads.find((squad) => squad.id === id))
+        .filter((squad): squad is SquadRecord => Boolean(squad))
+      const remainder = squads.filter((squad) => !ids.includes(squad.id))
+      squads.splice(0, squads.length, ...ordered, ...remainder)
+      ordered.forEach((squad, order) => {
+        squad.metadata_json = { ...squad.metadata_json, order }
       })
       return { updated: ordered.length }
     },
@@ -462,6 +580,14 @@ export function createMockLumenApiClient(): LumenApiClient {
       }
       Object.assign(subscription, request)
       return subscription
+    },
+    updateSquad: async (squadId: string, request: SquadUpdateRequest) => {
+      const squad = squads.find((item) => item.id === squadId)
+      if (!squad) {
+        throw new Error('Squad not found')
+      }
+      Object.assign(squad, request)
+      return squad
     },
     updateUser: async (userId: string, request: UserUpdateRequest) => {
       const user = users.find((item) => item.id === userId)

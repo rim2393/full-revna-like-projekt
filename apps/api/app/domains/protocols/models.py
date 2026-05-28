@@ -12,7 +12,7 @@ class Squad(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     name: Mapped[str] = mapped_column(String(128), nullable=False, unique=True, index=True)
     kind: Mapped[str] = mapped_column(String(32), nullable=False, default="internal", index=True)
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="active", index=True)
-    metadata_json: Mapped[dict[str, str]] = mapped_column(JSON, nullable=False, default=dict)
+    metadata_json: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False, default=dict)
 
 
 class ProtocolProfile(Base, UUIDPrimaryKeyMixin, TimestampMixin):

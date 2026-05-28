@@ -28,9 +28,17 @@ from app.domains.protocols.schemas import (
     ProtocolProfileResponse,
     ProtocolProfileUpdateRequest,
     SquadCreateRequest,
+    SquadDetailResponse,
+    SquadHostResponse,
+    SquadNodeResponse,
+    SquadProfileResponse,
+    SquadReorderRequest,
     SquadResponse,
     SquadUpdateRequest,
+    SquadUserMutationRequest,
+    SquadUserResponse,
 )
+from app.domains.users.models import User
 
 
 def _adapter(
@@ -486,7 +494,8 @@ async def check_port_conflicts(
 
 async def list_squads(session: AsyncSession) -> list[Squad]:
     result = await session.execute(select(Squad).order_by(Squad.created_at.desc()))
-    return list(result.scalars().all())
+    squads = list(result.scalars().all())
+    return sorted(squads, key=_squad_sort_key)
 
 
 async def get_squad(session: AsyncSession, *, squad_id: UUID) -> Squad:
@@ -534,6 +543,82 @@ async def delete_squad(session: AsyncSession, *, squad_id: UUID) -> None:
     squad = await get_squad(session, squad_id=squad_id)
     await session.delete(squad)
     await session.flush()
+
+
+async def get_squad_detail(session: AsyncSession, *, squad_id: UUID) -> SquadDetailResponse:
+    squad = await get_squad(session, squad_id=squad_id)
+    users = await _list_squad_users(session, squad=squad)
+    profiles = await _list_squad_profiles(session, squad_id=squad.id)
+    hosts = await _list_squad_hosts(session, squad_id=squad.id)
+    node_ids = {profile.node_id for profile in profiles} | {host.node_id for host in hosts}
+    nodes = await _list_nodes_by_ids(session, node_ids=node_ids)
+    inbound_matrix: list[ProfileInboundResponse] = []
+    nodes_by_id = {node.id: node for node in nodes}
+    for profile in profiles:
+        node = nodes_by_id.get(profile.node_id) or await _get_profile_node(session, profile)
+        profile_hosts = [host for host in hosts if host.protocol_profile_id == profile.id]
+        inbound_matrix.extend(_profile_inbounds(profile=profile, node=node, hosts=profile_hosts))
+    return SquadDetailResponse(
+        squad=squad_response(squad),
+        users=[_squad_user_response(user) for user in users],
+        nodes=[_squad_node_response(node) for node in nodes],
+        profiles=[_squad_profile_response(profile) for profile in profiles],
+        hosts=[_squad_host_response(host) for host in hosts],
+        inbound_matrix=inbound_matrix,
+    )
+
+
+async def add_squad_users(
+    session: AsyncSession,
+    *,
+    squad_id: UUID,
+    request: SquadUserMutationRequest,
+) -> Squad:
+    squad = await get_squad(session, squad_id=squad_id)
+    await _ensure_users_exist(session, user_ids=request.user_ids)
+    current = _squad_user_ids(squad)
+    for user_id in request.user_ids:
+        if str(user_id) not in current:
+            current.append(str(user_id))
+    squad.metadata_json = {**squad.metadata_json, "user_ids": current}
+    await session.flush()
+    return squad
+
+
+async def remove_squad_users(
+    session: AsyncSession,
+    *,
+    squad_id: UUID,
+    request: SquadUserMutationRequest,
+) -> Squad:
+    squad = await get_squad(session, squad_id=squad_id)
+    remove_ids = {str(user_id) for user_id in request.user_ids}
+    squad.metadata_json = {
+        **squad.metadata_json,
+        "user_ids": [user_id for user_id in _squad_user_ids(squad) if user_id not in remove_ids],
+    }
+    await session.flush()
+    return squad
+
+
+async def reorder_squads(session: AsyncSession, *, request: SquadReorderRequest) -> int:
+    result = await session.execute(select(Squad).where(Squad.id.in_(request.ids)))
+    squads = list(result.scalars().all())
+    if len(squads) != len(set(request.ids)):
+        found = {squad.id for squad in squads}
+        missing = [str(squad_id) for squad_id in request.ids if squad_id not in found]
+        raise APIError(
+            code="squad_not_found",
+            message="One or more squads were not found.",
+            status_code=status.HTTP_404_NOT_FOUND,
+            details=missing,
+        )
+    squads_by_id = {squad.id: squad for squad in squads}
+    for order, squad_id in enumerate(request.ids):
+        squad = squads_by_id[squad_id]
+        squad.metadata_json = {**squad.metadata_json, "order": order}
+    await session.flush()
+    return len(squads)
 
 
 async def list_hosts(session: AsyncSession) -> list[Host]:
@@ -766,6 +851,54 @@ def squad_response(squad: Squad) -> SquadResponse:
     )
 
 
+def _squad_user_response(user: User) -> SquadUserResponse:
+    return SquadUserResponse(
+        id=user.id,
+        email=user.email,
+        username=user.username,
+        display_name=user.display_name,
+        status=user.status,
+        tags=user.tags,
+    )
+
+
+def _squad_node_response(node: Node) -> SquadNodeResponse:
+    return SquadNodeResponse(
+        id=node.id,
+        name=node.name,
+        region=node.region,
+        public_address=node.public_address,
+        status=node.status,
+    )
+
+
+def _squad_profile_response(profile: ProtocolProfile) -> SquadProfileResponse:
+    return SquadProfileResponse(
+        id=profile.id,
+        name=profile.name,
+        adapter=profile.adapter,
+        node_id=profile.node_id,
+        status=profile.status,
+        inbounds=[
+            _inbound_tag(profile=profile, hosts=[], index=index)
+            for index, _reservation in enumerate(profile.port_reservations)
+        ],
+    )
+
+
+def _squad_host_response(host: Host) -> SquadHostResponse:
+    return SquadHostResponse(
+        id=host.id,
+        name=host.name,
+        hostname=host.hostname,
+        node_id=host.node_id,
+        protocol_profile_id=host.protocol_profile_id,
+        status=host.status,
+        inbound_tag=host.inbound_tag,
+        port=host.port,
+    )
+
+
 def host_response(host: Host) -> HostResponse:
     return HostResponse(
         id=host.id,
@@ -791,6 +924,74 @@ def _host_sort_key(host: Host) -> tuple[int, str]:
     if isinstance(order, str) and order.isdigit():
         return (int(order), host.name)
     return (1_000_000, host.name)
+
+
+def _squad_sort_key(squad: Squad) -> tuple[int, str]:
+    order = squad.metadata_json.get("order")
+    if isinstance(order, int):
+        return (order, squad.name)
+    if isinstance(order, str) and order.isdigit():
+        return (int(order), squad.name)
+    return (1_000_000, squad.name)
+
+
+def _squad_user_ids(squad: Squad) -> list[str]:
+    user_ids = squad.metadata_json.get("user_ids")
+    if not isinstance(user_ids, list):
+        return []
+    return [str(user_id) for user_id in user_ids]
+
+
+async def _ensure_users_exist(session: AsyncSession, *, user_ids: list[UUID]) -> None:
+    result = await session.execute(select(User.id).where(User.id.in_(user_ids)))
+    found = set(result.scalars().all())
+    if len(found) != len(set(user_ids)):
+        missing = [str(user_id) for user_id in user_ids if user_id not in found]
+        raise APIError(
+            code="user_not_found",
+            message="One or more users were not found.",
+            status_code=status.HTTP_404_NOT_FOUND,
+            details=missing,
+        )
+
+
+async def _list_squad_users(session: AsyncSession, *, squad: Squad) -> list[User]:
+    user_ids = _squad_user_ids(squad)
+    if not user_ids:
+        return []
+    result = await session.execute(
+        select(User).where(User.id.in_([UUID(user_id) for user_id in user_ids]))
+    )
+    users = list(result.scalars().all())
+    users_by_id = {str(user.id): user for user in users}
+    return [users_by_id[user_id] for user_id in user_ids if user_id in users_by_id]
+
+
+async def _list_squad_profiles(session: AsyncSession, *, squad_id: UUID) -> list[ProtocolProfile]:
+    result = await session.execute(
+        select(ProtocolProfile)
+        .where(ProtocolProfile.squad_id == squad_id)
+        .order_by(ProtocolProfile.created_at.desc(), ProtocolProfile.name.asc())
+    )
+    return list(result.scalars().all())
+
+
+async def _list_squad_hosts(session: AsyncSession, *, squad_id: UUID) -> list[Host]:
+    result = await session.execute(
+        select(Host)
+        .where(Host.squad_id == squad_id)
+        .order_by(Host.created_at.desc(), Host.name.asc())
+    )
+    return list(result.scalars().all())
+
+
+async def _list_nodes_by_ids(session: AsyncSession, *, node_ids: set[UUID]) -> list[Node]:
+    if not node_ids:
+        return []
+    result = await session.execute(
+        select(Node).where(Node.id.in_(node_ids)).order_by(Node.name.asc())
+    )
+    return list(result.scalars().all())
 
 
 async def _get_profile_node(session: AsyncSession, profile: ProtocolProfile) -> Node:

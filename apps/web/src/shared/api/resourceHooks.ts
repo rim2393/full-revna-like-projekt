@@ -10,6 +10,8 @@ import type {
   ProvisioningJobCreateRequest,
   SettingUpdateRequest,
   SquadCreateRequest,
+  SquadUpdateRequest,
+  SquadUserMutationRequest,
   SubscriptionCreateRequest,
   SubscriptionUpdateRequest,
   UserBulkActionRequest,
@@ -28,6 +30,7 @@ export const resourceQueryKeys = {
   session: ['auth', 'session'] as const,
   settings: ['resource', 'settings'] as const,
   squads: ['resource', 'squads'] as const,
+  squadDetail: (squadId: string) => ['resource', 'squads', squadId, 'detail'] as const,
   subscriptions: ['resource', 'subscriptions'] as const,
   userDetail: (userId: string) => ['resource', 'users', userId, 'detail'] as const,
   users: ['resource', 'users'] as const,
@@ -231,12 +234,76 @@ export function useCreateSquad() {
   })
 }
 
+export function useSquadDetailData(squadId: string | undefined) {
+  const apiClient = useApiClient()
+
+  return useQuery({
+    enabled: Boolean(squadId),
+    queryFn: () => apiClient.getSquadDetail(squadId as string),
+    queryKey: resourceQueryKeys.squadDetail(squadId ?? ''),
+  })
+}
+
+export function useUpdateSquad() {
+  const apiClient = useApiClient()
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ id, request }: { id: string; request: SquadUpdateRequest }) =>
+      apiClient.updateSquad(id, request),
+    onSuccess: (_data, variables) => {
+      void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.squads })
+      void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.squadDetail(variables.id) })
+    },
+  })
+}
+
 export function useDeleteSquad() {
   const apiClient = useApiClient()
   const queryClient = useQueryClient()
 
   return useMutation({
     mutationFn: (id: string) => apiClient.deleteSquad(id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.squads })
+    },
+  })
+}
+
+export function useAddSquadUsers() {
+  const apiClient = useApiClient()
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ id, request }: { id: string; request: SquadUserMutationRequest }) =>
+      apiClient.addSquadUsers(id, request),
+    onSuccess: (_data, variables) => {
+      void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.squads })
+      void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.squadDetail(variables.id) })
+    },
+  })
+}
+
+export function useRemoveSquadUsers() {
+  const apiClient = useApiClient()
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ id, request }: { id: string; request: SquadUserMutationRequest }) =>
+      apiClient.removeSquadUsers(id, request),
+    onSuccess: (_data, variables) => {
+      void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.squads })
+      void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.squadDetail(variables.id) })
+    },
+  })
+}
+
+export function useReorderSquads() {
+  const apiClient = useApiClient()
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (ids: string[]) => apiClient.reorderSquads(ids),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.squads })
     },

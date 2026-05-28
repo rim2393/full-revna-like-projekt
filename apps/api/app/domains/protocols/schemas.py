@@ -172,7 +172,7 @@ class SquadCreateRequest(BaseModel):
     name: str = Field(min_length=1, max_length=128)
     kind: Literal["internal", "external"] = "internal"
     status: str = Field(default="active", max_length=32)
-    metadata_json: dict[str, str] = Field(default_factory=dict)
+    metadata_json: dict[str, object] = Field(default_factory=dict)
 
 
 class SquadUpdateRequest(BaseModel):
@@ -181,7 +181,7 @@ class SquadUpdateRequest(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=128)
     kind: Literal["internal", "external"] | None = None
     status: str | None = Field(default=None, max_length=32)
-    metadata_json: dict[str, str] | None = None
+    metadata_json: dict[str, object] | None = None
 
 
 class SquadResponse(BaseModel):
@@ -189,11 +189,69 @@ class SquadResponse(BaseModel):
     name: str
     kind: str
     status: str
-    metadata_json: dict[str, str]
+    metadata_json: dict[str, object]
 
 
 class SquadListResponse(BaseModel):
     items: list[SquadResponse]
+
+
+class SquadUserResponse(BaseModel):
+    id: UUID
+    email: str
+    username: str | None
+    display_name: str | None
+    status: str
+    tags: list[str]
+
+
+class SquadNodeResponse(BaseModel):
+    id: UUID
+    name: str
+    region: str
+    public_address: str
+    status: str
+
+
+class SquadProfileResponse(BaseModel):
+    id: UUID
+    name: str
+    adapter: str
+    node_id: UUID
+    status: str
+    inbounds: list[str]
+
+
+class SquadHostResponse(BaseModel):
+    id: UUID
+    name: str
+    hostname: str
+    node_id: UUID
+    protocol_profile_id: UUID | None
+    status: str
+    inbound_tag: str | None
+    port: int | None
+
+
+class SquadDetailResponse(BaseModel):
+    squad: SquadResponse
+    users: list[SquadUserResponse]
+    nodes: list[SquadNodeResponse]
+    profiles: list[SquadProfileResponse]
+    hosts: list[SquadHostResponse]
+    inbound_matrix: list[ProfileInboundResponse]
+
+
+class SquadUserMutationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    user_ids: list[UUID] = Field(min_length=1)
+
+
+class SquadReorderRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    ids: list[UUID] = Field(min_length=1)
 
 
 class HostCreateRequest(BaseModel):

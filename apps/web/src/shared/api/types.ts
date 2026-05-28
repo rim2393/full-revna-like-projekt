@@ -314,20 +314,90 @@ export type SquadKind = 'internal' | 'external'
 export type SquadRecord = {
   id: string
   kind: SquadKind | (string & {})
-  metadata_json: Record<string, string>
+  metadata_json: Record<string, unknown>
   name: string
   status: string
 }
 
 export type SquadCreateRequest = {
   kind?: SquadKind
-  metadata_json?: Record<string, string>
+  metadata_json?: Record<string, unknown>
   name: string
   status?: string
 }
 
+export type SquadUpdateRequest = Partial<SquadCreateRequest>
+
 export type SquadListResponse = {
   items: SquadRecord[]
+}
+
+export type SquadUserRecord = {
+  display_name: string | null
+  email: string
+  id: string
+  status: string
+  tags: string[]
+  username: string | null
+}
+
+export type SquadNodeRecord = {
+  id: string
+  name: string
+  public_address: string
+  region: string
+  status: string
+}
+
+export type SquadProfileRecord = {
+  adapter: string
+  id: string
+  inbounds: string[]
+  name: string
+  node_id: string
+  status: string
+}
+
+export type SquadHostRecord = {
+  hostname: string
+  id: string
+  inbound_tag: string | null
+  name: string
+  node_id: string
+  port: number | null
+  protocol_profile_id: string | null
+  status: string
+}
+
+export type ProfileInboundRecord = {
+  adapter: string
+  config_json: Record<string, unknown>
+  credentials_ref: string | null
+  hosts: Array<Record<string, unknown>>
+  listen: string
+  node_id: string
+  node_name: string
+  port: number
+  profile_id: string
+  profile_name: string
+  protocol: string
+  security: string
+  status: string
+  tag: string
+  transport: string
+}
+
+export type SquadDetailResponse = {
+  hosts: SquadHostRecord[]
+  inbound_matrix: ProfileInboundRecord[]
+  nodes: SquadNodeRecord[]
+  profiles: SquadProfileRecord[]
+  squad: SquadRecord
+  users: SquadUserRecord[]
+}
+
+export type SquadUserMutationRequest = {
+  user_ids: string[]
 }
 
 export type ProtocolProfileRecord = {
@@ -552,7 +622,17 @@ export type LumenApiClient = {
   readLicense: () => Promise<LicenseSummary | null>
   revokeApiKey: (apiKeyId: string) => Promise<void>
   revokeSubscription: (subscriptionId: string) => Promise<SubscriptionRecord>
+  addSquadUsers: (
+    squadId: string,
+    request: SquadUserMutationRequest,
+  ) => Promise<SquadRecord>
+  getSquadDetail: (squadId: string) => Promise<SquadDetailResponse>
+  removeSquadUsers: (
+    squadId: string,
+    request: SquadUserMutationRequest,
+  ) => Promise<SquadRecord>
   reorderHosts: (ids: string[]) => Promise<ResourceBulkActionResponse>
+  reorderSquads: (ids: string[]) => Promise<ResourceBulkActionResponse>
   updateHost: (hostId: string, request: HostUpdateRequest) => Promise<HostRecord>
   updateProfile: (
     profileId: string,
@@ -564,5 +644,6 @@ export type LumenApiClient = {
   ) => Promise<SubscriptionRecord>
   verifyMfaChallenge: (request: MfaChallengeVerifyRequest) => Promise<AuthSession>
   updateSetting: (key: string, request: SettingUpdateRequest) => Promise<SettingRecord>
+  updateSquad: (squadId: string, request: SquadUpdateRequest) => Promise<SquadRecord>
   updateUser: (userId: string, request: UserUpdateRequest) => Promise<UserRecord>
 }

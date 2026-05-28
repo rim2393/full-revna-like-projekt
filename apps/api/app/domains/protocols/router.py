@@ -27,11 +27,15 @@ from app.domains.protocols.schemas import (
     ResourceBulkActionRequest,
     ResourceBulkActionResponse,
     SquadCreateRequest,
+    SquadDetailResponse,
     SquadListResponse,
+    SquadReorderRequest,
     SquadResponse,
     SquadUpdateRequest,
+    SquadUserMutationRequest,
 )
 from app.domains.protocols.service import (
+    add_squad_users,
     bulk_set_status,
     bulk_update_hosts,
     check_port_conflicts,
@@ -45,6 +49,7 @@ from app.domains.protocols.service import (
     get_profile,
     get_profile_computed_config,
     get_squad,
+    get_squad_detail,
     host_response,
     list_global_profile_inbounds,
     list_hosts,
@@ -53,7 +58,9 @@ from app.domains.protocols.service import (
     list_protocol_adapters,
     list_squads,
     profile_response,
+    remove_squad_users,
     reorder_hosts,
+    reorder_squads,
     squad_response,
     update_host,
     update_profile,
@@ -243,6 +250,15 @@ async def read_squad(
     return squad_response(await get_squad(session, squad_id=squad_id))
 
 
+@squads_router.get("/{squad_id}/detail", response_model=SquadDetailResponse)
+async def read_squad_detail(
+    squad_id: UUID,
+    _: Manager,
+    session: DatabaseSession,
+) -> SquadDetailResponse:
+    return await get_squad_detail(session, squad_id=squad_id)
+
+
 @squads_router.patch("/{squad_id}", response_model=SquadResponse)
 async def patch_squad(
     squad_id: UUID,
@@ -277,6 +293,64 @@ async def delete_squad_route(
         resource_id=str(squad_id),
     )
     await session.commit()
+
+
+@squads_router.post("/{squad_id}/users", response_model=SquadResponse)
+async def post_squad_users(
+    squad_id: UUID,
+    request: SquadUserMutationRequest,
+    principal: Manager,
+    session: DatabaseSession,
+) -> SquadResponse:
+    squad = await add_squad_users(session, squad_id=squad_id, request=request)
+    await record_audit_event(
+        session,
+        principal=principal,
+        action="squad.users.added",
+        resource_type="squad",
+        resource_id=str(squad.id),
+        metadata_json={"user_ids": [str(user_id) for user_id in request.user_ids]},
+    )
+    await session.commit()
+    return squad_response(squad)
+
+
+@squads_router.post("/{squad_id}/users/remove", response_model=SquadResponse)
+async def remove_squad_users_route(
+    squad_id: UUID,
+    request: SquadUserMutationRequest,
+    principal: Manager,
+    session: DatabaseSession,
+) -> SquadResponse:
+    squad = await remove_squad_users(session, squad_id=squad_id, request=request)
+    await record_audit_event(
+        session,
+        principal=principal,
+        action="squad.users.removed",
+        resource_type="squad",
+        resource_id=str(squad.id),
+        metadata_json={"user_ids": [str(user_id) for user_id in request.user_ids]},
+    )
+    await session.commit()
+    return squad_response(squad)
+
+
+@squads_router.post("/actions/reorder", response_model=ResourceBulkActionResponse)
+async def reorder_squad_route(
+    request: SquadReorderRequest,
+    principal: Manager,
+    session: DatabaseSession,
+) -> ResourceBulkActionResponse:
+    updated = await reorder_squads(session, request=request)
+    await record_audit_event(
+        session,
+        principal=principal,
+        action="squad.reordered",
+        resource_type="squad",
+        metadata_json={"squad_ids": [str(squad_id) for squad_id in request.ids]},
+    )
+    await session.commit()
+    return ResourceBulkActionResponse(updated=updated)
 
 
 @squads_router.post("/bulk/status", response_model=ResourceBulkActionResponse)

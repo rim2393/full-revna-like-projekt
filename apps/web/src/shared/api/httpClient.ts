@@ -14,6 +14,8 @@ import type {
   ProvisioningJobCreateRequest,
   SettingUpdateRequest,
   SquadCreateRequest,
+  SquadUpdateRequest,
+  SquadUserMutationRequest,
   SubscriptionCreateRequest,
   SubscriptionUpdateRequest,
   TokenPairResponse,
@@ -122,6 +124,7 @@ export function createHttpLumenApiClient({
     deleteUser: (userId: string) => request(`/api/v1/users/${userId}`, { method: 'DELETE' }),
     getUser: (userId: string) => request(`/api/v1/users/${userId}`),
     getUserDetail: (userId: string) => request(`/api/v1/users/${userId}/detail`),
+    getSquadDetail: (squadId: string) => request(`/api/v1/squads/${squadId}/detail`),
     listApiKeys: () => request('/api/admin/api-keys'),
     listHosts: () => request('/api/v1/hosts'),
     listNodes: () => request('/api/v1/nodes'),
@@ -173,8 +176,14 @@ export function createHttpLumenApiClient({
       request(`/api/v1/api-keys/${apiKeyId}`, { method: 'DELETE' }),
     revokeSubscription: (subscriptionId: string) =>
       request(`/api/v1/subscriptions/${subscriptionId}/revoke`, { method: 'POST' }),
+    addSquadUsers: (squadId: string, payload: SquadUserMutationRequest) =>
+      request(`/api/v1/squads/${squadId}/users`, { body: payload, method: 'POST' }),
+    removeSquadUsers: (squadId: string, payload: SquadUserMutationRequest) =>
+      request(`/api/v1/squads/${squadId}/users/remove`, { body: payload, method: 'POST' }),
     reorderHosts: (ids: string[]) =>
       request('/api/v1/hosts/actions/reorder', { body: { ids }, method: 'POST' }),
+    reorderSquads: (ids: string[]) =>
+      request('/api/v1/squads/actions/reorder', { body: { ids }, method: 'POST' }),
     updateHost: (hostId: string, payload: HostUpdateRequest) =>
       request(`/api/v1/hosts/${hostId}`, { body: payload, method: 'PATCH' }),
     updateProfile: (profileId: string, payload: ProtocolProfileUpdateRequest) =>
@@ -204,6 +213,8 @@ export function createHttpLumenApiClient({
     logout: () => request('/api/v1/auth/logout', { method: 'POST' }),
     updateSetting: (key: string, payload: SettingUpdateRequest) =>
       request(`/api/v1/settings/${encodeURIComponent(key)}`, { body: payload, method: 'PUT' }),
+    updateSquad: (squadId: string, payload: SquadUpdateRequest) =>
+      request(`/api/v1/squads/${squadId}`, { body: payload, method: 'PATCH' }),
     updateUser: (userId: string, payload: UserUpdateRequest) =>
       request(`/api/v1/users/${userId}`, { body: payload, method: 'PATCH' }),
   }

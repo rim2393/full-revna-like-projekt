@@ -495,6 +495,98 @@ async def test_host_bulk_actions_and_reorder_are_persisted(
     assert final_response.json()["items"] == []
 
 
+async def test_squad_detail_membership_and_reorder_are_persisted(
+    foundation_app: FoundationRouteApp,
+) -> None:
+    node_id = await seeded_node_id(foundation_app)
+
+    user_response = await foundation_app.client.post(
+        "/api/v1/users",
+        json={"email": "squad-user@example.com", "username": "squad-user", "tags": ["vip"]},
+    )
+    assert user_response.status_code == 201
+    user_id = user_response.json()["id"]
+
+    first_squad = await foundation_app.client.post(
+        "/api/v1/squads",
+        json={"name": "Squad Detail A", "kind": "internal"},
+    )
+    second_squad = await foundation_app.client.post(
+        "/api/v1/squads",
+        json={"name": "Squad Detail B", "kind": "external"},
+    )
+    assert first_squad.status_code == 201
+    assert second_squad.status_code == 201
+    first_squad_id = first_squad.json()["id"]
+    second_squad_id = second_squad.json()["id"]
+
+    add_user_response = await foundation_app.client.post(
+        f"/api/v1/squads/{first_squad_id}/users",
+        json={"user_ids": [user_id]},
+    )
+    assert add_user_response.status_code == 200
+    assert add_user_response.json()["metadata_json"]["user_ids"] == [user_id]
+
+    profile_response = await foundation_app.client.post(
+        "/api/v1/profiles",
+        json={
+            "name": "Squad Detail Profile",
+            "node_id": node_id,
+            "squad_id": first_squad_id,
+            "adapter": "vless-reality",
+            "credentials_ref": "vault://protocols/squad-detail",
+            "port_reservations": [
+                {"address": WILDCARD_BIND_ADDRESS, "port": 30443, "protocol": "tcp"}
+            ],
+        },
+    )
+    assert profile_response.status_code == 201
+    profile_id = profile_response.json()["id"]
+
+    host_response = await foundation_app.client.post(
+        "/api/v1/hosts",
+        json={
+            "name": "Squad Detail Host",
+            "hostname": "squad-detail.example.test",
+            "node_id": node_id,
+            "protocol_profile_id": profile_id,
+            "squad_id": first_squad_id,
+            "inbound_tag": "SQUAD_DETAIL_INBOUND",
+            "port": 30443,
+        },
+    )
+    assert host_response.status_code == 201
+
+    detail_response = await foundation_app.client.get(f"/api/v1/squads/{first_squad_id}/detail")
+    assert detail_response.status_code == 200
+    detail = detail_response.json()
+    assert detail["users"][0]["email"] == "squad-user@example.com"
+    assert detail["profiles"][0]["name"] == "Squad Detail Profile"
+    assert detail["hosts"][0]["hostname"] == "squad-detail.example.test"
+    assert detail["nodes"][0]["id"] == node_id
+    assert detail["inbound_matrix"][0]["tag"] == "SQUAD_DETAIL_INBOUND"
+
+    reorder_response = await foundation_app.client.post(
+        "/api/v1/squads/actions/reorder",
+        json={"ids": [second_squad_id, first_squad_id]},
+    )
+    assert reorder_response.status_code == 200
+    assert reorder_response.json()["updated"] == 2
+    list_response = await foundation_app.client.get("/api/v1/squads")
+    assert list_response.status_code == 200
+    assert [item["id"] for item in list_response.json()["items"][:2]] == [
+        second_squad_id,
+        first_squad_id,
+    ]
+
+    remove_user_response = await foundation_app.client.post(
+        f"/api/v1/squads/{first_squad_id}/users/remove",
+        json={"user_ids": [user_id]},
+    )
+    assert remove_user_response.status_code == 200
+    assert remove_user_response.json()["metadata_json"]["user_ids"] == []
+
+
 async def test_user_detail_returns_subscriptions_devices_nodes_and_history(
     foundation_app: FoundationRouteApp,
 ) -> None:
