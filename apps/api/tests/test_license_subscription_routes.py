@@ -1,3 +1,4 @@
+import base64
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -429,6 +430,87 @@ async def test_public_subscription_renderers_emit_client_compatible_formats(
     xray = xray_response.json()
     assert xray["outbounds"][0]["protocol"] == "vless"
     assert xray["outbounds"][0]["streamSettings"]["security"] == "reality"
+
+
+async def test_subscription_info_setting_feeds_manifest_and_renderer_headers(
+    route_app: RouteTestApp,
+) -> None:
+    user, license_record, node = await seed_subscription_dependencies(route_app)
+    setting_response = await route_app.client.put(
+        "/api/v1/settings/subscription.info",
+        json={
+            "value_json": {
+                "title": "Lumen Production",
+                "support_url": "https://support.example.test",
+                "auto_update_hours": "6",
+                "profile_page_url": "https://sub.example.test",
+            },
+        },
+    )
+    assert setting_response.status_code == 200
+
+    create_response = await route_app.client.post(
+        "/api/v1/subscriptions",
+        json={
+            "user_id": str(user.id),
+            "license_id": str(license_record.id),
+            "node_id": str(node.id),
+            "delivery_profile": {
+                "protocol": "vless-tcp-tls",
+                "adapter": "vless-tcp-tls",
+                "server_name": "subscription.example.test",
+            },
+            "config_hash": "sha256:subscription-info",
+        },
+    )
+    assert create_response.status_code == 201
+    public_id = create_response.json()["public_id"]
+
+    manifest_response = await route_app.client.get(
+        f"/api/v1/subscriptions/public/{public_id}/manifest",
+    )
+    assert manifest_response.status_code == 200
+    manifest = manifest_response.json()
+    assert manifest["provider"]["name"] == "Lumen Production"
+    assert manifest["nodes"][0]["protocols"][0]["rendererHints"]["name"] == "Lumen Production"
+    assert manifest["metadata"]["profileTitle"] == "Lumen Production"
+    assert manifest["metadata"]["supportUrl"] == "https://support.example.test"
+    assert manifest["metadata"]["profilePageUrl"] == "https://sub.example.test"
+    assert manifest["metadata"]["updateIntervalHours"] == "6"
+
+    render_response = await route_app.client.get(
+        f"/api/v1/subscriptions/public/{public_id}/render?target=hiddify",
+    )
+    assert render_response.status_code == 200
+    encoded_title = render_response.headers["profile-title"].removeprefix("base64:")
+    assert base64.b64decode(encoded_title).decode("utf-8") == "Lumen Production"
+    assert render_response.headers["profile-update-interval"] == "6"
+
+    override_response = await route_app.client.post(
+        "/api/v1/subscriptions",
+        json={
+            "user_id": str(user.id),
+            "license_id": str(license_record.id),
+            "node_id": str(node.id),
+            "delivery_profile": {
+                "protocol": "vless-tcp-tls",
+                "adapter": "vless-tcp-tls",
+                "profile_title": "Customer Override",
+                "support_url": "https://override.example.test",
+                "update_interval_hours": "1",
+            },
+            "config_hash": "sha256:subscription-override",
+        },
+    )
+    assert override_response.status_code == 201
+    override_manifest_response = await route_app.client.get(
+        f"/api/v1/subscriptions/public/{override_response.json()['public_id']}/manifest",
+    )
+    assert override_manifest_response.status_code == 200
+    override_manifest = override_manifest_response.json()
+    assert override_manifest["metadata"]["profileTitle"] == "Customer Override"
+    assert override_manifest["metadata"]["supportUrl"] == "https://override.example.test"
+    assert override_manifest["metadata"]["updateIntervalHours"] == "1"
 
 
 async def test_public_subscription_response_rules_apply_to_blocked_subscriptions(

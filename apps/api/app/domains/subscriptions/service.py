@@ -11,6 +11,7 @@ from app.domains.licenses.models import License
 from app.domains.nodes.models import Node
 from app.domains.protocols.models import Host, ProtocolProfile
 from app.domains.protocols.schemas import VAULT_REF_PREFIX
+from app.domains.settings.models import PanelSetting
 from app.domains.subscriptions.models import Subscription
 from app.domains.subscriptions.schemas import (
     SubscriptionCreateRequest,
@@ -20,6 +21,7 @@ from app.domains.subscriptions.schemas import (
 from app.domains.users.models import User
 
 SUBSCRIPTION_PUBLIC_ID_PREFIX = "lumen_sub"
+SUBSCRIPTION_INFO_SETTING_KEY = "subscription.info"
 PUBLIC_ID_COLLISION_ATTEMPTS = 3
 SERVABLE_STATUSES = frozenset({"active", "paid", "trial"})
 SECRET_FIELD_FRAGMENTS = frozenset(
@@ -145,6 +147,20 @@ async def build_subscription_manifest(
         subscription=subscription,
         protocol_type=protocol_type,
     )
+    page_settings = await _subscription_page_settings(session)
+    profile_title = (
+        delivery.get("profile_title")
+        or delivery.get("name")
+        or _setting_string(page_settings, "title")
+        or "Lumen"
+    )
+    support_url = delivery.get("support_url") or _setting_string(page_settings, "support_url")
+    update_interval_hours = delivery.get("update_interval_hours") or _setting_string(
+        page_settings,
+        "auto_update_hours",
+    )
+    profile_page_url = _setting_string(page_settings, "profile_page_url")
+    provider_name = delivery.get("provider_name") or profile_title
 
     return {
         "schemaVersion": "lumen.subscription-manifest.v1",
@@ -153,7 +169,7 @@ async def build_subscription_manifest(
         ),
         "provider": {
             "id": delivery.get("provider_id") or "lumen",
-            "name": delivery.get("provider_name") or "Lumen",
+            "name": provider_name,
         },
         "subscription": {
             "id": subscription.public_id,
@@ -189,7 +205,7 @@ async def build_subscription_manifest(
                         "capabilities": _manifest_capabilities(protocol_type),
                         "rendererHints": {
                             "liveDiagnostic": False,
-                            "name": delivery.get("profile_title") or delivery.get("name"),
+                            "name": profile_title,
                             "method": delivery.get("method"),
                         },
                     }
@@ -201,10 +217,11 @@ async def build_subscription_manifest(
         "metadata": {
             "source": "lumen-api",
             "subscriptionId": str(subscription.id),
-            "profileTitle": delivery.get("profile_title"),
-            "supportUrl": delivery.get("support_url"),
+            "profileTitle": profile_title,
+            "supportUrl": support_url,
+            "profilePageUrl": profile_page_url,
             "trafficLimitGb": delivery.get("traffic_limit_gb"),
-            "updateIntervalHours": delivery.get("update_interval_hours"),
+            "updateIntervalHours": update_interval_hours,
         },
     }
 
@@ -405,6 +422,23 @@ async def _get_optional_host(session: AsyncSession, host_id: str | None) -> Host
             status_code=status.HTTP_404_NOT_FOUND,
         )
     return host
+
+
+async def _subscription_page_settings(session: AsyncSession) -> dict[str, object]:
+    setting = (
+        await session.execute(
+            select(PanelSetting).where(PanelSetting.key == SUBSCRIPTION_INFO_SETTING_KEY),
+        )
+    ).scalar_one_or_none()
+    return dict(setting.value_json) if setting is not None else {}
+
+
+def _setting_string(settings: dict[str, object], key: str) -> str | None:
+    value = settings.get(key)
+    if value is None:
+        return None
+    normalized = str(value).strip()
+    return normalized or None
 
 
 def _manifest_port(
