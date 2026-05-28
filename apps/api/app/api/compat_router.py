@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 
 from app.domains.admin_compat.router import router as admin_compat_router
-from app.domains.api_keys.router import router as api_keys_router
+from app.domains.api_keys.remna_router import router as remna_api_tokens_router
 from app.domains.protocols.router import hosts_router, profiles_router, squads_router
 from app.domains.subscription_assets.router import response_rules_router, templates_router
 from app.domains.tools.router import router as tools_router
@@ -26,7 +26,11 @@ compat_router.include_router(
     prefix="/api/external-squads",
     tags=["remna-external-squads-compat"],
 )
-compat_router.include_router(api_keys_router, prefix="/api/tokens", tags=["remna-tokens-compat"])
+compat_router.include_router(
+    remna_api_tokens_router,
+    prefix="/api/tokens",
+    tags=["remna-tokens-compat"],
+)
 compat_router.include_router(
     templates_router,
     prefix="/api/subscription-templates",

@@ -224,3 +224,60 @@ def test_api_key_routes_issue_scope_and_revoke_keys(tmp_path) -> None:
         )
         assert rejected.status_code == 401
         assert rejected.json()["error"]["code"] == "invalid_api_key"
+
+
+def test_remna_tokens_compat_requires_web_session_and_uses_remna_shape(tmp_path) -> None:
+    with app_client(tmp_path) as client:
+        created = client.post(
+            "/api/v1/users",
+            headers={"X-Lumen-Api-Key": "lumen_sk_test_bootstrap"},
+            json={
+                "email": "owner@example.com",
+                "password": "correct horse battery staple",
+                "role": "owner",
+            },
+        )
+        assert created.status_code == 201
+
+        login = client.post(
+            "/api/v1/auth/login",
+            json={"email": "owner@example.com", "password": "correct horse battery staple"},
+        )
+        access_token = login.json()["access_token"]
+        auth_headers = {"Authorization": f"Bearer {access_token}"}
+
+        bootstrap_rejected = client.get(
+            "/api/tokens",
+            headers={"X-Lumen-Api-Key": "lumen_sk_test_bootstrap"},
+        )
+        assert bootstrap_rejected.status_code == 401
+        assert bootstrap_rejected.json()["error"]["code"] == "web_session_required"
+
+        issued = client.post(
+            "/api/tokens",
+            headers=auth_headers,
+            json={"tokenName": "Remna automation"},
+        )
+        assert issued.status_code == 201
+        issued_body = issued.json()
+        assert set(issued_body) == {"token", "uuid"}
+        assert issued_body["token"].startswith("lumen_sk_")
+
+        listed = client.get("/api/tokens", headers=auth_headers)
+        assert listed.status_code == 200
+        listed_body = listed.json()
+        assert listed_body["apiKeys"][0]["uuid"] == issued_body["uuid"]
+        assert listed_body["apiKeys"][0]["tokenName"] == "Remna automation"
+        assert listed_body["apiKeys"][0]["token"] == issued_body["token"][:18]
+        assert listed_body["docs"]["isDocsEnabled"] is True
+
+        via_api_key_rejected = client.get(
+            "/api/tokens",
+            headers={"X-Lumen-Api-Key": issued_body["token"]},
+        )
+        assert via_api_key_rejected.status_code == 401
+        assert via_api_key_rejected.json()["error"]["code"] == "web_session_required"
+
+        revoked = client.delete(f"/api/tokens/{issued_body['uuid']}", headers=auth_headers)
+        assert revoked.status_code == 200
+        assert revoked.json() == {"isDeleted": True}
