@@ -1,3 +1,4 @@
+import { RefreshCw } from 'lucide-react'
 import { useUsersPageData } from '../shared/api/resourceHooks'
 import type { UserStatus } from '../shared/api/types'
 import { DataTable } from '../shared/components/DataTable'
@@ -24,6 +25,18 @@ export function UsersPage() {
         eyebrow={spec.eyebrow}
         title={spec.title}
         description={spec.description}
+        actions={
+          <button
+            type="button"
+            className="button button--secondary"
+            aria-label="Refresh users"
+            disabled={query.isFetching}
+            onClick={() => void query.refetch()}
+          >
+            <RefreshCw size={18} aria-hidden="true" />
+            Refresh
+          </button>
+        }
       />
 
       {query.isLoading ? <LoadingState label="Loading users..." /> : null}

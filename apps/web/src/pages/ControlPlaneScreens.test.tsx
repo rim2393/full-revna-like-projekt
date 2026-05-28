@@ -56,6 +56,8 @@ describe('Control plane resource screens', () => {
     const apiClient = createMockLumenApiClient()
 
     for (const [path, label] of [
+      ['/users', /refresh users/i],
+      ['/nodes', /refresh nodes/i],
       ['/hosts', /refresh hosts/i],
       ['/profiles', /refresh profiles/i],
       ['/squads', /refresh squads/i],
@@ -65,7 +67,8 @@ describe('Control plane resource screens', () => {
       ['/settings', /refresh settings/i],
     ] as const) {
       const view = renderWithRouter(path, { apiClient, initialSession: mockSession })
-      expect(await screen.findByRole('button', { name: label })).toBeEnabled()
+      const refreshButton = await screen.findByRole('button', { name: label })
+      await waitFor(() => expect(refreshButton).toBeEnabled())
       view.unmount()
     }
   })

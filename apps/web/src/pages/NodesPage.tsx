@@ -361,6 +361,7 @@ export function NodesPage() {
           <button
             type="button"
             className="button button--secondary"
+            aria-label="Refresh nodes"
             disabled={query.isFetching}
             onClick={() => void query.refetch()}
           >
