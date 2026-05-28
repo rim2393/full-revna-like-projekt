@@ -11,6 +11,7 @@ type I18nContextValue = {
 const ru: Record<string, string> = {
   'API keys': 'API-ключи',
   Active: 'Активна',
+  active: 'активна',
   'Admin actions': 'Действия администратора',
   'All nodes': 'Все ноды',
   Attention: 'Внимание',
@@ -54,6 +55,7 @@ const ru: Record<string, string> = {
   'Node heartbeat, license, and API health alerts are clear.':
     'Heartbeat нод, лицензия и состояние API без активных предупреждений.',
   Nodes: 'Ноды',
+  Node: 'Нода',
   Notifications: 'Уведомления',
   'Open navigation': 'Открыть навигацию',
   'Open nodes': 'Открыть ноды',
@@ -94,7 +96,11 @@ const ru: Record<string, string> = {
   'read-only': 'только чтение',
   'Safe URL rendering with no secrets logged': 'Безопасная генерация URL без записи секретов в логи',
   'Control subscription endpoint behavior, cache windows, and client metadata.':
-    'Управление поведением endpoint подписки, окнами кеша и метаданными клиентов.',
+    'Управление поведением эндпоинта подписки, окнами кеша и метаданными клиентов.',
+  revoked: 'отозвана',
+  disabled: 'выключена',
+  expired: 'истекла',
+  limited: 'ограничена',
 }
 
 const I18nContext = createContext<I18nContextValue | undefined>(undefined)
