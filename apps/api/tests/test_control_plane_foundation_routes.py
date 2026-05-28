@@ -788,6 +788,7 @@ async def test_tools_reports_are_real_database_views(foundation_app: FoundationR
             role=Role.USER.value,
             status="active",
             device_limit=1,
+            traffic_used_gb=3.5,
             metadata_json={
                 "devices": [
                     {"id": "phone", "hwid": "HWID-1"},
@@ -795,6 +796,9 @@ async def test_tools_reports_are_real_database_views(foundation_app: FoundationR
                 ]
             },
         )
+        node = await session.get(Node, UUID(node_id))
+        assert node is not None
+        node.last_seen_at = datetime.now(UTC)
         license_record = License(
             license_key_hash=hash_license_key("tools-license"),
             customer_ref="tools",
@@ -811,7 +815,15 @@ async def test_tools_reports_are_real_database_views(foundation_app: FoundationR
             license_id=license_record.id,
             node_id=UUID(node_id),
             status="active",
-            delivery_profile={"client": "happ", "update_interval": "12"},
+            delivery_profile={
+                "client": "happ",
+                "format": "happ",
+                "protocol": "vless-tcp-tls",
+                "server_name": "tools.example.test",
+                "traffic_limit_gb": "25",
+                "update_interval": "12",
+                "update_interval_hours": "12",
+            },
             config_hash="abc123",
         )
         user_session = UserSession(
@@ -851,6 +863,9 @@ async def test_tools_reports_are_real_database_views(foundation_app: FoundationR
     )
     assert srh_row["parser"] == "happ"
     assert srh_row["response_headers"]["Profile-Update-Interval"] == "12"
+    assert srh_row["response_headers"]["X-Lumen-Inspector-Status"] == "renderable"
+    assert "download=3758096384" in srh_row["response_headers"]["Subscription-Userinfo"]
+    assert "total=26843545600" in srh_row["response_headers"]["Subscription-Userinfo"]
 
     sessions_response = await foundation_app.client.get("/api/v1/tools/sessions")
     assert sessions_response.status_code == 200
@@ -871,6 +886,10 @@ async def test_tools_reports_are_real_database_views(foundation_app: FoundationR
         if item["public_id"] == "lumen_sub_tools"
     )
     assert routing_row["route_status"] == "happ"
+
+    summary_response = await foundation_app.client.get("/api/v1/tools/summary")
+    assert summary_response.status_code == 200
+    assert summary_response.json()["happ_routes"] == 1
 
 
 async def test_protocol_profile_rejects_plaintext_credentials_ref(

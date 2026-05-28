@@ -3,6 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import Settings, get_settings
 from app.core.rbac import Permission, Principal, require_permission
 from app.db.session import get_db_session
 from app.domains.tools.schemas import (
@@ -25,6 +26,7 @@ from app.domains.tools.service import (
 router = APIRouter()
 ToolManager = Annotated[Principal, Depends(require_permission(Permission.SUBSCRIPTION_READ))]
 DatabaseSession = Annotated[AsyncSession, Depends(get_db_session)]
+AppSettings = Annotated[Settings, Depends(get_settings)]
 
 
 @router.get("/summary", response_model=ToolSummaryResponse)
@@ -38,8 +40,12 @@ async def read_hwid_inspector(_: ToolManager, session: DatabaseSession) -> HwidI
 
 
 @router.get("/srh-inspector", response_model=SrhInspectorResponse)
-async def read_srh_inspector(_: ToolManager, session: DatabaseSession) -> SrhInspectorResponse:
-    return await inspect_srh(session)
+async def read_srh_inspector(
+    _: ToolManager,
+    session: DatabaseSession,
+    settings: AppSettings,
+) -> SrhInspectorResponse:
+    return await inspect_srh(session, settings=settings)
 
 
 @router.get("/sessions", response_model=SessionInspectorResponse)
