@@ -27,6 +27,8 @@ import type {
   SubscriptionTemplateCreateRequest,
   SubscriptionTemplateUpdateRequest,
   SubscriptionUpdateRequest,
+  ToolSnippetCreateRequest,
+  ToolSnippetUpdateRequest,
   TokenPairResponse,
   UserBulkActionRequest,
   UserCreateRequest,
@@ -174,6 +176,13 @@ export function createHttpLumenApiClient({
     truncateTorrentReports: () =>
       request('/api/v1/tools/torrent-blocker-reports', { method: 'DELETE' }),
     generateX25519Keypair: () => request('/api/v1/tools/x25519-keypair', { method: 'POST' }),
+    listToolSnippets: () => request('/api/v1/tools/snippets'),
+    createToolSnippet: (payload: ToolSnippetCreateRequest) =>
+      request('/api/v1/tools/snippets', { body: payload, method: 'POST' }),
+    updateToolSnippet: (snippetId: string, payload: ToolSnippetUpdateRequest) =>
+      request(`/api/v1/tools/snippets/${snippetId}`, { body: payload, method: 'PATCH' }),
+    deleteToolSnippet: (snippetId: string) =>
+      request(`/api/v1/tools/snippets/${snippetId}`, { method: 'DELETE' }),
     listUsers: () => request('/api/v1/users'),
     getSession: async () => {
       try {

@@ -1,9 +1,11 @@
 import base64
+import re
 from datetime import UTC, datetime
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import x25519
+from fastapi import status
 from sqlalchemy import delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,6 +17,7 @@ from app.domains.audit.service import record_audit_event
 from app.domains.auth.models import UserSession
 from app.domains.auth.service import revoke_session
 from app.domains.nodes.models import Node
+from app.domains.settings.models import PanelSetting
 from app.domains.subscriptions.models import Subscription
 from app.domains.subscriptions.renderers import build_subscription_headers
 from app.domains.subscriptions.service import build_subscription_manifest
@@ -28,12 +31,22 @@ from app.domains.tools.schemas import (
     SessionInspectorRow,
     SrhInspectorResponse,
     SrhInspectorRow,
+    ToolSnippetCreateRequest,
+    ToolSnippetListResponse,
+    ToolSnippetRecord,
+    ToolSnippetUpdateRequest,
     ToolSummaryResponse,
     TorrentReportResponse,
     TorrentReportRow,
     X25519KeypairResponse,
 )
 from app.domains.users.models import User
+
+SNIPPETS_SETTING_KEY = "tools.snippets"
+SECRET_LIKE_PATTERN = re.compile(
+    r"(password|passwd|token|secret|private[_ -]?key|api[_ -]?key|bearer\s+[a-z0-9._-]+)",
+    re.IGNORECASE,
+)
 
 
 async def inspect_hwid(session: AsyncSession) -> HwidInspectorResponse:
@@ -320,6 +333,195 @@ async def generate_x25519_keypair(
         private_key=_base64url_nopad(private_raw),
         public_key=_base64url_nopad(public_raw),
     )
+
+
+async def list_tool_snippets(session: AsyncSession) -> ToolSnippetListResponse:
+    result = await session.execute(
+        select(PanelSetting).where(PanelSetting.key == SNIPPETS_SETTING_KEY)
+    )
+    setting = result.scalar_one_or_none()
+    if setting is None:
+        return ToolSnippetListResponse(items=[])
+    records = [_snippet_record(raw) for raw in _snippet_items(setting)]
+    return ToolSnippetListResponse(items=sorted(records, key=lambda item: (item.order, item.name)))
+
+
+async def create_tool_snippet(
+    session: AsyncSession,
+    *,
+    request: ToolSnippetCreateRequest,
+    principal: Principal,
+) -> ToolSnippetRecord:
+    _ensure_snippet_has_no_secret_like_content(request.content)
+    setting = await _snippets_setting(session, create=True, principal=principal)
+    items = _snippet_items(setting)
+    snippet_id = uuid4()
+    now = datetime.now(UTC)
+    order = request.order if request.order is not None else _next_snippet_order(items)
+    item = {
+        "id": str(snippet_id),
+        "name": request.name,
+        "content": request.content,
+        "description": request.description,
+        "language": request.language,
+        "order": order,
+        "updated_at": now.isoformat(),
+        "updated_by": principal.subject,
+    }
+    items.append(item)
+    await _save_snippet_items(session, setting=setting, items=items, principal=principal)
+    await record_audit_event(
+        session,
+        principal=principal,
+        action="tool.snippet.created",
+        resource_type="tool_snippet",
+        resource_id=str(snippet_id),
+        metadata_json={"name": request.name, "language": request.language},
+    )
+    return _snippet_record(item)
+
+
+async def update_tool_snippet(
+    session: AsyncSession,
+    *,
+    snippet_id: UUID,
+    request: ToolSnippetUpdateRequest,
+    principal: Principal,
+) -> ToolSnippetRecord:
+    setting = await _snippets_setting(session)
+    items = _snippet_items(setting)
+    index = _snippet_index(items, snippet_id=snippet_id)
+    existing = dict(items[index])
+    data = request.model_dump(exclude_unset=True)
+    if "content" in data and data["content"] is not None:
+        _ensure_snippet_has_no_secret_like_content(str(data["content"]))
+    updated = {**existing, **data}
+    updated["updated_at"] = datetime.now(UTC).isoformat()
+    updated["updated_by"] = principal.subject
+    items[index] = updated
+    await _save_snippet_items(session, setting=setting, items=items, principal=principal)
+    await record_audit_event(
+        session,
+        principal=principal,
+        action="tool.snippet.updated",
+        resource_type="tool_snippet",
+        resource_id=str(snippet_id),
+        metadata_json={"name": str(updated["name"]), "language": str(updated["language"])},
+    )
+    return _snippet_record(updated)
+
+
+async def delete_tool_snippet(
+    session: AsyncSession,
+    *,
+    snippet_id: UUID,
+    principal: Principal,
+) -> ToolSnippetListResponse:
+    setting = await _snippets_setting(session)
+    items = _snippet_items(setting)
+    index = _snippet_index(items, snippet_id=snippet_id)
+    removed = items.pop(index)
+    await _save_snippet_items(session, setting=setting, items=items, principal=principal)
+    await record_audit_event(
+        session,
+        principal=principal,
+        action="tool.snippet.deleted",
+        resource_type="tool_snippet",
+        resource_id=str(snippet_id),
+        metadata_json={"name": str(removed.get("name") or "")},
+    )
+    return ToolSnippetListResponse(items=[_snippet_record(item) for item in items])
+
+
+async def _snippets_setting(
+    session: AsyncSession,
+    *,
+    create: bool = False,
+    principal: Principal | None = None,
+) -> PanelSetting:
+    result = await session.execute(
+        select(PanelSetting).where(PanelSetting.key == SNIPPETS_SETTING_KEY)
+    )
+    setting = result.scalar_one_or_none()
+    if setting is None and create:
+        setting = PanelSetting(
+            key=SNIPPETS_SETTING_KEY,
+            value_json={"items": []},
+            updated_by=principal.subject if principal else None,
+        )
+        session.add(setting)
+        await session.flush()
+    if setting is None:
+        raise APIError(
+            code="tool_snippets_not_found",
+            message="No tool snippets have been created.",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+    return setting
+
+
+def _snippet_items(setting: PanelSetting) -> list[dict[str, object]]:
+    raw_items = setting.value_json.get("items", [])
+    if not isinstance(raw_items, list):
+        return []
+    return [dict(item) for item in raw_items if isinstance(item, dict)]
+
+
+async def _save_snippet_items(
+    session: AsyncSession,
+    *,
+    setting: PanelSetting,
+    items: list[dict[str, object]],
+    principal: Principal,
+) -> None:
+    setting.value_json = {"items": items}
+    setting.updated_by = principal.subject
+    await session.flush()
+
+
+def _snippet_record(raw: dict[str, object]) -> ToolSnippetRecord:
+    updated_at = raw.get("updated_at")
+    parsed_updated_at = (
+        datetime.fromisoformat(str(updated_at))
+        if updated_at is not None
+        else datetime.now(UTC)
+    )
+    return ToolSnippetRecord(
+        id=UUID(str(raw["id"])),
+        name=str(raw.get("name") or "Untitled snippet"),
+        content=str(raw.get("content") or ""),
+        description=str(raw["description"]) if raw.get("description") is not None else None,
+        language=str(raw.get("language") or "text"),
+        order=int(raw.get("order") or 0),
+        updated_at=parsed_updated_at,
+        updated_by=str(raw["updated_by"]) if raw.get("updated_by") is not None else None,
+    )
+
+
+def _next_snippet_order(items: list[dict[str, object]]) -> int:
+    if not items:
+        return 0
+    return max(int(item.get("order") or 0) for item in items) + 1
+
+
+def _snippet_index(items: list[dict[str, object]], *, snippet_id: UUID) -> int:
+    for index, item in enumerate(items):
+        if str(item.get("id")) == str(snippet_id):
+            return index
+    raise APIError(
+        code="tool_snippet_not_found",
+        message="Tool snippet was not found.",
+        status_code=status.HTTP_404_NOT_FOUND,
+    )
+
+
+def _ensure_snippet_has_no_secret_like_content(content: str) -> None:
+    if SECRET_LIKE_PATTERN.search(content):
+        raise APIError(
+            code="tool_snippet_secret_like_content",
+            message="Tool snippets must not store passwords, tokens, API keys, or private keys.",
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        )
 
 
 def _base64url_nopad(value: bytes) -> str:

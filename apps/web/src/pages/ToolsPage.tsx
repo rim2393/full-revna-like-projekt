@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react'
-import { Activity, Fingerprint, Flame, Radar, Route, Trash2 } from 'lucide-react'
+import { Activity, Fingerprint, Flame, Radar, Route, ScrollText, Trash2 } from 'lucide-react'
 import {
   useClearUserDevices,
+  useCreateToolSnippet,
+  useDeleteToolSnippet,
   useDeleteUserDevice,
   useGenerateX25519Keypair,
   useHappRoutingData,
@@ -10,8 +12,10 @@ import {
   useSessionInspectorData,
   useSrhInspectorData,
   useToolSummaryData,
+  useToolSnippetsData,
   useTorrentReportsData,
   useTruncateTorrentReports,
+  useUpdateToolSnippet,
 } from '../shared/api/resourceHooks'
 import { DataTable } from '../shared/components/DataTable'
 import { EmptyState, ErrorState, LoadingState } from '../shared/components/DataState'
@@ -19,7 +23,7 @@ import { PageHeader } from '../shared/components/PageHeader'
 import { StatusBadge } from '../shared/components/StatusBadge'
 import { formatDateTime, formatRecord, toneForStatus } from '../shared/utils/resourceFormat'
 
-type ToolId = 'hwid' | 'srh' | 'sessions' | 'torrent' | 'happ'
+type ToolId = 'hwid' | 'srh' | 'sessions' | 'torrent' | 'happ' | 'snippets'
 
 const tools: Array<{
   detail: string
@@ -57,22 +61,45 @@ const tools: Array<{
     id: 'happ',
     name: 'HApp routing',
   },
+  {
+    detail: 'Store reusable operational snippets in the control-plane database.',
+    icon: ScrollText,
+    id: 'snippets',
+    name: 'Snippets',
+  },
 ]
 
 export function ToolsPage() {
   const [activeTool, setActiveTool] = useState<ToolId>('hwid')
+  const [snippetForm, setSnippetForm] = useState({
+    content: 'systemctl status xray',
+    language: 'shell',
+    name: 'Xray status',
+  })
   const summaryQuery = useToolSummaryData()
   const hwidQuery = useHwidInspectorData()
   const srhQuery = useSrhInspectorData()
   const sessionsQuery = useSessionInspectorData()
   const torrentQuery = useTorrentReportsData()
   const happQuery = useHappRoutingData()
+  const snippetsQuery = useToolSnippetsData()
   const deleteDevice = useDeleteUserDevice()
   const clearDevices = useClearUserDevices()
   const revokeToolSession = useRevokeToolSession()
   const truncateTorrentReports = useTruncateTorrentReports()
   const generateX25519Keypair = useGenerateX25519Keypair()
-  const queries = [summaryQuery, hwidQuery, srhQuery, sessionsQuery, torrentQuery, happQuery]
+  const createSnippet = useCreateToolSnippet()
+  const updateSnippet = useUpdateToolSnippet()
+  const deleteSnippet = useDeleteToolSnippet()
+  const queries = [
+    summaryQuery,
+    hwidQuery,
+    srhQuery,
+    sessionsQuery,
+    torrentQuery,
+    happQuery,
+    snippetsQuery,
+  ]
   const isLoading = queries.some((query) => query.isLoading)
   const error = queries.find((query) => query.isError)?.error
 
@@ -192,6 +219,46 @@ export function ToolsPage() {
         title: 'Torrent blocker reports',
       }
     }
+    if (activeTool === 'snippets') {
+      return {
+        columns: ['Name', 'Language', 'Content', 'Updated', 'Actions'],
+        empty: 'No snippets stored.',
+        rows: (snippetsQuery.data?.items ?? []).map((item) => ({
+          cells: [
+            item.name,
+            item.language,
+            item.content,
+            formatDateTime(item.updated_at),
+            <div className="inline-actions">
+              <button
+                type="button"
+                className="button button--secondary"
+                disabled={updateSnippet.isPending}
+                onClick={() =>
+                  void updateSnippet.mutateAsync({
+                    id: item.id,
+                    request: { content: item.content, name: item.name },
+                  })
+                }
+              >
+                Save
+              </button>
+              <button
+                type="button"
+                className="icon-button"
+                aria-label={`Delete snippet ${item.name}`}
+                disabled={deleteSnippet.isPending}
+                onClick={() => void deleteSnippet.mutateAsync(item.id)}
+              >
+                <Trash2 size={16} aria-hidden="true" />
+              </button>
+            </div>,
+          ],
+          id: item.id,
+        })),
+        title: 'Snippets',
+      }
+    }
     return {
       columns: ['Subscription', 'User', 'Node', 'Route', 'Delivery profile'],
       empty: 'No HApp routes recorded.',
@@ -211,14 +278,17 @@ export function ToolsPage() {
     activeTool,
     clearDevices,
     deleteDevice,
+    deleteSnippet,
     happQuery.data,
     hwidQuery.data,
     generateX25519Keypair,
     revokeToolSession,
     sessionsQuery.data,
+    snippetsQuery.data,
     srhQuery.data,
     truncateTorrentReports,
     torrentQuery.data,
+    updateSnippet,
   ])
 
   return (
@@ -269,6 +339,16 @@ export function ToolsPage() {
                   Generate X25519
                 </button>
               ) : null}
+              {activeTool === 'snippets' ? (
+                <button
+                  type="button"
+                  className="button button--secondary"
+                  disabled={createSnippet.isPending}
+                  onClick={() => void createSnippet.mutateAsync(snippetForm)}
+                >
+                  Create snippet
+                </button>
+              ) : null}
             </div>
             <div className="toolbar">
               {tools.map((tool) => {
@@ -313,6 +393,46 @@ export function ToolsPage() {
                     <dd>{generateX25519Keypair.data.encoding}</dd>
                   </div>
                 </dl>
+              </div>
+            ) : null}
+            {activeTool === 'snippets' ? (
+              <div className="details-card">
+                <h3>Snippet editor</h3>
+                <div className="form-grid">
+                  <label>
+                    <span>Name</span>
+                    <input
+                      value={snippetForm.name}
+                      onChange={(event) =>
+                        setSnippetForm((current) => ({ ...current, name: event.target.value }))
+                      }
+                    />
+                  </label>
+                  <label>
+                    <span>Language</span>
+                    <input
+                      value={snippetForm.language}
+                      onChange={(event) =>
+                        setSnippetForm((current) => ({
+                          ...current,
+                          language: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                  <label className="form-grid__wide">
+                    <span>Content</span>
+                    <textarea
+                      value={snippetForm.content}
+                      onChange={(event) =>
+                        setSnippetForm((current) => ({
+                          ...current,
+                          content: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                </div>
               </div>
             ) : null}
           </article>

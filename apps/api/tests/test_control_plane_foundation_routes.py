@@ -1087,6 +1087,62 @@ async def test_tools_reports_are_real_database_views(foundation_app: FoundationR
         ).scalar_one()
         assert keygen_audit.metadata_json["private_key_stored"] == "false"
 
+    empty_snippets_response = await foundation_app.client.get("/api/v1/tools/snippets")
+    assert empty_snippets_response.status_code == 200
+    assert empty_snippets_response.json()["items"] == []
+
+    create_snippet_response = await foundation_app.client.post(
+        "/api/v1/tools/snippets",
+        json={
+            "name": "Xray restart",
+            "content": "systemctl restart xray",
+            "language": "shell",
+            "description": "Restart Xray safely",
+        },
+    )
+    assert create_snippet_response.status_code == 201
+    snippet = create_snippet_response.json()
+    assert snippet["name"] == "Xray restart"
+    assert snippet["language"] == "shell"
+
+    list_snippets_response = await foundation_app.client.get("/api/v1/tools/snippets")
+    assert list_snippets_response.status_code == 200
+    assert [item["id"] for item in list_snippets_response.json()["items"]] == [snippet["id"]]
+
+    update_snippet_response = await foundation_app.client.patch(
+        f"/api/v1/tools/snippets/{snippet['id']}",
+        json={"name": "Xray status", "content": "systemctl status xray"},
+    )
+    assert update_snippet_response.status_code == 200
+    assert update_snippet_response.json()["name"] == "Xray status"
+
+    secret_snippet_response = await foundation_app.client.post(
+        "/api/v1/tools/snippets",
+        json={"name": "Bad snippet", "content": "export API_TOKEN=plaintext"},
+    )
+    assert secret_snippet_response.status_code == 422
+    assert secret_snippet_response.json()["error"]["code"] == "tool_snippet_secret_like_content"
+
+    delete_snippet_response = await foundation_app.client.delete(
+        f"/api/v1/tools/snippets/{snippet['id']}"
+    )
+    assert delete_snippet_response.status_code == 200
+    assert delete_snippet_response.json()["items"] == []
+    async with foundation_app.sessionmaker() as session:
+        snippet_actions = [
+            row[0]
+            for row in (
+                await session.execute(
+                    select(AuditEvent.action).where(AuditEvent.resource_type == "tool_snippet")
+                )
+            ).all()
+        ]
+        assert snippet_actions == [
+            "tool.snippet.created",
+            "tool.snippet.updated",
+            "tool.snippet.deleted",
+        ]
+
 
 async def test_protocol_profile_rejects_plaintext_credentials_ref(
     foundation_app: FoundationRouteApp,

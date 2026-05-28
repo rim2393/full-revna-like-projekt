@@ -12,20 +12,28 @@ from app.domains.tools.schemas import (
     HwidInspectorResponse,
     SessionInspectorResponse,
     SrhInspectorResponse,
+    ToolSnippetCreateRequest,
+    ToolSnippetListResponse,
+    ToolSnippetRecord,
+    ToolSnippetUpdateRequest,
     ToolSummaryResponse,
     TorrentReportResponse,
     X25519KeypairResponse,
 )
 from app.domains.tools.service import (
+    create_tool_snippet,
+    delete_tool_snippet,
     generate_x25519_keypair,
     inspect_happ_routing,
     inspect_hwid,
     inspect_sessions,
     inspect_srh,
     inspect_torrent_reports,
+    list_tool_snippets,
     revoke_inspected_session,
     summarize_tools,
     truncate_torrent_reports,
+    update_tool_snippet,
 )
 
 router = APIRouter()
@@ -100,5 +108,49 @@ async def create_x25519_keypair(
     session: DatabaseSession,
 ) -> X25519KeypairResponse:
     response = await generate_x25519_keypair(session, principal=principal)
+    await session.commit()
+    return response
+
+
+@router.get("/snippets", response_model=ToolSnippetListResponse)
+async def read_tool_snippets(_: ToolManager, session: DatabaseSession) -> ToolSnippetListResponse:
+    return await list_tool_snippets(session)
+
+
+@router.post("/snippets", response_model=ToolSnippetRecord, status_code=201)
+async def create_snippet(
+    request: ToolSnippetCreateRequest,
+    principal: UtilityManager,
+    session: DatabaseSession,
+) -> ToolSnippetRecord:
+    response = await create_tool_snippet(session, request=request, principal=principal)
+    await session.commit()
+    return response
+
+
+@router.patch("/snippets/{snippet_id}", response_model=ToolSnippetRecord)
+async def update_snippet(
+    snippet_id: UUID,
+    request: ToolSnippetUpdateRequest,
+    principal: UtilityManager,
+    session: DatabaseSession,
+) -> ToolSnippetRecord:
+    response = await update_tool_snippet(
+        session,
+        snippet_id=snippet_id,
+        request=request,
+        principal=principal,
+    )
+    await session.commit()
+    return response
+
+
+@router.delete("/snippets/{snippet_id}", response_model=ToolSnippetListResponse)
+async def delete_snippet(
+    snippet_id: UUID,
+    principal: UtilityManager,
+    session: DatabaseSession,
+) -> ToolSnippetListResponse:
+    response = await delete_tool_snippet(session, snippet_id=snippet_id, principal=principal)
     await session.commit()
     return response

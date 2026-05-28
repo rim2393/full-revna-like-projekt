@@ -385,6 +385,72 @@ describe('Control plane resource screens', () => {
     expect(screen.getByText('private-key')).toBeInTheDocument()
   })
 
+  it('wires tool snippet CRUD actions to backend requests', async () => {
+    const user = userEvent.setup()
+    const createToolSnippet = vi.fn(async () => ({
+      content: 'systemctl status xray',
+      description: null,
+      id: 'snippet-1',
+      language: 'shell',
+      name: 'Xray status',
+      order: 0,
+      updated_at: '2026-05-28T00:00:00.000Z',
+      updated_by: 'owner',
+    }))
+    const updateToolSnippet = vi.fn(async () => ({
+      content: 'systemctl status xray',
+      description: null,
+      id: 'snippet-1',
+      language: 'shell',
+      name: 'Xray status',
+      order: 0,
+      updated_at: '2026-05-28T00:00:00.000Z',
+      updated_by: 'owner',
+    }))
+    const deleteToolSnippet = vi.fn(async () => ({ items: [] }))
+    const apiClient: LumenApiClient = {
+      ...createDevelopmentLumenApiClient(),
+      createToolSnippet,
+      deleteToolSnippet,
+      listToolSnippets: async () => ({
+        items: [
+          {
+            content: 'systemctl status xray',
+            description: null,
+            id: 'snippet-1',
+            language: 'shell',
+            name: 'Xray status',
+            order: 0,
+            updated_at: '2026-05-28T00:00:00.000Z',
+            updated_by: 'owner',
+          },
+        ],
+      }),
+      updateToolSnippet,
+    }
+
+    renderWithRouter('/tools', { apiClient, initialSession: developmentSession })
+
+    await user.click(await screen.findByRole('button', { name: /^snippets$/i }))
+    await user.click(screen.getByRole('button', { name: /create snippet/i }))
+    await waitFor(() =>
+      expect(createToolSnippet).toHaveBeenCalledWith({
+        content: 'systemctl status xray',
+        language: 'shell',
+        name: 'Xray status',
+      }),
+    )
+    await user.click(screen.getByRole('button', { name: /^save$/i }))
+    await waitFor(() =>
+      expect(updateToolSnippet).toHaveBeenCalledWith('snippet-1', {
+        content: 'systemctl status xray',
+        name: 'Xray status',
+      }),
+    )
+    await user.click(screen.getByRole('button', { name: /delete snippet xray status/i }))
+    await waitFor(() => expect(deleteToolSnippet).toHaveBeenCalledWith('snippet-1'))
+  })
+
   it('exposes refresh buttons as real accessible controls on resource screens', async () => {
     const apiClient = createDevelopmentLumenApiClient()
 

@@ -24,6 +24,8 @@ import type {
   SubscriptionTemplateCreateRequest,
   SubscriptionTemplateUpdateRequest,
   SubscriptionUpdateRequest,
+  ToolSnippetCreateRequest,
+  ToolSnippetUpdateRequest,
   UserBulkActionRequest,
   UserCreateRequest,
   UserUpdateRequest,
@@ -53,6 +55,7 @@ export const resourceQueryKeys = {
   toolSessions: ['resource', 'tools', 'sessions'] as const,
   toolTorrentReports: ['resource', 'tools', 'torrent-reports'] as const,
   toolHappRouting: ['resource', 'tools', 'happ-routing'] as const,
+  toolSnippets: ['resource', 'tools', 'snippets'] as const,
   userDetail: (userId: string) => ['resource', 'users', userId, 'detail'] as const,
   users: ['resource', 'users'] as const,
 }
@@ -622,6 +625,52 @@ export function useHappRoutingData() {
   return useQuery({
     queryFn: apiClient.inspectHappRouting,
     queryKey: resourceQueryKeys.toolHappRouting,
+  })
+}
+
+export function useToolSnippetsData() {
+  const apiClient = useApiClient()
+
+  return useQuery({
+    queryFn: apiClient.listToolSnippets,
+    queryKey: resourceQueryKeys.toolSnippets,
+  })
+}
+
+export function useCreateToolSnippet() {
+  const apiClient = useApiClient()
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (request: ToolSnippetCreateRequest) => apiClient.createToolSnippet(request),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.toolSnippets })
+    },
+  })
+}
+
+export function useUpdateToolSnippet() {
+  const apiClient = useApiClient()
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ id, request }: { id: string; request: ToolSnippetUpdateRequest }) =>
+      apiClient.updateToolSnippet(id, request),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.toolSnippets })
+    },
+  })
+}
+
+export function useDeleteToolSnippet() {
+  const apiClient = useApiClient()
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (id: string) => apiClient.deleteToolSnippet(id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.toolSnippets })
+    },
   })
 }
 

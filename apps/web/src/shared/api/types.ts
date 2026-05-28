@@ -729,6 +729,31 @@ export type X25519KeypairResponse = {
   public_key: string
 }
 
+export type ToolSnippetRecord = {
+  content: string
+  description: string | null
+  id: string
+  language: string
+  name: string
+  order: number
+  updated_at: string
+  updated_by: string | null
+}
+
+export type ToolSnippetCreateRequest = {
+  content: string
+  description?: string | null
+  language?: string
+  name: string
+  order?: number | null
+}
+
+export type ToolSnippetUpdateRequest = Partial<ToolSnippetCreateRequest>
+
+export type ToolSnippetListResponse = {
+  items: ToolSnippetRecord[]
+}
+
 export type SettingRecord = {
   id?: string
   key: string
@@ -877,6 +902,13 @@ export type LumenApiClient = {
   inspectHappRouting: () => Promise<HappRoutingResponse>
   truncateTorrentReports: () => Promise<TorrentReportResponse>
   generateX25519Keypair: () => Promise<X25519KeypairResponse>
+  listToolSnippets: () => Promise<ToolSnippetListResponse>
+  createToolSnippet: (request: ToolSnippetCreateRequest) => Promise<ToolSnippetRecord>
+  updateToolSnippet: (
+    snippetId: string,
+    request: ToolSnippetUpdateRequest,
+  ) => Promise<ToolSnippetRecord>
+  deleteToolSnippet: (snippetId: string) => Promise<ToolSnippetListResponse>
   listUsers: () => Promise<UserListResponse>
   login: (request: LoginRequest) => Promise<AuthSession | MfaChallenge>
   logout: () => Promise<void>

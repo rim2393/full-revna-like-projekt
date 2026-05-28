@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class HwidDeviceRecord(BaseModel):
@@ -99,3 +99,38 @@ class X25519KeypairResponse(BaseModel):
     public_key: str
     private_key: str
     encoding: str = "base64url-nopad"
+
+
+class ToolSnippetRecord(BaseModel):
+    id: UUID
+    name: str
+    content: str
+    description: str | None = None
+    language: str = "text"
+    order: int = 0
+    updated_at: datetime
+    updated_by: str | None = None
+
+
+class ToolSnippetCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1, max_length=128)
+    content: str = Field(min_length=1, max_length=12000)
+    description: str | None = Field(default=None, max_length=512)
+    language: str = Field(default="text", min_length=1, max_length=32)
+    order: int | None = None
+
+
+class ToolSnippetUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str | None = Field(default=None, min_length=1, max_length=128)
+    content: str | None = Field(default=None, min_length=1, max_length=12000)
+    description: str | None = Field(default=None, max_length=512)
+    language: str | None = Field(default=None, min_length=1, max_length=32)
+    order: int | None = None
+
+
+class ToolSnippetListResponse(BaseModel):
+    items: list[ToolSnippetRecord]

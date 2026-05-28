@@ -677,6 +677,32 @@ export function createDevelopmentLumenApiClient(): LumenApiClient {
       private_key: 'development-private-key-not-for-production-use',
       public_key: 'development-public-key-not-for-production-use',
     }),
+    listToolSnippets: async () => ({
+      items: [],
+    }),
+    createToolSnippet: async (request) => ({
+      content: request.content,
+      description: request.description ?? null,
+      id: `snippet-${Date.now()}`,
+      language: request.language ?? 'text',
+      name: request.name,
+      order: request.order ?? 0,
+      updated_at: generatedAt,
+      updated_by: developmentSession.userId,
+    }),
+    updateToolSnippet: async (snippetId, request) => ({
+      content: request.content ?? 'updated snippet',
+      description: request.description ?? null,
+      id: snippetId,
+      language: request.language ?? 'text',
+      name: request.name ?? 'Updated snippet',
+      order: request.order ?? 0,
+      updated_at: generatedAt,
+      updated_by: developmentSession.userId,
+    }),
+    deleteToolSnippet: async () => ({
+      items: [],
+    }),
     revokeToolSession: async (sessionId: string): Promise<SessionInspectorResponse> => ({
       items: users.slice(0, 3).map((user) => ({
         created_at: generatedAt,
