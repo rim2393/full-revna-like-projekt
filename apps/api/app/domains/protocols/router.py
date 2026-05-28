@@ -15,6 +15,8 @@ from app.domains.protocols.schemas import (
     HostUpdateRequest,
     PortCheckRequest,
     PortCheckResponse,
+    ProfileComputedConfigResponse,
+    ProfileInboundListResponse,
     ProtocolAdapterListResponse,
     ProtocolProfileCreateRequest,
     ProtocolProfileListResponse,
@@ -38,9 +40,12 @@ from app.domains.protocols.service import (
     delete_squad,
     get_host,
     get_profile,
+    get_profile_computed_config,
     get_squad,
     host_response,
+    list_global_profile_inbounds,
     list_hosts,
+    list_profile_inbounds,
     list_profiles,
     list_protocol_adapters,
     list_squads,
@@ -104,6 +109,14 @@ async def post_profile(
     return profile_response(profile)
 
 
+@profiles_router.get("/inbounds", response_model=ProfileInboundListResponse)
+async def read_all_profile_inbounds(
+    _: Manager,
+    session: DatabaseSession,
+) -> ProfileInboundListResponse:
+    return ProfileInboundListResponse(items=await list_global_profile_inbounds(session))
+
+
 @profiles_router.get("/{profile_id}", response_model=ProtocolProfileResponse)
 async def read_profile(
     profile_id: UUID,
@@ -111,6 +124,25 @@ async def read_profile(
     session: DatabaseSession,
 ) -> ProtocolProfileResponse:
     return profile_response(await get_profile(session, profile_id=profile_id))
+
+
+@profiles_router.get("/{profile_id}/computed-config", response_model=ProfileComputedConfigResponse)
+async def read_profile_computed_config(
+    profile_id: UUID,
+    _: Manager,
+    session: DatabaseSession,
+) -> ProfileComputedConfigResponse:
+    return await get_profile_computed_config(session, profile_id=profile_id)
+
+
+@profiles_router.get("/{profile_id}/inbounds", response_model=ProfileInboundListResponse)
+async def read_profile_inbounds(
+    profile_id: UUID,
+    _: Manager,
+    session: DatabaseSession,
+) -> ProfileInboundListResponse:
+    inbounds = await list_profile_inbounds(session, profile_id=profile_id)
+    return ProfileInboundListResponse(items=inbounds)
 
 
 @profiles_router.patch("/{profile_id}", response_model=ProtocolProfileResponse)

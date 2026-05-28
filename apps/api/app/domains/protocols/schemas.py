@@ -116,6 +116,56 @@ class ProtocolProfileListResponse(BaseModel):
     items: list[ProtocolProfileResponse]
 
 
+class ProfileComputedNodeResponse(BaseModel):
+    id: UUID
+    name: str
+    region: str
+    public_address: str
+    status: str
+    capabilities: dict[str, str]
+
+
+class ProfileInboundHostBindingResponse(BaseModel):
+    id: UUID
+    name: str
+    hostname: str
+    address: str | None
+    port: int | None
+    inbound_tag: str | None
+    status: str
+    tags: list[str]
+    remark: str | None
+
+
+class ProfileInboundResponse(BaseModel):
+    profile_id: UUID
+    profile_name: str
+    node_id: UUID
+    node_name: str
+    adapter: str
+    status: str
+    tag: str
+    protocol: str
+    listen: str
+    port: int
+    transport: str
+    security: str
+    credentials_ref: str | None
+    hosts: list[ProfileInboundHostBindingResponse]
+    config_json: dict[str, object]
+
+
+class ProfileInboundListResponse(BaseModel):
+    items: list[ProfileInboundResponse]
+
+
+class ProfileComputedConfigResponse(BaseModel):
+    profile: ProtocolProfileResponse
+    node: ProfileComputedNodeResponse
+    inbounds: list[ProfileInboundResponse]
+    computed_config: dict[str, object]
+
+
 class SquadCreateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

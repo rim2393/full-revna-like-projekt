@@ -1,3 +1,4 @@
+from copy import deepcopy
 from uuid import UUID
 
 from fastapi import status
@@ -16,6 +17,10 @@ from app.domains.protocols.schemas import (
     PortCheckResponse,
     PortConflict,
     PortReservation,
+    ProfileComputedConfigResponse,
+    ProfileComputedNodeResponse,
+    ProfileInboundHostBindingResponse,
+    ProfileInboundResponse,
     ProtocolAdapterResponse,
     ProtocolProfileCreateRequest,
     ProtocolProfileResponse,
@@ -289,6 +294,44 @@ async def get_profile(session: AsyncSession, *, profile_id: UUID) -> ProtocolPro
             status_code=status.HTTP_404_NOT_FOUND,
         )
     return profile
+
+
+async def get_profile_computed_config(
+    session: AsyncSession,
+    *,
+    profile_id: UUID,
+) -> ProfileComputedConfigResponse:
+    profile = await get_profile(session, profile_id=profile_id)
+    node = await _get_profile_node(session, profile)
+    inbounds = await list_profile_inbounds(session, profile_id=profile.id)
+    computed_config = _computed_xray_config(profile, inbounds)
+    return ProfileComputedConfigResponse(
+        profile=profile_response(profile),
+        node=_computed_node_response(node),
+        inbounds=inbounds,
+        computed_config=computed_config,
+    )
+
+
+async def list_profile_inbounds(
+    session: AsyncSession,
+    *,
+    profile_id: UUID,
+) -> list[ProfileInboundResponse]:
+    profile = await get_profile(session, profile_id=profile_id)
+    node = await _get_profile_node(session, profile)
+    hosts = await _list_profile_hosts(session, profile_id=profile.id)
+    return _profile_inbounds(profile=profile, node=node, hosts=hosts)
+
+
+async def list_global_profile_inbounds(session: AsyncSession) -> list[ProfileInboundResponse]:
+    profiles = await list_profiles(session)
+    inbounds: list[ProfileInboundResponse] = []
+    for profile in profiles:
+        node = await _get_profile_node(session, profile)
+        hosts = await _list_profile_hosts(session, profile_id=profile.id)
+        inbounds.extend(_profile_inbounds(profile=profile, node=node, hosts=hosts))
+    return inbounds
 
 
 async def create_profile(
@@ -630,6 +673,17 @@ def profile_response(profile: ProtocolProfile) -> ProtocolProfileResponse:
     )
 
 
+def _computed_node_response(node: Node) -> ProfileComputedNodeResponse:
+    return ProfileComputedNodeResponse(
+        id=node.id,
+        name=node.name,
+        region=node.region,
+        public_address=node.public_address,
+        status=node.status,
+        capabilities=node.capabilities,
+    )
+
+
 def squad_response(squad: Squad) -> SquadResponse:
     return SquadResponse(
         id=squad.id,
@@ -656,6 +710,240 @@ def host_response(host: Host) -> HostResponse:
         remark=host.remark,
         metadata_json=host.metadata_json,
     )
+
+
+async def _get_profile_node(session: AsyncSession, profile: ProtocolProfile) -> Node:
+    node = await session.get(Node, profile.node_id)
+    if node is None:
+        raise APIError(
+            code="profile_node_not_found",
+            message="Protocol profile node was not found.",
+            status_code=status.HTTP_404_NOT_FOUND,
+            details=[str(profile.node_id)],
+        )
+    return node
+
+
+async def _list_profile_hosts(session: AsyncSession, *, profile_id: UUID) -> list[Host]:
+    result = await session.execute(
+        select(Host)
+        .where(Host.protocol_profile_id == profile_id)
+        .order_by(Host.created_at.desc(), Host.name.asc())
+    )
+    return list(result.scalars().all())
+
+
+def _profile_inbounds(
+    *,
+    profile: ProtocolProfile,
+    node: Node,
+    hosts: list[Host],
+) -> list[ProfileInboundResponse]:
+    reservations = profile.port_reservations or []
+    if not reservations and hosts:
+        reservations = [_reservation_from_host(host) for host in hosts if host.port is not None]
+    if not reservations:
+        config_port = profile.config_json.get("port")
+        if config_port is None:
+            return []
+        reservations = [_reservation_from_profile_defaults(profile, port=config_port)]
+
+    return [
+        _profile_inbound_response(
+            profile=profile,
+            node=node,
+            hosts=hosts,
+            reservation=reservation,
+            index=index,
+        )
+        for index, reservation in enumerate(reservations)
+    ]
+
+
+def _profile_inbound_response(
+    *,
+    profile: ProtocolProfile,
+    node: Node,
+    hosts: list[Host],
+    reservation: dict[str, object],
+    index: int,
+) -> ProfileInboundResponse:
+    port = _port_from_reservation(reservation)
+    return ProfileInboundResponse(
+        profile_id=profile.id,
+        profile_name=profile.name,
+        node_id=node.id,
+        node_name=node.name,
+        adapter=profile.adapter,
+        status=profile.status,
+        tag=_inbound_tag(profile=profile, hosts=hosts, index=index),
+        protocol=_inbound_protocol(profile.adapter),
+        listen=str(reservation.get("address") or WILDCARD_BIND_ADDRESS),
+        port=port,
+        transport=_inbound_transport(profile),
+        security=_inbound_security(profile),
+        credentials_ref=profile.credentials_ref,
+        hosts=[_host_binding_response(host) for host in hosts],
+        config_json=profile.config_json,
+    )
+
+
+def _computed_xray_config(
+    profile: ProtocolProfile,
+    inbounds: list[ProfileInboundResponse],
+) -> dict[str, object]:
+    config = deepcopy(profile.config_json)
+    if not isinstance(config, dict):
+        config = {}
+    config.setdefault("log", {"loglevel": "warning"})
+    config.setdefault("routing", {"rules": []})
+    config.setdefault("inbounds", [_xray_inbound(inbound) for inbound in inbounds])
+    return config
+
+
+def _xray_inbound(inbound: ProfileInboundResponse) -> dict[str, object]:
+    return {
+        "tag": inbound.tag,
+        "listen": inbound.listen,
+        "port": inbound.port,
+        "protocol": inbound.protocol,
+        "settings": _xray_inbound_settings(inbound),
+        "streamSettings": {
+            "network": inbound.transport,
+            "security": inbound.security,
+        },
+    }
+
+
+def _xray_inbound_settings(inbound: ProfileInboundResponse) -> dict[str, object]:
+    if inbound.protocol == "vless":
+        settings: dict[str, object] = {"decryption": "none"}
+    else:
+        settings = {}
+    if inbound.credentials_ref is not None:
+        settings["clientsRef"] = inbound.credentials_ref
+    return settings
+
+
+def _host_binding_response(host: Host) -> ProfileInboundHostBindingResponse:
+    return ProfileInboundHostBindingResponse(
+        id=host.id,
+        name=host.name,
+        hostname=host.hostname,
+        address=host.address,
+        port=host.port,
+        inbound_tag=host.inbound_tag,
+        status=host.status,
+        tags=host.tags,
+        remark=host.remark,
+    )
+
+
+def _reservation_from_host(host: Host) -> dict[str, object]:
+    return {
+        "address": host.address or WILDCARD_BIND_ADDRESS,
+        "port": host.port,
+        "protocol": "tcp",
+        "exclusive": True,
+    }
+
+
+def _reservation_from_profile_defaults(
+    profile: ProtocolProfile,
+    *,
+    port: object,
+) -> dict[str, object]:
+    return {
+        "address": WILDCARD_BIND_ADDRESS,
+        "port": port,
+        "protocol": "udp" if _inbound_transport(profile) == "udp" else "tcp",
+        "exclusive": True,
+    }
+
+
+def _port_from_reservation(reservation: dict[str, object]) -> int:
+    try:
+        port = int(str(reservation["port"]))
+    except (KeyError, TypeError, ValueError) as exc:
+        raise APIError(
+            code="profile_inbound_port_invalid",
+            message="Protocol profile inbound reservation has an invalid port.",
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            details=["profile.port_reservations.port"],
+        ) from exc
+    if port < 1 or port > 65535:
+        raise APIError(
+            code="profile_inbound_port_invalid",
+            message="Protocol profile inbound reservation has an out-of-range port.",
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            details=["profile.port_reservations.port"],
+        )
+    return port
+
+
+def _inbound_tag(*, profile: ProtocolProfile, hosts: list[Host], index: int) -> str:
+    host_tag = next((host.inbound_tag for host in hosts if host.inbound_tag), None)
+    config_tag = profile.config_json.get("tag")
+    if isinstance(config_tag, str) and config_tag:
+        return config_tag
+    if host_tag is not None:
+        return host_tag
+    suffix = "" if index == 0 else f"-{index + 1}"
+    return f"{profile.adapter}-{profile.id}{suffix}"
+
+
+def _inbound_protocol(adapter: str) -> str:
+    if adapter.startswith("vless"):
+        return "vless"
+    if adapter.startswith("vmess"):
+        return "vmess"
+    if adapter.startswith("trojan"):
+        return "trojan"
+    if adapter.startswith("shadowsocks"):
+        return "shadowsocks"
+    if adapter.startswith("wireguard"):
+        return "wireguard"
+    if adapter.startswith("hysteria2"):
+        return "hysteria2"
+    if adapter.startswith("tuic"):
+        return "tuic"
+    if adapter == "naiveproxy":
+        return "http"
+    if adapter == "socks5":
+        return "socks"
+    if adapter == "http-proxy":
+        return "http"
+    if adapter == "tcp-smoke":
+        return "tcp"
+    return adapter.split("-", maxsplit=1)[0]
+
+
+def _inbound_transport(profile: ProtocolProfile) -> str:
+    network = profile.config_json.get("network") or profile.config_json.get("transport")
+    if isinstance(network, str) and network:
+        return network
+    if "grpc" in profile.adapter:
+        return "grpc"
+    if "xhttp" in profile.adapter:
+        return "xhttp"
+    if "httpupgrade" in profile.adapter:
+        return "httpupgrade"
+    if "-ws" in profile.adapter or "websocket" in profile.adapter:
+        return "ws"
+    if profile.adapter in {"wireguard-native", "wireguard-amneziawg", "hysteria2", "tuic-v5"}:
+        return "udp"
+    return "tcp"
+
+
+def _inbound_security(profile: ProtocolProfile) -> str:
+    security = profile.config_json.get("security")
+    if isinstance(security, dict) and isinstance(security.get("type"), str):
+        return str(security["type"])
+    if "reality" in profile.adapter:
+        return "reality"
+    if "tls" in profile.adapter or profile.adapter in {"hysteria2", "tuic-v5", "naiveproxy"}:
+        return "tls"
+    return "none"
 
 
 def _reservations_conflict(existing: dict[str, object], incoming: PortReservation) -> bool:

@@ -347,6 +347,92 @@ async def test_remna_parity_crud_and_bulk_actions(foundation_app: FoundationRout
     assert compat_hosts_response.json()["items"][0]["name"] == "Parity Host"
 
 
+async def test_profile_computed_config_and_inbounds_are_derived_from_bindings(
+    foundation_app: FoundationRouteApp,
+) -> None:
+    node_id = await seeded_node_id(foundation_app)
+
+    profile_response = await foundation_app.client.post(
+        "/api/v1/profiles",
+        json={
+            "name": "Computed Reality",
+            "node_id": node_id,
+            "adapter": "vless-reality",
+            "credentials_ref": "vault://protocols/computed-reality",
+            "config_json": {
+                "routing": {"domainStrategy": "AsIs"},
+                "security": {"type": "reality", "serverName": "www.example.com"},
+            },
+            "port_reservations": [
+                {"address": WILDCARD_BIND_ADDRESS, "port": 2443, "protocol": "tcp"}
+            ],
+        },
+    )
+    assert profile_response.status_code == 201
+    profile_id = profile_response.json()["id"]
+
+    host_response = await foundation_app.client.post(
+        "/api/v1/hosts",
+        json={
+            "name": "Computed Host",
+            "hostname": "computed.example.test",
+            "node_id": node_id,
+            "protocol_profile_id": profile_id,
+            "address": "203.0.113.77",
+            "port": 2443,
+            "inbound_tag": "COMPUTED_REALITY",
+            "remark": "Bound to computed profile",
+            "tags": ["computed"],
+        },
+    )
+    assert host_response.status_code == 201
+
+    profile_detail_response = await foundation_app.client.get(f"/api/v1/profiles/{profile_id}")
+    assert profile_detail_response.status_code == 200
+    assert profile_detail_response.json()["id"] == profile_id
+
+    inbounds_response = await foundation_app.client.get(f"/api/v1/profiles/{profile_id}/inbounds")
+    assert inbounds_response.status_code == 200
+    inbound = inbounds_response.json()["items"][0]
+    assert inbound["profile_id"] == profile_id
+    assert inbound["node_id"] == node_id
+    assert inbound["tag"] == "COMPUTED_REALITY"
+    assert inbound["protocol"] == "vless"
+    assert inbound["listen"] == WILDCARD_BIND_ADDRESS
+    assert inbound["port"] == 2443
+    assert inbound["transport"] == "tcp"
+    assert inbound["security"] == "reality"
+    assert inbound["credentials_ref"] == "vault://protocols/computed-reality"
+    assert inbound["hosts"][0]["hostname"] == "computed.example.test"
+    assert inbound["hosts"][0]["address"] == "203.0.113.77"
+
+    global_inbounds_response = await foundation_app.client.get("/api/v1/profiles/inbounds")
+    assert global_inbounds_response.status_code == 200
+    assert [item["profile_id"] for item in global_inbounds_response.json()["items"]] == [
+        profile_id
+    ]
+
+    computed_response = await foundation_app.client.get(
+        f"/api/v1/profiles/{profile_id}/computed-config",
+    )
+    assert computed_response.status_code == 200
+    computed = computed_response.json()
+    assert computed["profile"]["id"] == profile_id
+    assert computed["node"]["id"] == node_id
+    assert computed["node"]["public_address"] == "203.0.113.80"
+    assert computed["inbounds"][0]["tag"] == "COMPUTED_REALITY"
+    computed_config = computed["computed_config"]
+    assert computed_config["routing"] == {"domainStrategy": "AsIs"}
+    assert computed_config["inbounds"][0]["tag"] == "COMPUTED_REALITY"
+    assert computed_config["inbounds"][0]["settings"]["clientsRef"] == (
+        "vault://protocols/computed-reality"
+    )
+    assert computed_config["inbounds"][0]["streamSettings"] == {
+        "network": "tcp",
+        "security": "reality",
+    }
+
+
 async def test_user_detail_returns_subscriptions_devices_nodes_and_history(
     foundation_app: FoundationRouteApp,
 ) -> None:
