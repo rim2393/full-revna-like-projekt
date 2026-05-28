@@ -1,6 +1,9 @@
+import base64
 from datetime import UTC, datetime
 from uuid import UUID
 
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import x25519
 from sqlalchemy import delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -28,6 +31,7 @@ from app.domains.tools.schemas import (
     ToolSummaryResponse,
     TorrentReportResponse,
     TorrentReportRow,
+    X25519KeypairResponse,
 )
 from app.domains.users.models import User
 
@@ -277,13 +281,49 @@ async def summarize_tools(session: AsyncSession) -> ToolSummaryResponse:
             )
         )
     )
-    happ_routes = sum(1 for row in (await inspect_happ_routing(session)).items if row.route_status == "happ")
+    happ_routes = sum(
+        1 for row in (await inspect_happ_routing(session)).items if row.route_status == "happ"
+    )
     return ToolSummaryResponse(
         hwid_over_limit=sum(1 for row in hwid.items if row.status == "over_limit"),
         sessions_active=int(active_sessions or 0),
         torrent_events=int(torrent_count or 0),
         happ_routes=int(happ_routes or 0),
     )
+
+
+async def generate_x25519_keypair(
+    session: AsyncSession,
+    *,
+    principal: Principal,
+) -> X25519KeypairResponse:
+    private_key = x25519.X25519PrivateKey.generate()
+    public_key = private_key.public_key()
+    private_raw = private_key.private_bytes(
+        encoding=serialization.Encoding.Raw,
+        format=serialization.PrivateFormat.Raw,
+        encryption_algorithm=serialization.NoEncryption(),
+    )
+    public_raw = public_key.public_bytes(
+        encoding=serialization.Encoding.Raw,
+        format=serialization.PublicFormat.Raw,
+    )
+    await record_audit_event(
+        session,
+        principal=principal,
+        action="tool.x25519_keypair.generated",
+        resource_type="tool",
+        resource_id="x25519-keypair",
+        metadata_json={"encoding": "base64url-nopad", "private_key_stored": "false"},
+    )
+    return X25519KeypairResponse(
+        private_key=_base64url_nopad(private_raw),
+        public_key=_base64url_nopad(public_raw),
+    )
+
+
+def _base64url_nopad(value: bytes) -> str:
+    return base64.urlsafe_b64encode(value).decode("ascii").rstrip("=")
 
 
 async def _real_subscription_headers(

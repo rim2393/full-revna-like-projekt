@@ -173,6 +173,7 @@ export function createHttpLumenApiClient({
     inspectHappRouting: () => request('/api/v1/tools/happ-routing'),
     truncateTorrentReports: () =>
       request('/api/v1/tools/torrent-blocker-reports', { method: 'DELETE' }),
+    generateX25519Keypair: () => request('/api/v1/tools/x25519-keypair', { method: 'POST' }),
     listUsers: () => request('/api/v1/users'),
     getSession: async () => {
       try {

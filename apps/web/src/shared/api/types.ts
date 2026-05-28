@@ -723,6 +723,12 @@ export type ToolSummaryResponse = {
   torrent_events: number
 }
 
+export type X25519KeypairResponse = {
+  encoding: string
+  private_key: string
+  public_key: string
+}
+
 export type SettingRecord = {
   id?: string
   key: string
@@ -870,6 +876,7 @@ export type LumenApiClient = {
   inspectTorrentReports: () => Promise<TorrentReportResponse>
   inspectHappRouting: () => Promise<HappRoutingResponse>
   truncateTorrentReports: () => Promise<TorrentReportResponse>
+  generateX25519Keypair: () => Promise<X25519KeypairResponse>
   listUsers: () => Promise<UserListResponse>
   login: (request: LoginRequest) => Promise<AuthSession | MfaChallenge>
   logout: () => Promise<void>

@@ -672,6 +672,11 @@ export function createDevelopmentLumenApiClient(): LumenApiClient {
     }),
     inspectTorrentReports: async (): Promise<TorrentReportResponse> => ({ items: [] }),
     truncateTorrentReports: async (): Promise<TorrentReportResponse> => ({ items: [] }),
+    generateX25519Keypair: async () => ({
+      encoding: 'base64url-nopad',
+      private_key: 'development-private-key-not-for-production-use',
+      public_key: 'development-public-key-not-for-production-use',
+    }),
     revokeToolSession: async (sessionId: string): Promise<SessionInspectorResponse> => ({
       items: users.slice(0, 3).map((user) => ({
         created_at: generatedAt,

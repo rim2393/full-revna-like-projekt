@@ -364,6 +364,27 @@ describe('Control plane resource screens', () => {
     await waitFor(() => expect(truncateTorrentReports).toHaveBeenCalledTimes(1))
   })
 
+  it('wires X25519 keypair generation to backend requests', async () => {
+    const user = userEvent.setup()
+    const generateX25519Keypair = vi.fn(async () => ({
+      encoding: 'base64url-nopad',
+      private_key: 'private-key',
+      public_key: 'public-key',
+    }))
+    const apiClient: LumenApiClient = {
+      ...createDevelopmentLumenApiClient(),
+      generateX25519Keypair,
+    }
+
+    renderWithRouter('/tools', { apiClient, initialSession: developmentSession })
+
+    await user.click(await screen.findByRole('button', { name: /happ routing/i }))
+    await user.click(screen.getByRole('button', { name: /generate x25519/i }))
+    await waitFor(() => expect(generateX25519Keypair).toHaveBeenCalledTimes(1))
+    expect(await screen.findByText('public-key')).toBeInTheDocument()
+    expect(screen.getByText('private-key')).toBeInTheDocument()
+  })
+
   it('exposes refresh buttons as real accessible controls on resource screens', async () => {
     const apiClient = createDevelopmentLumenApiClient()
 

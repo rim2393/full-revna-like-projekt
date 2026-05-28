@@ -608,6 +608,14 @@ export function useTruncateTorrentReports() {
   })
 }
 
+export function useGenerateX25519Keypair() {
+  const apiClient = useApiClient()
+
+  return useMutation({
+    mutationFn: apiClient.generateX25519Keypair,
+  })
+}
+
 export function useHappRoutingData() {
   const apiClient = useApiClient()
 

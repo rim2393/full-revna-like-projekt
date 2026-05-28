@@ -93,3 +93,9 @@ class ToolSummaryResponse(BaseModel):
     sessions_active: int
     torrent_events: int
     happ_routes: int
+
+
+class X25519KeypairResponse(BaseModel):
+    public_key: str
+    private_key: str
+    encoding: str = "base64url-nopad"

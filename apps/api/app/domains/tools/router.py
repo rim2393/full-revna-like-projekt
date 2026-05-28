@@ -14,8 +14,10 @@ from app.domains.tools.schemas import (
     SrhInspectorResponse,
     ToolSummaryResponse,
     TorrentReportResponse,
+    X25519KeypairResponse,
 )
 from app.domains.tools.service import (
+    generate_x25519_keypair,
     inspect_happ_routing,
     inspect_hwid,
     inspect_sessions,
@@ -29,6 +31,7 @@ from app.domains.tools.service import (
 router = APIRouter()
 ToolManager = Annotated[Principal, Depends(require_permission(Permission.SUBSCRIPTION_READ))]
 SessionManager = Annotated[Principal, Depends(require_permission(Permission.USER_MANAGE))]
+UtilityManager = Annotated[Principal, Depends(require_permission(Permission.NODE_MANAGE))]
 DatabaseSession = Annotated[AsyncSession, Depends(get_db_session)]
 AppSettings = Annotated[Settings, Depends(get_settings)]
 
@@ -89,3 +92,13 @@ async def truncate_torrent_blocker_reports(
 @router.get("/happ-routing", response_model=HappRoutingResponse)
 async def read_happ_routing(_: ToolManager, session: DatabaseSession) -> HappRoutingResponse:
     return await inspect_happ_routing(session)
+
+
+@router.post("/x25519-keypair", response_model=X25519KeypairResponse)
+async def create_x25519_keypair(
+    principal: UtilityManager,
+    session: DatabaseSession,
+) -> X25519KeypairResponse:
+    response = await generate_x25519_keypair(session, principal=principal)
+    await session.commit()
+    return response

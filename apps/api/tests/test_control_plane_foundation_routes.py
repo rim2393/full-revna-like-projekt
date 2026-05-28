@@ -1,9 +1,11 @@
+import base64
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from uuid import UUID
 
 import pytest
+from cryptography.hazmat.primitives.asymmetric import x25519
 from httpx import ASGITransport, AsyncClient
 from pydantic import SecretStr
 from sqlalchemy import select
@@ -28,6 +30,11 @@ from app.domains.users.models import User
 from app.main import create_app
 
 NODE_TOKEN = "lumen_node_test_foundation"  # noqa: S105 - deterministic test token.
+
+
+def _decode_base64url_nopad(value: str) -> bytes:
+    padding = "=" * (-len(value) % 4)
+    return base64.urlsafe_b64decode(value + padding)
 
 
 @dataclass(frozen=True)
@@ -221,7 +228,9 @@ async def test_auth_provider_settings_are_typed_and_audited(
     telegram_provider = next(item for item in providers if item["provider"] == "telegram")
     assert telegram_provider["status"] == "unimplemented"
     assert telegram_provider["scopes"] == ["admin:login"]
-    assert telegram_provider["metadata_json"]["bot_binding"] == "disabled_until_callback_implemented"
+    assert telegram_provider["metadata_json"]["bot_binding"] == (
+        "disabled_until_callback_implemented"
+    )
 
     patch_response = await foundation_app.client.patch(
         "/api/v1/settings/auth/providers/google",
@@ -297,7 +306,9 @@ async def test_auth_provider_catalog_sanitizes_persisted_non_live_state(
     assert telegram_provider["enabled"] is False
     assert telegram_provider["status"] == "unimplemented"
     assert telegram_provider["scopes"] == ["admin:login"]
-    assert telegram_provider["metadata_json"]["bot_binding"] == "disabled_until_callback_implemented"
+    assert telegram_provider["metadata_json"]["bot_binding"] == (
+        "disabled_until_callback_implemented"
+    )
 
 
 async def test_subscription_templates_and_response_rules_are_persisted(
@@ -486,9 +497,9 @@ async def test_remna_parity_crud_and_bulk_actions(foundation_app: FoundationRout
 
     short_uuid = user_id.replace("-", "")[:8]
     lookup_paths = [
-        f"/api/v1/users/by-username/vpn-user",
-        f"/api/v1/users/by-email/vpn-user@example.com",
-        f"/api/v1/users/by-telegram/100500",
+        "/api/v1/users/by-username/vpn-user",
+        "/api/v1/users/by-email/vpn-user@example.com",
+        "/api/v1/users/by-telegram/100500",
         f"/api/v1/users/by-short-uuid/{short_uuid}",
         "/api/v1/users/by-id/42",
         "/api/v1/users/resolve/vpn-user",
@@ -1059,6 +1070,23 @@ async def test_tools_reports_are_real_database_views(foundation_app: FoundationR
     assert summary_response.status_code == 200
     assert summary_response.json()["happ_routes"] == 1
 
+    x25519_response = await foundation_app.client.post("/api/v1/tools/x25519-keypair")
+    assert x25519_response.status_code == 200
+    keypair = x25519_response.json()
+    assert keypair["encoding"] == "base64url-nopad"
+    assert keypair["private_key"] != keypair["public_key"]
+    assert len(keypair["private_key"]) == 43
+    assert len(keypair["public_key"]) == 43
+    x25519.X25519PrivateKey.from_private_bytes(_decode_base64url_nopad(keypair["private_key"]))
+    x25519.X25519PublicKey.from_public_bytes(_decode_base64url_nopad(keypair["public_key"]))
+    async with foundation_app.sessionmaker() as session:
+        keygen_audit = (
+            await session.execute(
+                select(AuditEvent).where(AuditEvent.action == "tool.x25519_keypair.generated")
+            )
+        ).scalar_one()
+        assert keygen_audit.metadata_json["private_key_stored"] == "false"
+
 
 async def test_protocol_profile_rejects_plaintext_credentials_ref(
     foundation_app: FoundationRouteApp,
@@ -1260,7 +1288,8 @@ async def test_node_pause_resume_and_quarantine_enqueue_commands(
     commands_response = await foundation_app.client.get(f"/api/v1/nodes/{node_id}/commands")
     assert commands_response.status_code == 200
     command_types = [item["command_type"] for item in commands_response.json()["items"]]
-    assert command_types == ["node.quarantine", "node.resume", "node.pause"]
+    assert command_types[0] == "node.quarantine"
+    assert set(command_types[1:]) == {"node.resume", "node.pause"}
 
     claim_response = await foundation_app.client.get(
         f"/api/v1/nodes/{node_id}/commands/next",

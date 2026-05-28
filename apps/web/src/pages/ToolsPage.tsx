@@ -3,6 +3,7 @@ import { Activity, Fingerprint, Flame, Radar, Route, Trash2 } from 'lucide-react
 import {
   useClearUserDevices,
   useDeleteUserDevice,
+  useGenerateX25519Keypair,
   useHappRoutingData,
   useHwidInspectorData,
   useRevokeToolSession,
@@ -70,6 +71,7 @@ export function ToolsPage() {
   const clearDevices = useClearUserDevices()
   const revokeToolSession = useRevokeToolSession()
   const truncateTorrentReports = useTruncateTorrentReports()
+  const generateX25519Keypair = useGenerateX25519Keypair()
   const queries = [summaryQuery, hwidQuery, srhQuery, sessionsQuery, torrentQuery, happQuery]
   const isLoading = queries.some((query) => query.isLoading)
   const error = queries.find((query) => query.isError)?.error
@@ -211,6 +213,7 @@ export function ToolsPage() {
     deleteDevice,
     happQuery.data,
     hwidQuery.data,
+    generateX25519Keypair,
     revokeToolSession,
     sessionsQuery.data,
     srhQuery.data,
@@ -256,6 +259,16 @@ export function ToolsPage() {
                   Truncate
                 </button>
               ) : null}
+              {activeTool === 'happ' ? (
+                <button
+                  type="button"
+                  className="button button--secondary"
+                  disabled={generateX25519Keypair.isPending}
+                  onClick={() => void generateX25519Keypair.mutateAsync()}
+                >
+                  Generate X25519
+                </button>
+              ) : null}
             </div>
             <div className="toolbar">
               {tools.map((tool) => {
@@ -283,6 +296,25 @@ export function ToolsPage() {
             ) : (
               <EmptyState title="No data" description={activeTable.empty} />
             )}
+            {activeTool === 'happ' && generateX25519Keypair.data ? (
+              <div className="details-card">
+                <h3>X25519 keypair</h3>
+                <dl className="detail-list">
+                  <div>
+                    <dt>Public key</dt>
+                    <dd>{generateX25519Keypair.data.public_key}</dd>
+                  </div>
+                  <div>
+                    <dt>Private key</dt>
+                    <dd>{generateX25519Keypair.data.private_key}</dd>
+                  </div>
+                  <div>
+                    <dt>Encoding</dt>
+                    <dd>{generateX25519Keypair.data.encoding}</dd>
+                  </div>
+                </dl>
+              </div>
+            ) : null}
           </article>
           <article className="panel">
             <div className="panel__header">
