@@ -153,11 +153,19 @@ async def build_subscription_manifest(
                             "transport": delivery.get("transport") or "tcp",
                             "network": delivery.get("network") or "public",
                         },
-                        "security": _manifest_security(profile=profile, delivery=delivery),
+                        "security": _manifest_security(
+                            profile=profile,
+                            delivery=delivery,
+                            protocol_type=protocol_type,
+                        ),
                         "flow": delivery.get("flow"),
                         "credentialsRef": credentials_ref,
                         "capabilities": _manifest_capabilities(protocol_type),
-                        "rendererHints": {"liveSmoke": protocol_type == "tcp-smoke"},
+                        "rendererHints": {
+                            "liveSmoke": protocol_type == "tcp-smoke",
+                            "name": delivery.get("profile_title") or delivery.get("name"),
+                            "method": delivery.get("method"),
+                        },
                     }
                 ],
                 "metadata": {},
@@ -167,6 +175,10 @@ async def build_subscription_manifest(
         "metadata": {
             "source": "lumen-api",
             "subscriptionId": str(subscription.id),
+            "profileTitle": delivery.get("profile_title"),
+            "supportUrl": delivery.get("support_url"),
+            "trafficLimitGb": delivery.get("traffic_limit_gb"),
+            "updateIntervalHours": delivery.get("update_interval_hours"),
         },
     }
 
@@ -357,20 +369,39 @@ def _manifest_security(
     *,
     profile: ProtocolProfile | None,
     delivery: dict[str, str],
+    protocol_type: str,
 ) -> dict[str, object]:
     config = profile.config_json if profile is not None else {}
     security = config.get("security") if isinstance(config.get("security"), dict) else {}
-    security_type = str(security.get("type") or delivery.get("security") or "none")
+    security_type = str(
+        security.get("type") or delivery.get("security") or _default_security(protocol_type)
+    )
     return {
         "type": security_type,
         "serverName": security.get("serverName") or delivery.get("server_name"),
-        "publicKey": security.get("publicKey"),
-        "shortId": security.get("shortId"),
-        "fingerprint": security.get("fingerprint"),
-        "spiderX": security.get("spiderX"),
-        "alpn": security.get("alpn") if isinstance(security.get("alpn"), list) else [],
+        "publicKey": security.get("publicKey") or delivery.get("public_key"),
+        "shortId": security.get("shortId") or delivery.get("short_id"),
+        "fingerprint": security.get("fingerprint") or delivery.get("fingerprint"),
+        "spiderX": security.get("spiderX") or delivery.get("spider_x"),
+        "alpn": _manifest_alpn(security=security, delivery=delivery),
         "allowInsecure": False,
     }
+
+
+def _default_security(protocol_type: str) -> str:
+    if protocol_type.endswith("reality") or "-reality" in protocol_type:
+        return "reality"
+    if protocol_type.endswith("tls") or "-tls" in protocol_type or protocol_type == "hysteria2":
+        return "tls"
+    return "none"
+
+
+def _manifest_alpn(*, security: dict[str, object], delivery: dict[str, str]) -> list[str]:
+    if isinstance(security.get("alpn"), list):
+        return [str(value) for value in security["alpn"]]
+    if delivery.get("alpn"):
+        return [value.strip() for value in delivery["alpn"].split(",") if value.strip()]
+    return []
 
 
 def _manifest_capabilities(protocol_type: str) -> list[str]:

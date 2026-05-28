@@ -4,6 +4,7 @@ import {
   createFallbackLandingModel,
   createLumenEdgeServer,
   matchSubscriptionManifestPath,
+  matchSubscriptionRenderPath,
   renderFallbackLandingHtml,
   validateSubscriptionPublicId
 } from "../src/index.js";
@@ -50,11 +51,24 @@ test("renders escaped fallback html", () => {
 
 test("matches public subscription manifest routes", () => {
   assert.equal(matchSubscriptionManifestPath("/sub/lumen_sub_abc1234567890xyz/manifest"), "lumen_sub_abc1234567890xyz");
-  assert.equal(matchSubscriptionManifestPath("/api/sub/lumen_sub_abc1234567890xyz"), "lumen_sub_abc1234567890xyz");
+  assert.equal(matchSubscriptionManifestPath("/api/sub/lumen_sub_abc1234567890xyz/manifest"), "lumen_sub_abc1234567890xyz");
+  assert.equal(matchSubscriptionManifestPath("/api/sub/lumen_sub_abc1234567890xyz"), null);
   assert.equal(matchSubscriptionManifestPath("/sub/%E0%A4%A/manifest"), "%E0%A4%A");
   assert.equal(matchSubscriptionManifestPath("/unknown/lumen_sub_abc1234567890xyz"), null);
   assert.equal(validateSubscriptionPublicId("lumen_sub_abc1234567890xyz"), true);
   assert.equal(validateSubscriptionPublicId("../secret"), false);
+});
+
+test("matches public subscription render routes", () => {
+  assert.deepEqual(matchSubscriptionRenderPath("/sub/lumen_sub_abc1234567890xyz"), {
+    publicId: "lumen_sub_abc1234567890xyz",
+    target: null
+  });
+  assert.deepEqual(matchSubscriptionRenderPath("/sub/lumen_sub_abc1234567890xyz/hiddify"), {
+    publicId: "lumen_sub_abc1234567890xyz",
+    target: "hiddify"
+  });
+  assert.equal(matchSubscriptionRenderPath("/sub/lumen_sub_abc1234567890xyz/manifest"), null);
 });
 
 test("proxies public subscription manifest without exposing API credentials", async () => {
@@ -83,6 +97,39 @@ test("proxies public subscription manifest without exposing API credentials", as
     assert.equal(body.schemaVersion, "lumen.subscription-manifest.v1");
     assert.equal(upstreamCalls[0].url, "http://api.internal:8000/api/v1/subscriptions/public/lumen_sub_abc1234567890xyz/manifest");
     assert.equal(upstreamCalls[0].options.headers.accept, "application/json");
+    assert.equal(upstreamCalls[0].options.headers.authorization, undefined);
+  } finally {
+    await close(server);
+  }
+});
+
+test("proxies public rendered subscription with target negotiation", async () => {
+  const upstreamCalls = [];
+  const server = createLumenEdgeServer({
+    env: { API_INTERNAL_URL: "http://api.internal:8000" },
+    fetchImpl: async (url, options) => {
+      upstreamCalls.push({ url, options });
+      return new Response("vless://example\n", {
+        status: 200,
+        headers: {
+          "content-type": "text/plain; charset=utf-8",
+          "profile-title": "base64:THVtZW4=",
+          "subscription-userinfo": "upload=0; download=0; total=0; expire=0",
+          "x-lumen-render-target": "hiddify"
+        }
+      });
+    },
+    randomUUID: () => "req_test"
+  });
+  const port = await listen(server);
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/sub/lumen_sub_abc1234567890xyz/hiddify`);
+    const body = await response.text();
+
+    assert.equal(response.status, 200);
+    assert.equal(body, "vless://example\n");
+    assert.equal(response.headers.get("x-lumen-render-target"), "hiddify");
+    assert.equal(upstreamCalls[0].url, "http://api.internal:8000/api/v1/subscriptions/public/lumen_sub_abc1234567890xyz/render?target=hiddify");
     assert.equal(upstreamCalls[0].options.headers.authorization, undefined);
   } finally {
     await close(server);

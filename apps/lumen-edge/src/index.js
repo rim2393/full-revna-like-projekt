@@ -7,6 +7,7 @@ export { createLumenEdgeServer, listenFromEnv } from "./server.js";
 export {
   SUBSCRIPTION_PROXY_MODEL_VERSION,
   matchSubscriptionManifestPath,
+  matchSubscriptionRenderPath,
   normalizeApiInternalUrl,
   validateSubscriptionPublicId
 } from "./subscription-proxy.js";

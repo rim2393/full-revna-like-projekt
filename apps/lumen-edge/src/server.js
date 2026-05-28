@@ -4,6 +4,7 @@ import { createServer } from "node:http";
 import { createFallbackLandingModel, renderFallbackLandingHtml } from "./fallback-landing.js";
 import {
   matchSubscriptionManifestPath,
+  matchSubscriptionRenderPath,
   normalizeApiInternalUrl,
   validateSubscriptionPublicId
 } from "./subscription-proxy.js";
@@ -56,6 +57,77 @@ async function proxySubscriptionManifest(request, response, input) {
   return true;
 }
 
+async function proxySubscriptionRender(request, response, input) {
+  const url = new URL(request.url ?? "/", `http://${request.headers.host ?? "localhost"}`);
+  const match = matchSubscriptionRenderPath(url.pathname);
+  if (match === null) {
+    return false;
+  }
+  if (!validateSubscriptionPublicId(match.publicId)) {
+    writeJson(response, 404, {
+      error: {
+        code: "subscription_not_found",
+        message: "Subscription was not found."
+      }
+    });
+    return true;
+  }
+
+  const apiInternalUrl = normalizeApiInternalUrl(input.env.API_INTERNAL_URL);
+  if (apiInternalUrl === null) {
+    writeJson(response, 503, {
+      error: {
+        code: "subscription_upstream_unavailable",
+        message: "Subscription upstream is not configured."
+      }
+    });
+    return true;
+  }
+
+  const target = match.target || url.searchParams.get("target") || url.searchParams.get("format") || inferTargetFromUserAgent(request.headers["user-agent"]);
+  const upstreamUrl = `${apiInternalUrl}/api/v1/subscriptions/public/${encodeURIComponent(match.publicId)}/render?target=${encodeURIComponent(target)}`;
+  const upstream = await input.fetchImpl(upstreamUrl, {
+    headers: { accept: request.headers.accept ?? "*/*" }
+  });
+  const body = await upstream.text();
+  const headers = {
+    "content-type": upstream.headers.get("content-type") ?? "text/plain; charset=utf-8",
+    "cache-control": "no-store"
+  };
+  for (const name of [
+    "content-disposition",
+    "profile-title",
+    "profile-update-interval",
+    "subscription-userinfo",
+    "x-lumen-render-target"
+  ]) {
+    const value = upstream.headers.get(name);
+    if (value) {
+      headers[name] = value;
+    }
+  }
+  response.writeHead(upstream.status, headers);
+  response.end(body);
+  return true;
+}
+
+function inferTargetFromUserAgent(userAgent = "") {
+  const value = String(userAgent).toLowerCase();
+  if (value.includes("hiddify")) {
+    return "hiddify";
+  }
+  if (value.includes("happ")) {
+    return "happ";
+  }
+  if (value.includes("sing-box") || value.includes("singbox") || value.includes("nekobox")) {
+    return "sing-box";
+  }
+  if (value.includes("clash") || value.includes("mihomo") || value.includes("stash")) {
+    return "mihomo";
+  }
+  return "v2ray";
+}
+
 export function createLumenEdgeServer(input = {}) {
   const env = input.env ?? process.env;
   const fetchImpl = input.fetchImpl ?? fetch;
@@ -70,6 +142,10 @@ export function createLumenEdgeServer(input = {}) {
       }
 
       if (await proxySubscriptionManifest(request, response, { env, fetchImpl })) {
+        return;
+      }
+
+      if (await proxySubscriptionRender(request, response, { env, fetchImpl })) {
         return;
       }
 
@@ -107,4 +183,3 @@ export function listenFromEnv(input = {}) {
 if (import.meta.url === `file://${process.argv[1]}`) {
   listenFromEnv();
 }
-

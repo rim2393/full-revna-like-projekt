@@ -239,6 +239,78 @@ async def test_subscription_manifest_route_renders_live_smoke_protocol(
     assert public_manifest["nodes"][0]["protocols"][0]["type"] == "tcp-smoke"
 
 
+async def test_public_subscription_renderers_emit_client_compatible_formats(
+    route_app: RouteTestApp,
+) -> None:
+    user, license_record, node = await seed_subscription_dependencies(route_app)
+    create_response = await route_app.client.post(
+        "/api/v1/subscriptions",
+        json={
+            "user_id": str(user.id),
+            "license_id": str(license_record.id),
+            "node_id": str(node.id),
+            "delivery_profile": {
+                "protocol": "vless-reality",
+                "adapter": "vless-reality",
+                "profile_title": "Lumen Test",
+                "server_name": "www.example.com",
+                "public_key": "F1E2D3C4B5A69788776655443322110abcdEFGH_-",
+                "short_id": "a1b2c3d4",
+                "fingerprint": "chrome",
+                "spider_x": "/",
+                "flow": "xtls-rprx-vision",
+                "traffic_limit_gb": "500",
+            },
+            "config_hash": "sha256:vless-reality",
+        },
+    )
+    assert create_response.status_code == 201
+    public_id = create_response.json()["public_id"]
+
+    raw_response = await route_app.client.get(
+        f"/api/v1/subscriptions/public/{public_id}/render?target=hiddify",
+    )
+    assert raw_response.status_code == 200
+    assert raw_response.headers["x-lumen-render-target"] == "hiddify"
+    assert raw_response.headers["profile-title"].startswith("base64:")
+    assert "total=536870912000" in raw_response.headers["subscription-userinfo"]
+    raw_body = raw_response.text
+    assert raw_body.startswith("vless://")
+    assert "security=reality" in raw_body
+    assert "pbk=F1E2D3C4B5A69788776655443322110abcdEFGH_-" in raw_body
+    assert "sid=a1b2c3d4" in raw_body
+    assert "flow=xtls-rprx-vision" in raw_body
+
+    mihomo_response = await route_app.client.get(
+        f"/api/v1/subscriptions/public/{public_id}/render?target=mihomo",
+    )
+    assert mihomo_response.status_code == 200
+    assert "proxies:" in mihomo_response.text
+    assert 'type: "vless"' in mihomo_response.text
+    assert "reality-opts:" in mihomo_response.text
+    assert 'public-key: "F1E2D3C4B5A69788776655443322110abcdEFGH_-"' in (
+        mihomo_response.text
+    )
+
+    sing_box_response = await route_app.client.get(
+        f"/api/v1/subscriptions/public/{public_id}/render?target=sing-box",
+    )
+    assert sing_box_response.status_code == 200
+    sing_box = sing_box_response.json()
+    assert sing_box["outbounds"][0]["type"] == "vless"
+    assert sing_box["outbounds"][0]["tls"]["reality"]["public_key"] == (
+        "F1E2D3C4B5A69788776655443322110abcdEFGH_-"
+    )
+
+    xray_response = await route_app.client.get(
+        f"/api/v1/subscriptions/public/{public_id}/render?target=amnezia",
+    )
+    assert xray_response.status_code == 200
+    xray = xray_response.json()
+    assert xray["outbounds"][0]["protocol"] == "vless"
+    assert xray["outbounds"][0]["streamSettings"]["security"] == "reality"
+
+
 async def test_public_subscription_manifest_rejects_plaintext_profile_credential(
     route_app: RouteTestApp,
 ) -> None:

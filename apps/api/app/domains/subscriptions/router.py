@@ -1,12 +1,17 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import Settings, get_settings
 from app.core.rbac import Permission, Principal, require_permission
 from app.db.session import get_db_session
 from app.domains.subscriptions.models import Subscription
+from app.domains.subscriptions.renderers import (
+    normalize_render_target,
+    render_subscription_for_target,
+)
 from app.domains.subscriptions.schemas import (
     SubscriptionCreateRequest,
     SubscriptionListResponse,
@@ -36,6 +41,7 @@ SubscriptionManager = Annotated[
     Depends(require_permission(Permission.SUBSCRIPTION_MANAGE)),
 ]
 DatabaseSession = Annotated[AsyncSession, Depends(get_db_session)]
+RuntimeSettings = Annotated[Settings, Depends(get_settings)]
 
 
 def subscription_response(subscription: Subscription) -> SubscriptionResponse:
@@ -83,6 +89,39 @@ async def get_public_subscription_manifest(
     return await build_public_subscription_manifest(session, public_id=public_id)
 
 
+@router.get("/public/{public_id}/render")
+async def render_public_subscription(
+    public_id: str,
+    session: DatabaseSession,
+    settings: RuntimeSettings,
+    target: str | None = Query(
+        default=None,
+        description=(
+            "Client target or renderer format: hiddify, happ, mihomo, sing-box, "
+            "v2ray, amnezia."
+        ),
+    ),
+    render_format: str | None = Query(
+        default=None,
+        alias="format",
+        description="Compatibility alias for target.",
+    ),
+) -> Response:
+    manifest = await build_public_subscription_manifest(session, public_id=public_id)
+    render_target = normalize_render_target(target or render_format)
+    rendered = render_subscription_for_target(manifest, settings=settings, target=render_target)
+    return Response(
+        content=rendered.body,
+        media_type=rendered.content_type,
+        headers={
+            **rendered.headers,
+            "cache-control": "no-store",
+            "content-disposition": f'inline; filename="{rendered.filename}"',
+            "x-lumen-render-target": render_target,
+        },
+    )
+
+
 @router.get("/{subscription_id}", response_model=SubscriptionResponse)
 async def get_subscription(
     subscription_id: UUID,
@@ -100,3 +139,27 @@ async def get_subscription_manifest(
     session: DatabaseSession,
 ) -> dict[str, object]:
     return await build_subscription_manifest(session, subscription_id=subscription_id)
+
+
+@router.get("/{subscription_id}/render")
+async def render_subscription(
+    subscription_id: UUID,
+    _: SubscriptionReader,
+    session: DatabaseSession,
+    settings: RuntimeSettings,
+    target: str | None = Query(default=None),
+    render_format: str | None = Query(default=None, alias="format"),
+) -> Response:
+    manifest = await build_subscription_manifest(session, subscription_id=subscription_id)
+    render_target = normalize_render_target(target or render_format)
+    rendered = render_subscription_for_target(manifest, settings=settings, target=render_target)
+    return Response(
+        content=rendered.body,
+        media_type=rendered.content_type,
+        headers={
+            **rendered.headers,
+            "cache-control": "no-store",
+            "content-disposition": f'inline; filename="{rendered.filename}"',
+            "x-lumen-render-target": render_target,
+        },
+    )
