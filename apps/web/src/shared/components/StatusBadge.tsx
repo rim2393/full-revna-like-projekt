@@ -1,4 +1,5 @@
 import type { MetricTone } from '../data/lumenData'
+import { useI18n } from '../i18n/I18nProvider'
 
 type StatusBadgeProps = {
   children: string
@@ -6,5 +7,7 @@ type StatusBadgeProps = {
 }
 
 export function StatusBadge({ children, tone = 'neutral' }: StatusBadgeProps) {
-  return <span className={`status-badge status-badge--${tone}`}>{children}</span>
+  const { t } = useI18n()
+
+  return <span className={`status-badge status-badge--${tone}`}>{t(children)}</span>
 }

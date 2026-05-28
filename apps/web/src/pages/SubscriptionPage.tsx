@@ -2,9 +2,11 @@ import { useSubscriptionsPageData, useUsersPageData, useNodesPageData } from '..
 import { ResourceScreen } from '../shared/components/ResourceScreen'
 import { StatusBadge } from '../shared/components/StatusBadge'
 import { placeholderSpecs } from '../shared/data/lumenData'
+import { useI18n } from '../shared/i18n/I18nProvider'
 import { formatDateTime, formatRecord, toneForStatus } from '../shared/utils/resourceFormat'
 
 export function SubscriptionPage() {
+  const { t } = useI18n()
   const query = useSubscriptionsPageData()
   const usersQuery = useUsersPageData()
   const nodesQuery = useNodesPageData()
@@ -30,10 +32,10 @@ export function SubscriptionPage() {
         cells: [
           subscription.public_id,
           users.find((user) => user.id === subscription.user_id)?.displayName ?? subscription.user_id,
-          nodes.find((node) => node.id === subscription.node_id)?.name ?? subscription.node_id ?? 'All nodes',
+          nodes.find((node) => node.id === subscription.node_id)?.name ?? subscription.node_id ?? t('All nodes'),
           formatRecord(subscription.delivery_profile),
           formatDateTime(subscription.expires_at),
-          subscription.config_hash ?? 'Not generated',
+          subscription.config_hash ?? t('Not generated'),
           <StatusBadge tone={toneForStatus(subscription.status)}>{subscription.status}</StatusBadge>,
         ],
         id: subscription.id,
@@ -42,8 +44,8 @@ export function SubscriptionPage() {
         <article className="panel">
           <div className="panel__header">
             <div>
-              <p className="eyebrow">Response rules</p>
-              <h2>Client surface</h2>
+              <p className="eyebrow">{t('Response rules')}</p>
+              <h2>{t('Client surface')}</h2>
             </div>
             <StatusBadge>read-only</StatusBadge>
           </div>
@@ -51,7 +53,7 @@ export function SubscriptionPage() {
             {placeholderSpecs.subscription.items.map((item) => (
               <li key={item}>
                 <span aria-hidden="true">-</span>
-                <span>{item}</span>
+                <span>{t(item)}</span>
               </li>
             ))}
           </ul>

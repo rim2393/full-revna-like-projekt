@@ -5,6 +5,7 @@ import { DataTable } from './DataTable'
 import { PageHeader } from './PageHeader'
 import { StatusBadge } from './StatusBadge'
 import type { PlaceholderSpec } from '../data/lumenData'
+import { useI18n } from '../i18n/I18nProvider'
 
 type ResourceScreenProps<TItem> = {
   actions?: ReactNode
@@ -77,6 +78,8 @@ export function ResourceScreen<TItem>({
   tableEyebrow,
   tableTitle,
 }: ResourceScreenProps<TItem>) {
+  const { t } = useI18n()
+
   return (
     <section className="page">
       <PageHeader
@@ -88,12 +91,12 @@ export function ResourceScreen<TItem>({
             <button
               type="button"
               className="button button--secondary"
-              aria-label={`Refresh ${spec.title.toLowerCase()}`}
+              aria-label={t(`Refresh ${spec.title.toLowerCase()}`)}
               disabled={!onRefresh}
               onClick={onRefresh}
             >
               <RefreshCw size={18} aria-hidden="true" />
-              Refresh
+              {t('Refresh')}
             </button>
           )
         }
@@ -116,9 +119,9 @@ export function ResourceScreen<TItem>({
           <article className="panel panel--wide">
             <div className="panel__header">
               <div>
-                <p className="eyebrow">{tableEyebrow}</p>
-                <h2>{tableTitle}</h2>
-              </div>
+              <p className="eyebrow">{t(tableEyebrow)}</p>
+              <h2>{t(tableTitle)}</h2>
+            </div>
               <StatusBadge>{sourceLabel}</StatusBadge>
             </div>
             <DataTable caption={caption} columns={columns} rows={items.map(renderRow)} />

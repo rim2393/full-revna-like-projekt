@@ -1,12 +1,17 @@
 import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { createMockLumenApiClient } from '../shared/api/mockClient'
 import type { LumenApiClient } from '../shared/api/types'
 import { mockSession } from '../shared/data/lumenData'
 import { renderWithRouter } from '../test/renderWithRouter'
 
 describe('Lumen admin routing scaffold', () => {
+  beforeEach(() => {
+    window.localStorage.clear()
+    document.documentElement.lang = 'en'
+  })
+
   it('renders the dashboard shell with primary navigation', async () => {
     const apiClient: LumenApiClient = {
       ...createMockLumenApiClient(),
@@ -60,10 +65,11 @@ describe('Lumen admin routing scaffold', () => {
     await user.selectOptions(screen.getByRole('combobox', { name: /interface language/i }), 'ru')
     expect(document.documentElement.lang).toBe('ru')
     expect(window.localStorage.getItem('lumen-ui-language')).toBe('ru')
+    expect(screen.getByRole('link', { name: /пользователи/i })).toHaveAttribute('href', '/users')
 
-    await user.type(screen.getByPlaceholderText(/search users, nodes, hosts/i), 'nodes')
+    await user.type(screen.getByPlaceholderText(/поиск пользователей, нод, хостов/i), 'ноды')
     await user.keyboard('{Enter}')
-    expect(await screen.findByRole('heading', { name: /nodes/i })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: /ноды/i })).toBeInTheDocument()
   })
 
   it('redirects protected admin routes to real sign in without a session', async () => {

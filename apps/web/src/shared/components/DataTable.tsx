@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { useI18n } from '../i18n/I18nProvider'
 
 type DataTableRow = {
   cells: ReactNode[]
@@ -12,15 +13,17 @@ type DataTableProps = {
 }
 
 export function DataTable({ caption, columns, rows }: DataTableProps) {
+  const { t } = useI18n()
+
   return (
     <div className="data-table-wrap">
       <table className="data-table">
-        <caption>{caption}</caption>
+        <caption>{t(caption)}</caption>
         <thead>
           <tr>
             {columns.map((column) => (
               <th key={column} scope="col">
-                {column}
+                {t(column)}
               </th>
             ))}
           </tr>

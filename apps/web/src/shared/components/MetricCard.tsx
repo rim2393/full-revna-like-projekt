@@ -1,4 +1,5 @@
 import type { DashboardMetric } from '../data/lumenData'
+import { useI18n } from '../i18n/I18nProvider'
 import { StatusBadge } from './StatusBadge'
 
 type MetricCardProps = {
@@ -7,6 +8,7 @@ type MetricCardProps = {
 
 export function MetricCard({ metric }: MetricCardProps) {
   const Icon = metric.icon
+  const { t } = useI18n()
 
   return (
     <article className="metric-card">
@@ -14,7 +16,7 @@ export function MetricCard({ metric }: MetricCardProps) {
         <Icon size={20} />
       </div>
       <div>
-        <p>{metric.label}</p>
+        <p>{t(metric.label)}</p>
         <strong>{metric.value}</strong>
       </div>
       <StatusBadge tone={metric.tone}>{metric.detail}</StatusBadge>
