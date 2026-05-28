@@ -25,6 +25,7 @@ import {
 import { createNodeAgentRuntimeConfig, loadNodeAgentConfigFromEnv } from "./runtime-loop.js";
 import { readSecretFromEnv } from "./secret-input.js";
 import { createTcpDiagnosticListenerPlan, startTcpDiagnosticListener, stopLiveListener } from "./live-listeners.js";
+import { applyXrayConfig, createXrayApplyPlan } from "./xray-runtime.js";
 
 const DEFAULT_STATE_DIR = "/var/lib/lumen-node";
 const NODE_TOKEN_FILE = "node-token";
@@ -180,6 +181,19 @@ function liveListenerPlanFromEnvelope(envelope) {
   });
 }
 
+function xrayApplyPlanFromEnvelope(envelope) {
+  if (!envelope.payload.xrayConfig) {
+    return null;
+  }
+  return createXrayApplyPlan({
+    id: envelope.payload.profileId ?? envelope.payload.profile_id ?? envelope.payload.outboundId ?? envelope.id,
+    xrayConfig: envelope.payload.xrayConfig,
+    configPath: envelope.payload.xrayConfigPath,
+    xrayBinary: envelope.payload.xrayBinary,
+    reloadArgv: envelope.payload.xrayReloadArgv
+  });
+}
+
 function withResultOutputs(commandResult, outputs) {
   return Object.freeze({
     ...commandResult,
@@ -199,15 +213,17 @@ async function applyRuntimeEffects(command, commandResult, input = {}) {
   }
   if (input.dryRun !== false) {
     return withResultOutputs(commandResult, {
-      implementationStatus: "live-listener-dry-run"
+      implementationStatus: commandResult.runtimeAction.type === "xray.apply"
+        ? "xray-dry-run"
+        : "live-listener-dry-run"
     });
-  }
-  if (input.enableLiveDiagnostic !== true) {
-    return failedCommandResult(command, new Error("live diagnostic listener is disabled"), "live_diagnostic_disabled");
   }
 
   try {
     if (commandResult.runtimeAction.type === "tcp-diagnostic.start") {
+      if (input.enableLiveDiagnostic !== true) {
+        return failedCommandResult(command, new Error("live diagnostic listener is disabled"), "live_diagnostic_disabled");
+      }
       const liveListener = await startTcpDiagnosticListener(commandResult.runtimeAction.plan);
       return withResultOutputs(commandResult, {
         implementationStatus: "live-listener-active",
@@ -221,8 +237,19 @@ async function applyRuntimeEffects(command, commandResult, input = {}) {
         liveListener
       });
     }
+    if (commandResult.runtimeAction.type === "xray.apply") {
+      const xray = await applyXrayConfig(commandResult.runtimeAction.plan, {
+        dryRun: input.dryRun,
+        env: input.env,
+        execFileImpl: input.execFileImpl
+      });
+      return withResultOutputs(commandResult, xray);
+    }
   } catch (error) {
-    return failedCommandResult(command, error, "live_listener_failed");
+    const code = commandResult.runtimeAction.type === "xray.apply"
+      ? "xray_apply_failed"
+      : "live_listener_failed";
+    return failedCommandResult(command, error, code);
   }
 
   return commandResult;
@@ -337,10 +364,17 @@ export function applyNodeCommand(command, currentState, input = {}) {
       case COMMAND_TYPES.FIREWALL_PLAN_APPLY:
       case COMMAND_TYPES.OUTBOUND_APPLY:
         {
+          const xrayPlan = xrayApplyPlanFromEnvelope(envelope);
+          if (xrayPlan) {
+            runtimeAction = Object.freeze({
+              type: "xray.apply",
+              plan: xrayPlan
+            });
+          }
           const liveListener = envelope.command === COMMAND_TYPES.OUTBOUND_APPLY
             ? liveListenerPlanFromEnvelope(envelope)
             : null;
-          if (liveListener) {
+          if (!runtimeAction && liveListener) {
             runtimeAction = Object.freeze({
               type: "tcp-diagnostic.start",
               plan: liveListener
@@ -355,7 +389,9 @@ export function applyNodeCommand(command, currentState, input = {}) {
           appliedRevision: nextState.appliedRevision,
           command: envelope.command,
           dryRun: input.dryRun ?? true,
-          implementationStatus: runtimeAction ? "live-listener-pending" : "applied"
+          implementationStatus: runtimeAction.type === "xray.apply"
+            ? "xray-apply-pending"
+            : "live-listener-pending"
         };
         break;
       case COMMAND_TYPES.OUTBOUND_REMOVE:
@@ -484,7 +520,9 @@ export async function runNodeAgentOnce(input = {}) {
     });
     commandResult = await applyRuntimeEffects(command, commandResult, {
       dryRun: enrollment.config.dryRun,
-      enableLiveDiagnostic: (input.env ?? {}).LUMEN_ENABLE_LIVE_DIAGNOSTIC === "true"
+      enableLiveDiagnostic: (input.env ?? {}).LUMEN_ENABLE_LIVE_DIAGNOSTIC === "true",
+      env: input.env ?? {},
+      execFileImpl: input.execFileImpl
     });
     if (commandResult.state) {
       latestState = commandResult.state;

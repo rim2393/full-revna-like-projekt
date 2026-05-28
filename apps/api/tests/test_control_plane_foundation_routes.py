@@ -950,7 +950,7 @@ async def test_node_command_queue_and_metrics(foundation_app: FoundationRouteApp
 
     command_response = await foundation_app.client.post(
         f"/api/v1/nodes/{node_id}/commands",
-        json={"command_type": "protocol.apply", "payload_json": {"profile_id": profile_id}},
+        json={"command_type": "capabilities.report", "payload_json": {"profile_id": profile_id}},
     )
     assert command_response.status_code == 201
     command_id = command_response.json()["id"]
@@ -973,7 +973,7 @@ async def test_node_command_queue_and_metrics(foundation_app: FoundationRouteApp
     skipped_command_response = await foundation_app.client.post(
         f"/api/v1/nodes/{node_id}/commands",
         json={
-            "command_type": "outbound.apply",
+            "command_type": "conflict.scan",
             "payload_json": {"profile_id": profile_id, "node_id": node_id},
         },
     )
@@ -997,6 +997,23 @@ async def test_node_command_queue_and_metrics(foundation_app: FoundationRouteApp
     )
     assert skipped_complete_response.status_code == 200
     assert skipped_complete_response.json()["status"] == "skipped"
+
+    unsupported_command_response = await foundation_app.client.post(
+        f"/api/v1/nodes/{node_id}/commands",
+        json={"command_type": "protocol.apply", "payload_json": {"profile_id": profile_id}},
+    )
+    assert unsupported_command_response.status_code == 422
+    assert unsupported_command_response.json()["error"]["code"] == "node_command_not_supported"
+
+    non_live_outbound_response = await foundation_app.client.post(
+        f"/api/v1/nodes/{node_id}/commands",
+        json={
+            "command_type": "outbound.apply",
+            "payload_json": {"profile_id": profile_id, "node_id": node_id},
+        },
+    )
+    assert non_live_outbound_response.status_code == 422
+    assert non_live_outbound_response.json()["error"]["code"] == "node_command_payload_not_live"
 
     empty_claim_response = await foundation_app.client.get(
         f"/api/v1/nodes/{node_id}/commands/next",
@@ -1030,26 +1047,49 @@ async def test_node_pause_resume_and_quarantine_enqueue_commands(
         json={"reason": "license expired", "license_enforced": True},
     )
     assert pause_response.status_code == 200
-    assert pause_response.json()["status"] == "license_paused"
+    assert pause_response.json()["status"] == "active"
+    assert pause_response.json()["capabilities"]["pending_control_target_status"] == (
+        "license_paused"
+    )
 
     resume_response = await foundation_app.client.post(
         f"/api/v1/nodes/{node_id}/resume",
         json={"target_status": "offline"},
     )
     assert resume_response.status_code == 200
-    assert resume_response.json()["status"] == "offline"
+    assert resume_response.json()["status"] == "active"
+    assert resume_response.json()["capabilities"]["pending_control_target_status"] == "offline"
 
     quarantine_response = await foundation_app.client.post(
         f"/api/v1/nodes/{node_id}/quarantine",
         json={"reason": "unexpected config drift"},
     )
     assert quarantine_response.status_code == 200
-    assert quarantine_response.json()["status"] == "quarantined"
+    assert quarantine_response.json()["status"] == "active"
+    assert quarantine_response.json()["capabilities"]["pending_control_command_type"] == (
+        "node.quarantine"
+    )
 
     commands_response = await foundation_app.client.get(f"/api/v1/nodes/{node_id}/commands")
     assert commands_response.status_code == 200
     command_types = [item["command_type"] for item in commands_response.json()["items"]]
     assert command_types == ["node.quarantine", "node.resume", "node.pause"]
+
+    claim_response = await foundation_app.client.get(
+        f"/api/v1/nodes/{node_id}/commands/next",
+        headers={"X-Lumen-Node-Token": NODE_TOKEN},
+    )
+    assert claim_response.status_code == 200
+    assert claim_response.json()["command_type"] == "node.pause"
+    complete_response = await foundation_app.client.post(
+        f"/api/v1/nodes/{node_id}/commands/{claim_response.json()['id']}/result",
+        headers={"X-Lumen-Node-Token": NODE_TOKEN},
+        json={"status": "succeeded", "result_json": {"mode": "license_paused"}},
+    )
+    assert complete_response.status_code == 200
+    node_response = await foundation_app.client.get(f"/api/v1/nodes/{node_id}")
+    assert node_response.status_code == 200
+    assert node_response.json()["status"] == "license_paused"
 
 
 async def test_node_command_result_requires_claimed_command(

@@ -92,6 +92,14 @@ export {
 export { applyNodeCommand, enrollNodeAgent, runNodeAgentLoop, runNodeAgentOnce } from "./runtime-runner.js";
 export { readSecretFromEnv } from "./secret-input.js";
 export {
+  DEFAULT_XRAY_BINARY,
+  DEFAULT_XRAY_CONFIG_PATH,
+  DEFAULT_XRAY_RELOAD_ARGV,
+  XRAY_RUNTIME_MODEL_VERSION,
+  applyXrayConfig,
+  createXrayApplyPlan
+} from "./xray-runtime.js";
+export {
   LIVE_LISTENER_MODEL_VERSION,
   TCP_DIAGNOSTIC_LISTENER_KIND,
   createTcpDiagnosticListenerPlan,

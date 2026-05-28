@@ -319,8 +319,8 @@ export function NodesPage() {
   const [formError, setFormError] = useState<string | null>(null)
   const [latestJob, setLatestJob] = useState<ProvisioningJobResponse | null>(null)
   const [selectedNodeId, setSelectedNodeId] = useState<string | undefined>(undefined)
-  const [commandType, setCommandType] = useState('node.restart')
-  const [commandPayload, setCommandPayload] = useState('{"reason":"operator requested"}')
+  const [commandType, setCommandType] = useState('capabilities.report')
+  const [commandPayload, setCommandPayload] = useState('{}')
   const [commandError, setCommandError] = useState<string | null>(null)
   const createCommand = useCreateNodeCommand()
   const pauseNode = usePauseNode()
@@ -544,12 +544,11 @@ export function NodesPage() {
                   value={commandType}
                   onChange={(event) => setCommandType(event.target.value)}
                 >
-                  <option value="node.restart">node.restart</option>
-                  <option value="node.reload">node.reload</option>
-                  <option value="xray.reload">xray.reload</option>
-                  <option value="firewall.sync">firewall.sync</option>
-                  <option value="protocol.apply">protocol.apply</option>
-                  <option value="telemetry.collect">telemetry.collect</option>
+                  <option value="capabilities.report">capabilities.report</option>
+                  <option value="conflict.scan">conflict.scan</option>
+                  <option value="outbound.apply">outbound.apply</option>
+                  <option value="outbound.remove">outbound.remove</option>
+                  <option value="desired-state.validate">desired-state.validate</option>
                 </select>
               </label>
               <label htmlFor="node-command-payload">

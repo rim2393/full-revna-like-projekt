@@ -463,3 +463,139 @@ test("outbound apply fails when no live runtime backend exists", () => {
   assert.equal(result.errorCode, "command_apply_failed");
   assert.match(result.errorMessage, /no live runtime backend/);
 });
+
+test("run once applies Xray config only after writing, testing, and reload", async () => {
+  const stateDir = mkdtempSync(join(tmpdir(), "lumen-agent-state-"));
+  const xrayDir = mkdtempSync(join(tmpdir(), "lumen-xray-"));
+  const xrayConfigPath = join(xrayDir, "config.json");
+  try {
+    writeFileSync(join(stateDir, "node-token"), "persisted-node-token\n", { mode: 0o600 });
+    writeFileSync(join(stateDir, "heartbeat-path"), "/api/v1/nodes/node-1/heartbeat\n", { mode: 0o600 });
+    const calls = [];
+    const execCalls = [];
+
+    const xrayConfig = {
+      log: { loglevel: "warning" },
+      inbounds: [
+        {
+          tag: "VLESS_REALITY",
+          listen: "0.0.0.0",
+          port: 18443,
+          protocol: "vless",
+          settings: { clients: [{ id: "7f3d9e04-3e76-46a6-9f63-ef45a3129c20" }] },
+          streamSettings: { network: "tcp", security: "reality" }
+        }
+      ],
+      outbounds: [{ protocol: "freedom", tag: "direct" }]
+    };
+
+    const result = await runNodeAgentOnce({
+      env: {
+        LUMEN_CONTROL_PLANE_URL: "https://panel.example",
+        LUMEN_NODE_NAME: "node-1",
+        LUMEN_STATE_DIR: stateDir,
+        LUMEN_DRY_RUN: "false",
+        LUMEN_XRAY_CONFIG_FILE: xrayConfigPath,
+        LUMEN_XRAY_BINARY: "xray-test-bin",
+        LUMEN_XRAY_RELOAD_ARGV: JSON.stringify(["systemctl", "reload", "xray"])
+      },
+      execFileImpl: async (command, args) => {
+        execCalls.push({ command, args });
+        return { stdout: "", stderr: "" };
+      },
+      fetchImpl: async (url, options) => {
+        calls.push({ url, options });
+        if (url.endsWith("/heartbeat")) {
+          return jsonResponse({
+            id: "node-1",
+            name: "node-1",
+            status: "active",
+            last_seen_at: "2026-05-27T00:00:00Z",
+            capabilities: {}
+          });
+        }
+        if (url.endsWith("/commands/next")) {
+          return jsonResponse({
+            id: "cmd-xray-apply-1",
+            node_id: "node-1",
+            command_type: COMMAND_TYPES.OUTBOUND_APPLY,
+            status: "claimed",
+            payload_json: {
+              profileId: "profile-1",
+              adapter: "vless-reality",
+              xrayConfig
+            },
+            created_at: "2026-05-27T00:01:00.000Z"
+          });
+        }
+        if (url.endsWith("/result")) {
+          return jsonResponse({
+            id: "cmd-xray-apply-1",
+            node_id: "node-1",
+            command_type: COMMAND_TYPES.OUTBOUND_APPLY,
+            status: JSON.parse(options.body).status,
+            payload_json: {},
+            result_json: JSON.parse(options.body).result_json
+          });
+        }
+        return jsonResponse({
+          id: "metric-1",
+          node_id: "node-1",
+          metric_kind: "runtime",
+          values_json: JSON.parse(options.body).values_json
+        });
+      }
+    });
+
+    assert.equal(result.command.status, "succeeded");
+    assert.deepEqual(execCalls, [
+      { command: "xray-test-bin", args: ["-test", "-config", xrayConfigPath] },
+      { command: "systemctl", args: ["reload", "xray"] }
+    ]);
+    const written = JSON.parse(readFileSync(xrayConfigPath, "utf8"));
+    assert.equal(written.inbounds[0].tag, "VLESS_REALITY");
+    const resultBody = JSON.parse(calls[2].options.body);
+    assert.equal(resultBody.result_json.outputs.implementationStatus, "xray-applied");
+    assert.equal(resultBody.result_json.outputs.configPath, xrayConfigPath);
+  } finally {
+    rmSync(stateDir, { recursive: true, force: true });
+    rmSync(xrayDir, { recursive: true, force: true });
+  }
+});
+
+test("xray apply fails when config still contains unresolved refs", () => {
+  const active = createProvisioningState({
+    nodeId: "node-1",
+    updatedAt: "2026-05-27T00:00:00.000Z"
+  });
+
+  const result = applyNodeCommand(
+    {
+      id: "cmd-xray-invalid-1",
+      node_id: "node-1",
+      command_type: COMMAND_TYPES.OUTBOUND_APPLY,
+      created_at: "2026-05-27T00:02:00.000Z",
+      payload_json: {
+        adapter: "vless-reality",
+        xrayConfig: {
+          inbounds: [
+            {
+              tag: "BROKEN",
+              port: 18443,
+              protocol: "vless",
+              settings: { clientsRef: "vault://protocols/unresolved" }
+            }
+          ]
+        }
+      }
+    },
+    active,
+    {
+      startedAt: "2026-05-27T00:02:01.000Z",
+      finishedAt: "2026-05-27T00:02:02.000Z"
+    }
+  );
+
+  assert.equal(result.status, "failed");
+  assert.match(result.errorMessage, /unresolved refs/);
+});

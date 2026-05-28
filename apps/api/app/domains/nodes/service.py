@@ -54,6 +54,20 @@ SECRET_FIELD_FRAGMENTS = frozenset(
         "runtime_config",
     }
 )
+SUPPORTED_NODE_COMMAND_TYPES = frozenset(
+    {
+        "capabilities.report",
+        "conflict.scan",
+        "desired-state.apply",
+        "desired-state.validate",
+        "firewall-plan.apply",
+        "node.pause",
+        "node.quarantine",
+        "node.resume",
+        "outbound.apply",
+        "outbound.remove",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -104,6 +118,62 @@ def ensure_no_inline_secret_keys(values: dict[str, str], *, field_name: str) -> 
                 status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 details=[f"{field_name}.{key}"],
             )
+
+
+def ensure_supported_node_command(request: NodeCommandCreateRequest) -> None:
+    if request.command_type not in SUPPORTED_NODE_COMMAND_TYPES:
+        raise APIError(
+            code="node_command_not_supported",
+            message="Node command type is not supported by the live node-agent.",
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            details=[request.command_type],
+        )
+    if request.command_type == "outbound.apply":
+        adapter = request.payload_json.get("adapter")
+        has_live_payload = (
+            isinstance(request.payload_json.get("xrayConfig"), dict)
+            or adapter == "tcp-diagnostic-listener"
+        )
+        if not has_live_payload:
+            raise APIError(
+                code="node_command_payload_not_live",
+                message="outbound.apply requires a live Xray config or tcp diagnostic listener payload.",
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                details=["payload_json.xrayConfig"],
+            )
+
+
+def _set_pending_control_action(node: Node, command: NodeCommand) -> None:
+    capabilities = dict(node.capabilities)
+    capabilities["pending_control_command_id"] = str(command.id)
+    capabilities["pending_control_command_type"] = command.command_type
+    if target_status := command.payload_json.get("status") or command.payload_json.get("target_status"):
+        capabilities["pending_control_target_status"] = str(target_status)
+    node.capabilities = capabilities
+
+
+def _clear_pending_control_action(node: Node, command: NodeCommand) -> None:
+    capabilities = dict(node.capabilities)
+    if capabilities.get("pending_control_command_id") == str(command.id):
+        for key in (
+            "pending_control_command_id",
+            "pending_control_command_type",
+            "pending_control_target_status",
+        ):
+            capabilities.pop(key, None)
+    node.capabilities = capabilities
+
+
+def _apply_completed_control_action(node: Node, command: NodeCommand) -> None:
+    if command.command_type == "node.pause":
+        target = command.payload_json.get("status") or NodeStatus.PAUSED.value
+        node.status = str(target)
+    elif command.command_type == "node.resume":
+        target = command.payload_json.get("target_status") or NodeStatus.OFFLINE.value
+        node.status = str(target)
+    elif command.command_type == "node.quarantine":
+        node.status = NodeStatus.QUARANTINED.value
+    _clear_pending_control_action(node, command)
 
 
 async def get_provisioning_job(
@@ -434,6 +504,7 @@ async def enqueue_node_command(
 ) -> NodeCommand:
     await get_node(session, node_id=node_id)
     ensure_no_inline_secret_keys(request.payload_json, field_name="payload_json")
+    ensure_supported_node_command(request)
     command = NodeCommand(
         node_id=node_id,
         command_type=request.command_type,
@@ -455,8 +526,7 @@ async def pause_node(
     status_value = (
         NodeStatus.LICENSE_PAUSED.value if request.license_enforced else NodeStatus.PAUSED.value
     )
-    node.status = status_value
-    await enqueue_node_command(
+    command = await enqueue_node_command(
         session,
         node_id=node_id,
         request=NodeCommandCreateRequest(
@@ -468,6 +538,7 @@ async def pause_node(
             },
         ),
     )
+    _set_pending_control_action(node, command)
     await session.flush()
     return node
 
@@ -489,8 +560,7 @@ async def resume_node(
             message="Resume target status must be an operational node status.",
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         )
-    node.status = request.target_status.value
-    await enqueue_node_command(
+    command = await enqueue_node_command(
         session,
         node_id=node_id,
         request=NodeCommandCreateRequest(
@@ -498,6 +568,7 @@ async def resume_node(
             payload_json={"target_status": request.target_status.value},
         ),
     )
+    _set_pending_control_action(node, command)
     await session.flush()
     return node
 
@@ -509,8 +580,7 @@ async def quarantine_node(
     request: NodeQuarantineRequest,
 ) -> Node:
     node = await get_node(session, node_id=node_id)
-    node.status = NodeStatus.QUARANTINED.value
-    await enqueue_node_command(
+    command = await enqueue_node_command(
         session,
         node_id=node_id,
         request=NodeCommandCreateRequest(
@@ -518,6 +588,7 @@ async def quarantine_node(
             payload_json={"reason": request.reason},
         ),
     )
+    _set_pending_control_action(node, command)
     await session.flush()
     return node
 
@@ -594,6 +665,12 @@ async def complete_node_command(
     command.error_code = request.error_code
     command.error_message = request.error_message
     command.completed_at = utc_now()
+    node = await session.get(Node, node_id)
+    if node is not None and command.command_type in {"node.pause", "node.resume", "node.quarantine"}:
+        if request.status == "succeeded":
+            _apply_completed_control_action(node, command)
+        elif request.status == "failed":
+            _clear_pending_control_action(node, command)
     await session.flush()
     return command
 
