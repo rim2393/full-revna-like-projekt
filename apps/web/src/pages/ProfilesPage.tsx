@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { useCreateProfile, useNodesPageData, useProfilesPageData, useProtocolAdaptersData, useSquadsPageData } from '../shared/api/resourceHooks'
 import {
   FormError,
@@ -21,13 +21,19 @@ export function ProfilesPage() {
   const squads = squadsQuery.data?.items ?? []
   const adapters = adaptersQuery.data?.items ?? []
   const [name, setName] = useState('')
-  const [adapter, setAdapter] = useState('vless')
+  const [adapter, setAdapter] = useState('vless-reality')
   const [nodeId, setNodeId] = useState('')
   const [squadId, setSquadId] = useState('')
   const [port, setPort] = useState('443')
   const [credentialsRef, setCredentialsRef] = useState('vault://lumen/profiles/new-profile')
   const [config, setConfig] = useState('transport=tcp, security=reality')
   const [formError, setFormError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (adapters.length > 0 && !adapters.some((item) => item.protocol === adapter)) {
+      setAdapter(adapters[0].protocol)
+    }
+  }, [adapter, adapters])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
