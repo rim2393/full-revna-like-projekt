@@ -242,6 +242,109 @@ async def test_protocol_profile_port_conflict_and_host_flow(
     assert smoke_profile_response.json()["adapter"] == "tcp-smoke"
 
 
+async def test_remna_parity_crud_and_bulk_actions(foundation_app: FoundationRouteApp) -> None:
+    node_id = await seeded_node_id(foundation_app)
+
+    user_response = await foundation_app.client.post(
+        "/api/v1/users",
+        json={
+            "email": "vpn-user@example.com",
+            "username": "vpn-user",
+            "display_name": "VPN User",
+            "traffic_limit_gb": 300,
+            "traffic_used_gb": 12.5,
+            "device_limit": 5,
+            "tags": ["default"],
+        },
+    )
+    assert user_response.status_code == 201
+    user_id = user_response.json()["id"]
+
+    update_user_response = await foundation_app.client.patch(
+        f"/api/v1/users/{user_id}",
+        json={"status": "limited", "telegram_id": "100500", "traffic_used_gb": 15.25},
+    )
+    assert update_user_response.status_code == 200
+    assert update_user_response.json()["status"] == "limited"
+    assert update_user_response.json()["telegram_id"] == "100500"
+
+    bulk_user_response = await foundation_app.client.post(
+        "/api/v1/users/bulk/reset-traffic",
+        json={"user_ids": [user_id]},
+    )
+    assert bulk_user_response.status_code == 200
+    assert bulk_user_response.json()["updated"] == 1
+    assert bulk_user_response.json()["items"][0]["traffic_used_gb"] == 0
+
+    squad_response = await foundation_app.client.post(
+        "/api/v1/squads",
+        json={"name": "Parity squad", "kind": "internal"},
+    )
+    assert squad_response.status_code == 201
+    squad_id = squad_response.json()["id"]
+
+    profile_response = await foundation_app.client.post(
+        "/api/v1/profiles",
+        json={
+            "name": "Parity Reality",
+            "node_id": node_id,
+            "squad_id": squad_id,
+            "adapter": "vless-reality",
+            "credentials_ref": "vault://protocols/parity-reality",
+            "port_reservations": [
+                {"address": WILDCARD_BIND_ADDRESS, "port": 8443, "protocol": "tcp"}
+            ],
+            "metadata_json": {"xray_template": "reality-default"},
+        },
+    )
+    assert profile_response.status_code == 201
+    profile_id = profile_response.json()["id"]
+
+    patch_profile_response = await foundation_app.client.patch(
+        f"/api/v1/profiles/{profile_id}",
+        json={
+            "status": "disabled",
+            "config_json": {"routing": {"domainStrategy": "AsIs"}},
+            "port_reservations": [
+                {"address": WILDCARD_BIND_ADDRESS, "port": 9443, "protocol": "tcp"}
+            ],
+        },
+    )
+    assert patch_profile_response.status_code == 200
+    assert patch_profile_response.json()["status"] == "disabled"
+    assert patch_profile_response.json()["port_reservations"][0]["port"] == 9443
+
+    host_response = await foundation_app.client.post(
+        "/api/v1/hosts",
+        json={
+            "name": "Parity Host",
+            "hostname": "parity.example.test",
+            "node_id": node_id,
+            "protocol_profile_id": profile_id,
+            "squad_id": squad_id,
+            "address": "203.0.113.99",
+            "port": 9443,
+            "inbound_tag": "VLESS_REALITY",
+            "remark": "Visible in subscription",
+            "tags": ["reality"],
+        },
+    )
+    assert host_response.status_code == 201
+    host_id = host_response.json()["id"]
+
+    patch_host_response = await foundation_app.client.patch(
+        f"/api/v1/hosts/{host_id}",
+        json={"status": "disabled", "remark": "Temporarily hidden"},
+    )
+    assert patch_host_response.status_code == 200
+    assert patch_host_response.json()["status"] == "disabled"
+    assert patch_host_response.json()["remark"] == "Temporarily hidden"
+
+    compat_hosts_response = await foundation_app.client.get("/api/hosts")
+    assert compat_hosts_response.status_code == 200
+    assert compat_hosts_response.json()["items"][0]["name"] == "Parity Host"
+
+
 async def test_protocol_profile_rejects_plaintext_credentials_ref(
     foundation_app: FoundationRouteApp,
 ) -> None:

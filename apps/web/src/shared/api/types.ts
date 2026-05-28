@@ -105,6 +105,61 @@ export type AdminUserRecord = {
   trafficUsedGb: number
 }
 
+export type UserRecord = {
+  created_at: string
+  device_limit: number | null
+  display_name: string | null
+  email: string
+  expires_at: string | null
+  id: string
+  metadata_json: Record<string, unknown>
+  role: 'owner' | 'admin' | 'operator' | 'user'
+  status: UserStatus | 'revoked' | (string & {})
+  tags: string[]
+  telegram_id: string | null
+  traffic_limit_gb: number | null
+  traffic_used_gb: number
+  updated_at: string
+  username: string | null
+}
+
+export type UserCreateRequest = {
+  device_limit?: number | null
+  display_name?: string | null
+  email: string
+  expires_at?: string | null
+  metadata_json?: Record<string, unknown>
+  password?: string | null
+  role?: 'owner' | 'admin' | 'operator' | 'user'
+  status?: string
+  tags?: string[]
+  telegram_id?: string | null
+  traffic_limit_gb?: number | null
+  traffic_used_gb?: number
+  username?: string | null
+}
+
+export type UserUpdateRequest = Partial<Omit<UserCreateRequest, 'password'>> & {
+  password?: string | null
+}
+
+export type UserListResponse = {
+  items: UserRecord[]
+}
+
+export type UserBulkActionRequest = {
+  expires_at?: string | null
+  status?: string | null
+  tags?: string[] | null
+  traffic_delta_gb?: number | null
+  user_ids: string[]
+}
+
+export type UserBulkActionResponse = {
+  items: UserRecord[]
+  updated: number
+}
+
 export type LegacyNodeStatus = 'healthy' | 'degraded' | 'offline'
 
 export type NodeRecord = {
@@ -243,6 +298,7 @@ export type ProtocolProfileRecord = {
   config_json: Record<string, unknown>
   credentials_ref: string | null
   id: string
+  metadata_json: Record<string, unknown>
   name: string
   node_id: string
   port_reservations: Array<Record<string, unknown>>
@@ -255,6 +311,7 @@ export type ProtocolProfileCreateRequest = {
   allow_port_conflicts?: boolean
   config_json?: Record<string, unknown>
   credentials_ref?: string | null
+  metadata_json?: Record<string, unknown>
   name: string
   node_id: string
   port_reservations?: PortReservation[]
@@ -262,30 +319,44 @@ export type ProtocolProfileCreateRequest = {
   status?: string
 }
 
+export type ProtocolProfileUpdateRequest = Partial<ProtocolProfileCreateRequest>
+
 export type ProtocolProfileListResponse = {
   items: ProtocolProfileRecord[]
 }
 
 export type HostRecord = {
+  address: string | null
   hostname: string
   id: string
+  inbound_tag: string | null
+  metadata_json: Record<string, unknown>
   name: string
   node_id: string
+  port: number | null
   protocol_profile_id: string | null
+  remark: string | null
   squad_id: string | null
   status: string
   tags: string[]
 }
 
 export type HostCreateRequest = {
+  address?: string | null
   hostname: string
+  inbound_tag?: string | null
+  metadata_json?: Record<string, unknown>
   name: string
   node_id: string
+  port?: number | null
   protocol_profile_id?: string | null
+  remark?: string | null
   squad_id?: string | null
   status?: string
   tags?: string[]
 }
+
+export type HostUpdateRequest = Partial<HostCreateRequest>
 
 export type HostListResponse = {
   items: HostRecord[]
@@ -376,6 +447,10 @@ export type InstallTokenExchangeResponse = {
 }
 
 export type LumenApiClient = {
+  bulkUsers: (
+    action: string,
+    request: UserBulkActionRequest,
+  ) => Promise<UserBulkActionResponse>
   checkPortConflicts: (request: PortCheckRequest) => Promise<PortCheckResponse>
   createApiKey: (request: ApiKeyCreateRequest) => Promise<ApiKeyCreateResponse>
   createHost: (request: HostCreateRequest) => Promise<HostRecord>
@@ -384,6 +459,11 @@ export type LumenApiClient = {
     request: ProvisioningJobCreateRequest,
   ) => Promise<ProvisioningJobResponse>
   createSquad: (request: SquadCreateRequest) => Promise<SquadRecord>
+  createUser: (request: UserCreateRequest) => Promise<UserRecord>
+  deleteHost: (hostId: string) => Promise<void>
+  deleteProfile: (profileId: string) => Promise<void>
+  deleteSquad: (squadId: string) => Promise<void>
+  deleteUser: (userId: string) => Promise<void>
   getSession: () => Promise<AuthSession | null>
   listApiKeys: () => Promise<ResourceListResponse<ApiKeyRecord>>
   listHosts: () => Promise<HostListResponse>
@@ -393,12 +473,18 @@ export type LumenApiClient = {
   listSettings: () => Promise<SettingListResponse>
   listSquads: () => Promise<SquadListResponse>
   listSubscriptions: () => Promise<SubscriptionListResponse>
-  listUsers: () => Promise<ResourceListResponse<AdminUserRecord>>
+  listUsers: () => Promise<UserListResponse>
   login: (request: LoginRequest) => Promise<AuthSession | MfaChallenge>
   logout: () => Promise<void>
   readProvisioningJob: (jobId: string) => Promise<ProvisioningJobResponse>
   readLicense: () => Promise<LicenseSummary | null>
   revokeApiKey: (apiKeyId: string) => Promise<void>
+  updateHost: (hostId: string, request: HostUpdateRequest) => Promise<HostRecord>
+  updateProfile: (
+    profileId: string,
+    request: ProtocolProfileUpdateRequest,
+  ) => Promise<ProtocolProfileRecord>
   verifyMfaChallenge: (request: MfaChallengeVerifyRequest) => Promise<AuthSession>
   updateSetting: (key: string, request: SettingUpdateRequest) => Promise<SettingRecord>
+  updateUser: (userId: string, request: UserUpdateRequest) => Promise<UserRecord>
 }

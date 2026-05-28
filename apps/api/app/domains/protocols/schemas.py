@@ -70,6 +70,7 @@ class ProtocolProfileCreateRequest(BaseModel):
     config_json: dict[str, object] = Field(default_factory=dict)
     port_reservations: list[PortReservation] = Field(default_factory=list)
     credentials_ref: str | None = Field(default=None, max_length=512)
+    metadata_json: dict[str, object] = Field(default_factory=dict)
     allow_port_conflicts: bool = False
 
     @field_validator("credentials_ref")
@@ -88,6 +89,27 @@ class ProtocolProfileResponse(BaseModel):
     config_json: dict[str, object]
     port_reservations: list[dict[str, object]]
     credentials_ref: str | None
+    metadata_json: dict[str, object]
+
+
+class ProtocolProfileUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str | None = Field(default=None, min_length=1, max_length=128)
+    node_id: UUID | None = None
+    squad_id: UUID | None = None
+    adapter: str | None = Field(default=None, min_length=1, max_length=64)
+    status: str | None = Field(default=None, max_length=32)
+    config_json: dict[str, object] | None = None
+    port_reservations: list[PortReservation] | None = None
+    credentials_ref: str | None = Field(default=None, max_length=512)
+    metadata_json: dict[str, object] | None = None
+    allow_port_conflicts: bool = False
+
+    @field_validator("credentials_ref")
+    @classmethod
+    def validate_credentials_ref(cls, value: str | None) -> str | None:
+        return validate_vault_ref(value)
 
 
 class ProtocolProfileListResponse(BaseModel):
@@ -101,6 +123,15 @@ class SquadCreateRequest(BaseModel):
     kind: Literal["internal", "external"] = "internal"
     status: str = Field(default="active", max_length=32)
     metadata_json: dict[str, str] = Field(default_factory=dict)
+
+
+class SquadUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str | None = Field(default=None, min_length=1, max_length=128)
+    kind: Literal["internal", "external"] | None = None
+    status: str | None = Field(default=None, max_length=32)
+    metadata_json: dict[str, str] | None = None
 
 
 class SquadResponse(BaseModel):
@@ -125,6 +156,11 @@ class HostCreateRequest(BaseModel):
     squad_id: UUID | None = None
     status: str = Field(default="active", max_length=32)
     tags: list[str] = Field(default_factory=list)
+    address: str | None = Field(default=None, max_length=255)
+    port: int | None = Field(default=None, ge=1, le=65535)
+    inbound_tag: str | None = Field(default=None, max_length=128)
+    remark: str | None = Field(default=None, max_length=255)
+    metadata_json: dict[str, object] = Field(default_factory=dict)
 
 
 class HostResponse(BaseModel):
@@ -136,7 +172,40 @@ class HostResponse(BaseModel):
     squad_id: UUID | None
     status: str
     tags: list[str]
+    address: str | None
+    port: int | None
+    inbound_tag: str | None
+    remark: str | None
+    metadata_json: dict[str, object]
+
+
+class HostUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str | None = Field(default=None, min_length=1, max_length=128)
+    hostname: str | None = Field(default=None, min_length=1, max_length=255)
+    node_id: UUID | None = None
+    protocol_profile_id: UUID | None = None
+    squad_id: UUID | None = None
+    status: str | None = Field(default=None, max_length=32)
+    tags: list[str] | None = None
+    address: str | None = Field(default=None, max_length=255)
+    port: int | None = Field(default=None, ge=1, le=65535)
+    inbound_tag: str | None = Field(default=None, max_length=128)
+    remark: str | None = Field(default=None, max_length=255)
+    metadata_json: dict[str, object] | None = None
 
 
 class HostListResponse(BaseModel):
     items: list[HostResponse]
+
+
+class ResourceBulkActionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    ids: list[UUID] = Field(min_length=1)
+    status: str | None = None
+
+
+class ResourceBulkActionResponse(BaseModel):
+    updated: int

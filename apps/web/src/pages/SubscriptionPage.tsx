@@ -62,7 +62,8 @@ export function SubscriptionPage() {
       renderRow={(subscription) => ({
         cells: [
           subscription.public_id,
-          users.find((user) => user.id === subscription.user_id)?.displayName ?? subscription.user_id,
+          users.find((user) => user.id === subscription.user_id)?.display_name ??
+            subscription.user_id,
           nodes.find((node) => node.id === subscription.node_id)?.name ?? subscription.node_id ?? t('All nodes'),
           formatRecord(subscription.delivery_profile),
           subscription.expires_at ? formatDateTime(subscription.expires_at) : t('Not set'),

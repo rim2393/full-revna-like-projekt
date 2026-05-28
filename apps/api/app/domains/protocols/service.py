@@ -11,6 +11,7 @@ from app.domains.protocols.schemas import (
     WILDCARD_BIND_ADDRESS,
     HostCreateRequest,
     HostResponse,
+    HostUpdateRequest,
     PortCheckRequest,
     PortCheckResponse,
     PortConflict,
@@ -18,9 +19,12 @@ from app.domains.protocols.schemas import (
     ProtocolAdapterResponse,
     ProtocolProfileCreateRequest,
     ProtocolProfileResponse,
+    ProtocolProfileUpdateRequest,
     SquadCreateRequest,
     SquadResponse,
+    SquadUpdateRequest,
 )
+
 
 def _adapter(
     protocol: str,
@@ -334,10 +338,65 @@ async def create_profile(
         config_json=request.config_json,
         port_reservations=[reservation.model_dump() for reservation in request.port_reservations],
         credentials_ref=request.credentials_ref,
+        metadata_json=request.metadata_json,
     )
     session.add(profile)
     await session.flush()
     return profile
+
+
+async def update_profile(
+    session: AsyncSession,
+    *,
+    profile_id: UUID,
+    request: ProtocolProfileUpdateRequest,
+) -> ProtocolProfile:
+    profile = await get_profile(session, profile_id=profile_id)
+    data = request.model_dump(exclude_unset=True)
+    if "node_id" in data and data["node_id"] is not None:
+        await _ensure_node_exists(session, data["node_id"])
+    if "squad_id" in data and data["squad_id"] is not None:
+        await get_squad(session, squad_id=data["squad_id"])
+    if "adapter" in data and data["adapter"] is not None:
+        _ensure_adapter_known(data["adapter"])
+    if "name" in data and data["name"] != profile.name:
+        await _ensure_unique_name(
+            session,
+            model=ProtocolProfile,
+            name=data["name"],
+            code="protocol_profile_name_exists",
+            exclude_id=profile.id,
+        )
+    if "port_reservations" in data and data["port_reservations"] is not None:
+        reservations = request.port_reservations or []
+        node_id = data.get("node_id") or profile.node_id
+        port_check = await check_port_conflicts(
+            session,
+            request=PortCheckRequest(
+                node_id=node_id,
+                reservations=reservations,
+                exclude_profile_id=profile.id,
+            ),
+        )
+        if port_check.conflicts and not request.allow_port_conflicts:
+            raise APIError(
+                code="protocol_port_conflict",
+                message="Protocol profile conflicts with an existing exclusive bind reservation.",
+                status_code=status.HTTP_409_CONFLICT,
+                details=[conflict.model_dump_json() for conflict in port_check.conflicts],
+            )
+        data["port_reservations"] = [reservation.model_dump() for reservation in reservations]
+    data.pop("allow_port_conflicts", None)
+    for field, value in data.items():
+        setattr(profile, field, value)
+    await session.flush()
+    return profile
+
+
+async def delete_profile(session: AsyncSession, *, profile_id: UUID) -> None:
+    profile = await get_profile(session, profile_id=profile_id)
+    await session.delete(profile)
+    await session.flush()
 
 
 async def check_port_conflicts(
@@ -397,19 +456,39 @@ async def get_squad(session: AsyncSession, *, squad_id: UUID) -> Squad:
 
 
 async def create_squad(session: AsyncSession, *, request: SquadCreateRequest) -> Squad:
-    existing = (
-        await session.execute(select(Squad).where(Squad.name == request.name))
-    ).scalar_one_or_none()
-    if existing is not None:
-        raise APIError(
-            code="squad_name_exists",
-            message="Squad name already exists.",
-            status_code=status.HTTP_409_CONFLICT,
-        )
+    await _ensure_unique_name(session, model=Squad, name=request.name, code="squad_name_exists")
     squad = Squad(**request.model_dump())
     session.add(squad)
     await session.flush()
     return squad
+
+
+async def update_squad(
+    session: AsyncSession,
+    *,
+    squad_id: UUID,
+    request: SquadUpdateRequest,
+) -> Squad:
+    squad = await get_squad(session, squad_id=squad_id)
+    data = request.model_dump(exclude_unset=True)
+    if "name" in data and data["name"] != squad.name:
+        await _ensure_unique_name(
+            session,
+            model=Squad,
+            name=data["name"],
+            code="squad_name_exists",
+            exclude_id=squad.id,
+        )
+    for field, value in data.items():
+        setattr(squad, field, value)
+    await session.flush()
+    return squad
+
+
+async def delete_squad(session: AsyncSession, *, squad_id: UUID) -> None:
+    squad = await get_squad(session, squad_id=squad_id)
+    await session.delete(squad)
+    await session.flush()
 
 
 async def list_hosts(session: AsyncSession) -> list[Host]:
@@ -434,19 +513,69 @@ async def create_host(session: AsyncSession, *, request: HostCreateRequest) -> H
         await get_profile(session, profile_id=request.protocol_profile_id)
     if request.squad_id is not None:
         await get_squad(session, squad_id=request.squad_id)
-    existing = (
-        await session.execute(select(Host).where(Host.name == request.name))
-    ).scalar_one_or_none()
-    if existing is not None:
-        raise APIError(
-            code="host_name_exists",
-            message="Host name already exists.",
-            status_code=status.HTTP_409_CONFLICT,
-        )
+    await _ensure_unique_name(session, model=Host, name=request.name, code="host_name_exists")
     host = Host(**request.model_dump())
     session.add(host)
     await session.flush()
     return host
+
+
+async def update_host(
+    session: AsyncSession,
+    *,
+    host_id: UUID,
+    request: HostUpdateRequest,
+) -> Host:
+    host = await get_host(session, host_id=host_id)
+    data = request.model_dump(exclude_unset=True)
+    if "node_id" in data and data["node_id"] is not None:
+        await _ensure_node_exists(session, data["node_id"])
+    if "protocol_profile_id" in data and data["protocol_profile_id"] is not None:
+        await get_profile(session, profile_id=data["protocol_profile_id"])
+    if "squad_id" in data and data["squad_id"] is not None:
+        await get_squad(session, squad_id=data["squad_id"])
+    if "name" in data and data["name"] != host.name:
+        await _ensure_unique_name(
+            session,
+            model=Host,
+            name=data["name"],
+            code="host_name_exists",
+            exclude_id=host.id,
+        )
+    for field, value in data.items():
+        setattr(host, field, value)
+    await session.flush()
+    return host
+
+
+async def delete_host(session: AsyncSession, *, host_id: UUID) -> None:
+    host = await get_host(session, host_id=host_id)
+    await session.delete(host)
+    await session.flush()
+
+
+async def bulk_set_status(
+    session: AsyncSession,
+    *,
+    model: type[ProtocolProfile] | type[Host] | type[Squad],
+    ids: list[UUID],
+    status_value: str,
+) -> int:
+    result = await session.execute(select(model).where(model.id.in_(ids)))
+    records = list(result.scalars().all())
+    if len(records) != len(set(ids)):
+        found = {record.id for record in records}
+        missing = [str(record_id) for record_id in ids if record_id not in found]
+        raise APIError(
+            code="resource_not_found",
+            message="One or more resources were not found.",
+            status_code=status.HTTP_404_NOT_FOUND,
+            details=missing,
+        )
+    for record in records:
+        record.status = status_value
+    await session.flush()
+    return len(records)
 
 
 async def _ensure_node_exists(session: AsyncSession, node_id: UUID) -> None:
@@ -456,6 +585,33 @@ async def _ensure_node_exists(session: AsyncSession, node_id: UUID) -> None:
             code="node_not_found",
             message="Node was not found.",
             status_code=status.HTTP_404_NOT_FOUND,
+        )
+
+
+def _ensure_adapter_known(adapter: str) -> None:
+    if adapter not in {item.protocol for item in PROTOCOL_ADAPTERS}:
+        raise APIError(
+            code="protocol_adapter_unknown",
+            message="Protocol adapter is not registered.",
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            details=[adapter],
+        )
+
+
+async def _ensure_unique_name(
+    session: AsyncSession,
+    *,
+    model: type[ProtocolProfile] | type[Host] | type[Squad],
+    name: str,
+    code: str,
+    exclude_id: UUID | None = None,
+) -> None:
+    existing = (await session.execute(select(model).where(model.name == name))).scalar_one_or_none()
+    if existing is not None and existing.id != exclude_id:
+        raise APIError(
+            code=code,
+            message="Resource name already exists.",
+            status_code=status.HTTP_409_CONFLICT,
         )
 
 
@@ -470,6 +626,7 @@ def profile_response(profile: ProtocolProfile) -> ProtocolProfileResponse:
         config_json=profile.config_json,
         port_reservations=profile.port_reservations,
         credentials_ref=profile.credentials_ref,
+        metadata_json=profile.metadata_json,
     )
 
 
@@ -493,6 +650,11 @@ def host_response(host: Host) -> HostResponse:
         squad_id=host.squad_id,
         status=host.status,
         tags=host.tags,
+        address=host.address,
+        port=host.port,
+        inbound_tag=host.inbound_tag,
+        remark=host.remark,
+        metadata_json=host.metadata_json,
     )
 
 

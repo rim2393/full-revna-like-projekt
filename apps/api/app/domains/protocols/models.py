@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from sqlalchemy import JSON, ForeignKey, String, Uuid
+from sqlalchemy import JSON, ForeignKey, Integer, String, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
@@ -40,6 +40,7 @@ class ProtocolProfile(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         default=list,
     )
     credentials_ref: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    metadata_json: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False, default=dict)
 
 
 class Host(Base, UUIDPrimaryKeyMixin, TimestampMixin):
@@ -67,3 +68,8 @@ class Host(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     )
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="active", index=True)
     tags: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    address: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    port: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    inbound_tag: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
+    remark: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    metadata_json: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False, default=dict)

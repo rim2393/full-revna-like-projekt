@@ -7,25 +7,35 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.rbac import Permission, Principal, require_permission
 from app.db.session import get_db_session
 from app.domains.audit.service import record_audit_event
+from app.domains.protocols.models import Host, ProtocolProfile, Squad
 from app.domains.protocols.schemas import (
     HostCreateRequest,
     HostListResponse,
     HostResponse,
+    HostUpdateRequest,
     PortCheckRequest,
     PortCheckResponse,
     ProtocolAdapterListResponse,
     ProtocolProfileCreateRequest,
     ProtocolProfileListResponse,
     ProtocolProfileResponse,
+    ProtocolProfileUpdateRequest,
+    ResourceBulkActionRequest,
+    ResourceBulkActionResponse,
     SquadCreateRequest,
     SquadListResponse,
     SquadResponse,
+    SquadUpdateRequest,
 )
 from app.domains.protocols.service import (
+    bulk_set_status,
     check_port_conflicts,
     create_host,
     create_profile,
     create_squad,
+    delete_host,
+    delete_profile,
+    delete_squad,
     get_host,
     get_profile,
     get_squad,
@@ -36,6 +46,9 @@ from app.domains.protocols.service import (
     list_squads,
     profile_response,
     squad_response,
+    update_host,
+    update_profile,
+    update_squad,
 )
 
 protocols_router = APIRouter()
@@ -100,6 +113,64 @@ async def read_profile(
     return profile_response(await get_profile(session, profile_id=profile_id))
 
 
+@profiles_router.patch("/{profile_id}", response_model=ProtocolProfileResponse)
+async def patch_profile(
+    profile_id: UUID,
+    request: ProtocolProfileUpdateRequest,
+    principal: Manager,
+    session: DatabaseSession,
+) -> ProtocolProfileResponse:
+    profile = await update_profile(session, profile_id=profile_id, request=request)
+    await record_audit_event(
+        session,
+        principal=principal,
+        action="protocol_profile.updated",
+        resource_type="protocol_profile",
+        resource_id=str(profile.id),
+    )
+    await session.commit()
+    return profile_response(profile)
+
+
+@profiles_router.delete("/{profile_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_profile_route(
+    profile_id: UUID,
+    principal: Manager,
+    session: DatabaseSession,
+) -> None:
+    await delete_profile(session, profile_id=profile_id)
+    await record_audit_event(
+        session,
+        principal=principal,
+        action="protocol_profile.deleted",
+        resource_type="protocol_profile",
+        resource_id=str(profile_id),
+    )
+    await session.commit()
+
+
+@profiles_router.post("/bulk/status", response_model=ResourceBulkActionResponse)
+async def bulk_profile_status(
+    request: ResourceBulkActionRequest,
+    principal: Manager,
+    session: DatabaseSession,
+) -> ResourceBulkActionResponse:
+    updated = await bulk_set_status(
+        session,
+        model=ProtocolProfile,
+        ids=request.ids,
+        status_value=request.status or "active",
+    )
+    await record_audit_event(
+        session,
+        principal=principal,
+        action="protocol_profile.bulk.status",
+        resource_type="protocol_profile",
+    )
+    await session.commit()
+    return ResourceBulkActionResponse(updated=updated)
+
+
 @squads_router.get("", response_model=SquadListResponse)
 async def read_squads(
     _: Manager,
@@ -136,6 +207,64 @@ async def read_squad(
     return squad_response(await get_squad(session, squad_id=squad_id))
 
 
+@squads_router.patch("/{squad_id}", response_model=SquadResponse)
+async def patch_squad(
+    squad_id: UUID,
+    request: SquadUpdateRequest,
+    principal: Manager,
+    session: DatabaseSession,
+) -> SquadResponse:
+    squad = await update_squad(session, squad_id=squad_id, request=request)
+    await record_audit_event(
+        session,
+        principal=principal,
+        action="squad.updated",
+        resource_type="squad",
+        resource_id=str(squad.id),
+    )
+    await session.commit()
+    return squad_response(squad)
+
+
+@squads_router.delete("/{squad_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_squad_route(
+    squad_id: UUID,
+    principal: Manager,
+    session: DatabaseSession,
+) -> None:
+    await delete_squad(session, squad_id=squad_id)
+    await record_audit_event(
+        session,
+        principal=principal,
+        action="squad.deleted",
+        resource_type="squad",
+        resource_id=str(squad_id),
+    )
+    await session.commit()
+
+
+@squads_router.post("/bulk/status", response_model=ResourceBulkActionResponse)
+async def bulk_squad_status(
+    request: ResourceBulkActionRequest,
+    principal: Manager,
+    session: DatabaseSession,
+) -> ResourceBulkActionResponse:
+    updated = await bulk_set_status(
+        session,
+        model=Squad,
+        ids=request.ids,
+        status_value=request.status or "active",
+    )
+    await record_audit_event(
+        session,
+        principal=principal,
+        action="squad.bulk.status",
+        resource_type="squad",
+    )
+    await session.commit()
+    return ResourceBulkActionResponse(updated=updated)
+
+
 @hosts_router.get("", response_model=HostListResponse)
 async def read_hosts(
     _: Manager,
@@ -170,3 +299,61 @@ async def read_host(
     session: DatabaseSession,
 ) -> HostResponse:
     return host_response(await get_host(session, host_id=host_id))
+
+
+@hosts_router.patch("/{host_id}", response_model=HostResponse)
+async def patch_host(
+    host_id: UUID,
+    request: HostUpdateRequest,
+    principal: Manager,
+    session: DatabaseSession,
+) -> HostResponse:
+    host = await update_host(session, host_id=host_id, request=request)
+    await record_audit_event(
+        session,
+        principal=principal,
+        action="host.updated",
+        resource_type="host",
+        resource_id=str(host.id),
+    )
+    await session.commit()
+    return host_response(host)
+
+
+@hosts_router.delete("/{host_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_host_route(
+    host_id: UUID,
+    principal: Manager,
+    session: DatabaseSession,
+) -> None:
+    await delete_host(session, host_id=host_id)
+    await record_audit_event(
+        session,
+        principal=principal,
+        action="host.deleted",
+        resource_type="host",
+        resource_id=str(host_id),
+    )
+    await session.commit()
+
+
+@hosts_router.post("/bulk/status", response_model=ResourceBulkActionResponse)
+async def bulk_host_status(
+    request: ResourceBulkActionRequest,
+    principal: Manager,
+    session: DatabaseSession,
+) -> ResourceBulkActionResponse:
+    updated = await bulk_set_status(
+        session,
+        model=Host,
+        ids=request.ids,
+        status_value=request.status or "active",
+    )
+    await record_audit_event(
+        session,
+        principal=principal,
+        action="host.bulk.status",
+        resource_type="host",
+    )
+    await session.commit()
+    return ResourceBulkActionResponse(updated=updated)

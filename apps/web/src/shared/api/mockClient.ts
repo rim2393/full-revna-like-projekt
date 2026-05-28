@@ -37,6 +37,11 @@ import type {
   SquadListResponse,
   SquadRecord,
   SubscriptionListResponse,
+  UserBulkActionRequest,
+  UserCreateRequest,
+  UserListResponse,
+  UserRecord,
+  UserUpdateRequest,
 } from './types'
 
 const generatedAt = '2026-05-27T00:00:00Z'
@@ -108,6 +113,7 @@ export function createMockLumenApiClient(): LumenApiClient {
   const settings = [...settingRecords]
   const squads = [...squadRecords]
   const subscriptions = [...subscriptionRecords]
+  const users = [...userRecords]
 
   function updateSettingValue(key: string, request: SettingUpdateRequest): SettingRecord {
     const existing = settings.find((setting) => setting.key === key)
@@ -174,11 +180,16 @@ export function createMockLumenApiClient(): LumenApiClient {
     },
     createHost: async (request: HostCreateRequest): Promise<HostRecord> => {
       const host: HostRecord = {
+        address: request.address ?? request.hostname,
         hostname: request.hostname,
         id: `host_${request.name.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`,
+        inbound_tag: request.inbound_tag ?? null,
+        metadata_json: request.metadata_json ?? {},
         name: request.name,
         node_id: request.node_id,
+        port: request.port ?? null,
         protocol_profile_id: request.protocol_profile_id ?? null,
+        remark: request.remark ?? null,
         squad_id: request.squad_id ?? null,
         status: request.status ?? 'active',
         tags: request.tags ?? [],
@@ -194,6 +205,7 @@ export function createMockLumenApiClient(): LumenApiClient {
         config_json: request.config_json ?? {},
         credentials_ref: request.credentials_ref ?? null,
         id: `profile_${request.name.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`,
+        metadata_json: request.metadata_json ?? {},
         name: request.name,
         node_id: request.node_id,
         port_reservations: request.port_reservations ?? [],
@@ -215,6 +227,52 @@ export function createMockLumenApiClient(): LumenApiClient {
       squads.unshift(squad)
       return squad
     },
+    createUser: async (request: UserCreateRequest): Promise<UserRecord> => {
+      const now = new Date().toISOString()
+      const user: UserRecord = {
+        created_at: now,
+        device_limit: request.device_limit ?? null,
+        display_name: request.display_name ?? request.username ?? null,
+        email: request.email,
+        expires_at: request.expires_at ?? null,
+        id: `user_${request.email.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`,
+        metadata_json: request.metadata_json ?? {},
+        role: request.role ?? 'user',
+        status: request.status ?? 'active',
+        tags: request.tags ?? [],
+        telegram_id: request.telegram_id ?? null,
+        traffic_limit_gb: request.traffic_limit_gb ?? null,
+        traffic_used_gb: request.traffic_used_gb ?? 0,
+        updated_at: now,
+        username: request.username ?? null,
+      }
+      users.unshift(user)
+      return user
+    },
+    deleteHost: async (hostId: string) => {
+      const index = hosts.findIndex((host) => host.id === hostId)
+      if (index >= 0) {
+        hosts.splice(index, 1)
+      }
+    },
+    deleteProfile: async (profileId: string) => {
+      const index = profiles.findIndex((profile) => profile.id === profileId)
+      if (index >= 0) {
+        profiles.splice(index, 1)
+      }
+    },
+    deleteSquad: async (squadId: string) => {
+      const index = squads.findIndex((squad) => squad.id === squadId)
+      if (index >= 0) {
+        squads.splice(index, 1)
+      }
+    },
+    deleteUser: async (userId: string) => {
+      const index = users.findIndex((user) => user.id === userId)
+      if (index >= 0) {
+        users.splice(index, 1)
+      }
+    },
     getSession: async () => mockSession,
     listApiKeys: async () => asListResponse(apiKeys),
     listHosts: async (): Promise<HostListResponse> => ({ items: hosts }),
@@ -228,7 +286,7 @@ export function createMockLumenApiClient(): LumenApiClient {
     listSubscriptions: async (): Promise<SubscriptionListResponse> => ({
       items: subscriptions,
     }),
-    listUsers: async () => asListResponse(userRecords),
+    listUsers: async (): Promise<UserListResponse> => ({ items: users }),
     login: async () => ({
       challengeToken: 'mock-mfa-challenge',
       expiresAt: '2026-05-27T00:05:00.000Z',
@@ -270,6 +328,45 @@ export function createMockLumenApiClient(): LumenApiClient {
       if (record) {
         record.status = 'revoked'
       }
+    },
+    bulkUsers: async (
+      action: string,
+      request: UserBulkActionRequest,
+    ) => {
+      const selected = users.filter((user) => request.user_ids.includes(user.id))
+      for (const user of selected) {
+        if (action === 'reset-traffic') {
+          user.traffic_used_gb = 0
+        }
+        if (action === 'status' && request.status) {
+          user.status = request.status
+        }
+      }
+      return { items: selected, updated: selected.length }
+    },
+    updateHost: async (hostId: string, request) => {
+      const host = hosts.find((item) => item.id === hostId)
+      if (!host) {
+        throw new Error('Host not found')
+      }
+      Object.assign(host, request)
+      return host
+    },
+    updateProfile: async (profileId: string, request) => {
+      const profile = profiles.find((item) => item.id === profileId)
+      if (!profile) {
+        throw new Error('Profile not found')
+      }
+      Object.assign(profile, request)
+      return profile
+    },
+    updateUser: async (userId: string, request: UserUpdateRequest) => {
+      const user = users.find((item) => item.id === userId)
+      if (!user) {
+        throw new Error('User not found')
+      }
+      Object.assign(user, request, { updated_at: new Date().toISOString() })
+      return user
     },
     verifyMfaChallenge: async () => ({
       ...mockSession,

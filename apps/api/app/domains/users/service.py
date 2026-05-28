@@ -7,7 +7,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.errors import APIError
 from app.core.security import hash_password
 from app.domains.users.models import User
-from app.domains.users.schemas import UserCreateRequest, UserResponse
+from app.domains.users.schemas import (
+    UserBulkActionRequest,
+    UserCreateRequest,
+    UserResponse,
+    UserUpdateRequest,
+)
 
 
 async def list_users(session: AsyncSession) -> list[User]:
@@ -28,22 +33,154 @@ async def get_user(session: AsyncSession, user_id: UUID) -> User:
 
 async def create_user(session: AsyncSession, *, request: UserCreateRequest) -> User:
     email = request.email.lower()
-    existing = await session.execute(select(User).where(User.email == email))
-    if existing.scalar_one_or_none() is not None:
-        raise APIError(
-            code="user_email_already_exists",
-            message="A user with this email already exists.",
-            status_code=status.HTTP_409_CONFLICT,
-        )
+    await _ensure_unique_identity(session, email=email, username=request.username)
     user = User(
         email=email,
         password_hash=hash_password(request.password) if request.password is not None else None,
         role=request.role.value,
         status=request.status,
+        username=request.username,
+        display_name=request.display_name,
+        telegram_id=request.telegram_id,
+        traffic_limit_gb=request.traffic_limit_gb,
+        traffic_used_gb=request.traffic_used_gb,
+        device_limit=request.device_limit,
+        expires_at=request.expires_at,
+        tags=request.tags,
+        metadata_json=request.metadata_json,
     )
     session.add(user)
     await session.flush()
     return user
+
+
+async def update_user(
+    session: AsyncSession,
+    *,
+    user_id: UUID,
+    request: UserUpdateRequest,
+) -> User:
+    user = await get_user(session, user_id)
+    data = request.model_dump(exclude_unset=True)
+    if "email" in data and data["email"] is not None:
+        email = str(data.pop("email")).lower()
+        await _ensure_unique_identity(session, email=email, username=None, exclude_user_id=user.id)
+        user.email = email
+    if "username" in data:
+        username = data["username"]
+        if username is not None:
+            await _ensure_unique_identity(
+                session,
+                email=None,
+                username=username,
+                exclude_user_id=user.id,
+            )
+        user.username = username
+        data.pop("username")
+    if "password" in data:
+        password = data.pop("password")
+        if password is not None:
+            user.password_hash = hash_password(password)
+    if "role" in data and data["role"] is not None:
+        user.role = data.pop("role").value
+    for field, value in data.items():
+        setattr(user, field, value)
+    await session.flush()
+    return user
+
+
+async def delete_user(session: AsyncSession, *, user_id: UUID) -> None:
+    user = await get_user(session, user_id)
+    await session.delete(user)
+    await session.flush()
+
+
+async def apply_bulk_user_action(
+    session: AsyncSession,
+    *,
+    request: UserBulkActionRequest,
+    action: str,
+) -> list[User]:
+    users = await _get_users_by_ids(session, request.user_ids)
+    for user in users:
+        if action == "status":
+            if request.status is None:
+                raise APIError(
+                    code="bulk_status_required",
+                    message="status is required for status bulk action.",
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                )
+            user.status = request.status
+        elif action == "reset-traffic":
+            user.traffic_used_gb = 0.0
+        elif action == "extend":
+            if request.expires_at is None:
+                raise APIError(
+                    code="bulk_expires_at_required",
+                    message="expires_at is required for extend bulk action.",
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                )
+            user.expires_at = request.expires_at
+        elif action == "revoke":
+            user.status = "revoked"
+        elif action == "tag":
+            user.tags = request.tags or []
+        elif action == "traffic":
+            user.traffic_used_gb = max(
+                0.0,
+                user.traffic_used_gb + (request.traffic_delta_gb or 0.0),
+            )
+        else:
+            raise APIError(
+                code="bulk_action_unknown",
+                message="Bulk user action is not supported.",
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                details=[action],
+            )
+    await session.flush()
+    return users
+
+
+async def _ensure_unique_identity(
+    session: AsyncSession,
+    *,
+    email: str | None,
+    username: str | None,
+    exclude_user_id: UUID | None = None,
+) -> None:
+    if email is not None:
+        result = await session.execute(select(User).where(User.email == email))
+        existing = result.scalar_one_or_none()
+        if existing is not None and existing.id != exclude_user_id:
+            raise APIError(
+                code="user_email_already_exists",
+                message="A user with this email already exists.",
+                status_code=status.HTTP_409_CONFLICT,
+            )
+    if username is not None:
+        result = await session.execute(select(User).where(User.username == username))
+        existing = result.scalar_one_or_none()
+        if existing is not None and existing.id != exclude_user_id:
+            raise APIError(
+                code="user_username_already_exists",
+                message="A user with this username already exists.",
+                status_code=status.HTTP_409_CONFLICT,
+            )
+
+
+async def _get_users_by_ids(session: AsyncSession, user_ids: list[UUID]) -> list[User]:
+    result = await session.execute(select(User).where(User.id.in_(user_ids)))
+    users = list(result.scalars().all())
+    if len(users) != len(set(user_ids)):
+        found = {user.id for user in users}
+        missing = [str(user_id) for user_id in user_ids if user_id not in found]
+        raise APIError(
+            code="user_not_found",
+            message="One or more users were not found.",
+            status_code=status.HTTP_404_NOT_FOUND,
+            details=missing,
+        )
+    return users
 
 
 def user_to_response(user: User) -> UserResponse:
@@ -52,5 +189,15 @@ def user_to_response(user: User) -> UserResponse:
         email=user.email,
         role=user.role,
         status=user.status,
+        username=user.username,
+        display_name=user.display_name,
+        telegram_id=user.telegram_id,
+        traffic_limit_gb=user.traffic_limit_gb,
+        traffic_used_gb=user.traffic_used_gb,
+        device_limit=user.device_limit,
+        expires_at=user.expires_at,
+        tags=user.tags,
+        metadata_json=user.metadata_json,
         created_at=user.created_at,
+        updated_at=user.updated_at,
     )

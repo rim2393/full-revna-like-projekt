@@ -1,31 +1,113 @@
-import { RefreshCw } from 'lucide-react'
-import { useUsersPageData } from '../shared/api/resourceHooks'
-import type { UserStatus } from '../shared/api/types'
+import { useState, type FormEvent } from 'react'
+import { Ban, RefreshCw, RotateCcw, Save, Trash2 } from 'lucide-react'
+import {
+  useBulkUsers,
+  useCreateUser,
+  useDeleteUser,
+  useUpdateUser,
+  useUsersPageData,
+} from '../shared/api/resourceHooks'
+import type { UserRecord } from '../shared/api/types'
 import { DataTable } from '../shared/components/DataTable'
 import { EmptyState, ErrorState, LoadingState } from '../shared/components/DataState'
-import { OperatorGuide } from '../shared/components/OperatorGuide'
+import {
+  FormError,
+  ScreenForm,
+  SubmitButton,
+} from '../shared/components/ResourceScreen'
 import { PageHeader } from '../shared/components/PageHeader'
 import { StatusBadge } from '../shared/components/StatusBadge'
-import type { MetricTone } from '../shared/data/lumenData'
 import { placeholderSpecs } from '../shared/data/lumenData'
+import { toneForStatus } from '../shared/utils/resourceFormat'
 
-const userTone: Record<UserStatus, MetricTone> = {
-  active: 'good',
-  disabled: 'danger',
-  limited: 'watch',
+function formatUserName(user: UserRecord): string {
+  return user.display_name || user.username || user.email
+}
+
+function formatLimit(user: UserRecord): string {
+  const used = `${user.traffic_used_gb.toFixed(2)} GB`
+  if (user.traffic_limit_gb === null) {
+    return `${used} / unlimited`
+  }
+  return `${used} / ${user.traffic_limit_gb.toFixed(0)} GB`
 }
 
 export function UsersPage() {
   const spec = placeholderSpecs.users
   const query = useUsersPageData()
+  const createUser = useCreateUser()
+  const updateUser = useUpdateUser()
+  const deleteUser = useDeleteUser()
+  const bulkUsers = useBulkUsers()
   const users = query.data?.items ?? []
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [email, setEmail] = useState('')
+  const [username, setUsername] = useState('')
+  const [displayName, setDisplayName] = useState('')
+  const [trafficLimit, setTrafficLimit] = useState('300')
+  const [deviceLimit, setDeviceLimit] = useState('5')
+  const [formError, setFormError] = useState<string | null>(null)
+
+  function toggleSelected(id: string) {
+    setSelectedIds((current) => {
+      const next = new Set(current)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+  }
+
+  async function handleCreate(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setFormError(null)
+    const parsedTrafficLimit = trafficLimit.trim() ? Number(trafficLimit) : null
+    const parsedDeviceLimit = deviceLimit.trim() ? Number(deviceLimit) : null
+    if (
+      (parsedTrafficLimit !== null && !Number.isFinite(parsedTrafficLimit)) ||
+      (parsedDeviceLimit !== null && !Number.isInteger(parsedDeviceLimit))
+    ) {
+      setFormError('Traffic and device limits must be valid numbers.')
+      return
+    }
+    try {
+      await createUser.mutateAsync({
+        device_limit: parsedDeviceLimit,
+        display_name: displayName.trim() || null,
+        email: email.trim(),
+        role: 'user',
+        status: 'active',
+        traffic_limit_gb: parsedTrafficLimit,
+        username: username.trim() || null,
+      })
+      setEmail('')
+      setUsername('')
+      setDisplayName('')
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : 'User could not be created.')
+    }
+  }
+
+  async function runBulk(action: string, status?: string) {
+    if (selectedIds.size === 0) {
+      setFormError('Select at least one user first.')
+      return
+    }
+    setFormError(null)
+    await bulkUsers.mutateAsync({
+      action,
+      request: { status, user_ids: Array.from(selectedIds) },
+    })
+  }
 
   return (
     <section className="page">
       <PageHeader
         eyebrow={spec.eyebrow}
         title={spec.title}
-        description={spec.description}
+        description="Real VPN customer accounts with traffic, device limits, expiry, status and bulk controls."
         actions={
           <button
             type="button"
@@ -45,45 +127,144 @@ export function UsersPage() {
       {query.isSuccess && users.length === 0 ? (
         <EmptyState
           title="No users found"
-          description="Provisioned accounts will appear here once the users endpoint returns records."
+          description="Create the first VPN customer account to issue subscriptions and assign squads."
         />
       ) : null}
-      {query.isSuccess && users.length > 0 ? (
-        <section className="resource-grid">
-          <article className="panel panel--wide">
-            <div className="panel__header">
-              <div>
-                <p className="eyebrow">Identity registry</p>
-                <h2>User directory</h2>
-              </div>
-              <StatusBadge>{query.data.source}</StatusBadge>
+
+      <section className="resource-grid">
+        <article className="panel panel--wide">
+          <div className="panel__header">
+            <div>
+              <p className="eyebrow">Identity registry</p>
+              <h2>User directory</h2>
             </div>
-            <DataTable
-              caption="User directory"
-              columns={['User', 'Role', 'Subscription', 'MFA', 'Traffic', 'Status']}
-              rows={users.map((user) => ({
-                cells: [
-                  `${user.displayName} (${user.email})`,
-                  user.role,
-                  `${user.subscription} until ${user.expiresAt}`,
-                  user.mfaEnabled ? 'Enabled' : 'Not enabled',
-                  `${user.trafficUsedGb} GB`,
-                  <StatusBadge tone={userTone[user.status]}>{user.status}</StatusBadge>,
-                ],
-                id: user.id,
-              }))}
-            />
-          </article>
-          <OperatorGuide
-            title="User workflow"
-            steps={[
-              { detail: 'Create the customer and verify status, expiry, traffic, and MFA.', label: 'Inspect user' },
-              { detail: 'Attach the user to a squad when routing or limits must differ.', label: 'Assign squad', to: '/squads' },
-              { detail: 'Open subscriptions to copy the customer import page.', label: 'Share subscription', to: '/subscription' },
-            ]}
+            <StatusBadge>{`${users.length} real users`}</StatusBadge>
+          </div>
+          <div className="inline-actions">
+            <button
+              type="button"
+              className="button button--secondary"
+              onClick={() => void runBulk('status', 'active')}
+            >
+              <Save size={16} aria-hidden="true" />
+              Enable selected
+            </button>
+            <button
+              type="button"
+              className="button button--secondary"
+              onClick={() => void runBulk('status', 'disabled')}
+            >
+              <Ban size={16} aria-hidden="true" />
+              Disable selected
+            </button>
+            <button
+              type="button"
+              className="button button--secondary"
+              onClick={() => void runBulk('reset-traffic')}
+            >
+              <RotateCcw size={16} aria-hidden="true" />
+              Reset traffic
+            </button>
+          </div>
+          <DataTable
+            caption="User directory"
+            columns={['Select', 'User', 'Role', 'Devices', 'Traffic', 'Tags', 'Status', 'Actions']}
+            rows={users.map((user) => ({
+              cells: [
+                <input
+                  aria-label={`Select ${formatUserName(user)}`}
+                  checked={selectedIds.has(user.id)}
+                  type="checkbox"
+                  onChange={() => toggleSelected(user.id)}
+                />,
+                `${formatUserName(user)} (${user.email})`,
+                user.role,
+                user.device_limit === null ? 'unlimited' : user.device_limit,
+                formatLimit(user),
+                user.tags.length > 0 ? user.tags.join(', ') : 'none',
+                <StatusBadge tone={toneForStatus(user.status)}>{user.status}</StatusBadge>,
+                <div className="inline-actions">
+                  <button
+                    type="button"
+                    className="icon-button"
+                    aria-label={`Toggle ${formatUserName(user)} status`}
+                    onClick={() =>
+                      void updateUser.mutateAsync({
+                        id: user.id,
+                        request: { status: user.status === 'active' ? 'disabled' : 'active' },
+                      })
+                    }
+                  >
+                    <Ban size={16} aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    className="icon-button"
+                    aria-label={`Delete ${formatUserName(user)}`}
+                    onClick={() => void deleteUser.mutateAsync(user.id)}
+                  >
+                    <Trash2 size={16} aria-hidden="true" />
+                  </button>
+                </div>,
+              ],
+              id: user.id,
+            }))}
           />
-        </section>
-      ) : null}
+        </article>
+        <ScreenForm onSubmit={handleCreate}>
+          <div>
+            <p className="eyebrow">Create user</p>
+            <h2>VPN account</h2>
+            <p>Limits are stored in the backend and used by subscription delivery.</p>
+          </div>
+          <label htmlFor="user-email">
+            Email
+            <input
+              id="user-email"
+              required
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+            />
+          </label>
+          <label htmlFor="user-username">
+            Username
+            <input
+              id="user-username"
+              value={username}
+              onChange={(event) => setUsername(event.target.value)}
+            />
+          </label>
+          <label htmlFor="user-display-name">
+            Display name
+            <input
+              id="user-display-name"
+              value={displayName}
+              onChange={(event) => setDisplayName(event.target.value)}
+            />
+          </label>
+          <label htmlFor="user-traffic-limit">
+            Traffic limit GB
+            <input
+              id="user-traffic-limit"
+              inputMode="decimal"
+              value={trafficLimit}
+              onChange={(event) => setTrafficLimit(event.target.value)}
+            />
+          </label>
+          <label htmlFor="user-device-limit">
+            Device limit
+            <input
+              id="user-device-limit"
+              inputMode="numeric"
+              value={deviceLimit}
+              onChange={(event) => setDeviceLimit(event.target.value)}
+            />
+          </label>
+          <FormError message={formError} />
+          <SubmitButton pending={createUser.isPending}>Create user</SubmitButton>
+        </ScreenForm>
+      </section>
     </section>
   )
 }

@@ -2,16 +2,21 @@ import type {
   ApiKeyCreateRequest,
   AuthSession,
   HostCreateRequest,
+  HostUpdateRequest,
   LoginRequest,
   LoginApiResponse,
   MfaChallengeVerifyRequest,
   LumenApiClient,
   PortCheckRequest,
   ProtocolProfileCreateRequest,
+  ProtocolProfileUpdateRequest,
   ProvisioningJobCreateRequest,
   SettingUpdateRequest,
   SquadCreateRequest,
   TokenPairResponse,
+  UserBulkActionRequest,
+  UserCreateRequest,
+  UserUpdateRequest,
 } from './types'
 
 type HttpClientOptions = {
@@ -37,7 +42,7 @@ export function createHttpLumenApiClient({
 }: HttpClientOptions): LumenApiClient {
   async function request<TResponse>(
     path: string,
-    options: { body?: unknown; method?: 'DELETE' | 'GET' | 'POST' | 'PUT' } = {},
+    options: { body?: unknown; method?: 'DELETE' | 'GET' | 'PATCH' | 'POST' | 'PUT' } = {},
   ): Promise<TResponse> {
     const session = getSession()
     const headers: Record<string, string> = {
@@ -81,6 +86,11 @@ export function createHttpLumenApiClient({
   }
 
   return {
+    bulkUsers: (action: string, payload: UserBulkActionRequest) =>
+      request(`/api/v1/users/bulk/${encodeURIComponent(action)}`, {
+        body: payload,
+        method: 'POST',
+      }),
     checkPortConflicts: (payload: PortCheckRequest) =>
       request('/api/v1/protocols/port-check', { body: payload, method: 'POST' }),
     createApiKey: (payload: ApiKeyCreateRequest) =>
@@ -93,6 +103,13 @@ export function createHttpLumenApiClient({
       request('/api/v1/nodes/provisioning-jobs', { body: payload, method: 'POST' }),
     createSquad: (payload: SquadCreateRequest) =>
       request('/api/v1/squads', { body: payload, method: 'POST' }),
+    createUser: (payload: UserCreateRequest) =>
+      request('/api/v1/users', { body: payload, method: 'POST' }),
+    deleteHost: (hostId: string) => request(`/api/v1/hosts/${hostId}`, { method: 'DELETE' }),
+    deleteProfile: (profileId: string) =>
+      request(`/api/v1/profiles/${profileId}`, { method: 'DELETE' }),
+    deleteSquad: (squadId: string) => request(`/api/v1/squads/${squadId}`, { method: 'DELETE' }),
+    deleteUser: (userId: string) => request(`/api/v1/users/${userId}`, { method: 'DELETE' }),
     listApiKeys: () => request('/api/admin/api-keys'),
     listHosts: () => request('/api/v1/hosts'),
     listNodes: () => request('/api/v1/nodes'),
@@ -101,7 +118,7 @@ export function createHttpLumenApiClient({
     listSettings: () => request('/api/v1/settings'),
     listSquads: () => request('/api/v1/squads'),
     listSubscriptions: () => request('/api/v1/subscriptions'),
-    listUsers: () => request('/api/admin/users'),
+    listUsers: () => request('/api/v1/users'),
     getSession: async () => {
       try {
         return await request('/api/auth/session')
@@ -142,6 +159,10 @@ export function createHttpLumenApiClient({
     readLicense: () => request('/api/admin/license'),
     revokeApiKey: (apiKeyId: string) =>
       request(`/api/v1/api-keys/${apiKeyId}`, { method: 'DELETE' }),
+    updateHost: (hostId: string, payload: HostUpdateRequest) =>
+      request(`/api/v1/hosts/${hostId}`, { body: payload, method: 'PATCH' }),
+    updateProfile: (profileId: string, payload: ProtocolProfileUpdateRequest) =>
+      request(`/api/v1/profiles/${profileId}`, { body: payload, method: 'PATCH' }),
     verifyMfaChallenge: async (payload: MfaChallengeVerifyRequest) => {
       const tokenPair = await request<TokenPairResponse>('/api/v1/auth/mfa/challenge/verify', {
         body: {
@@ -165,5 +186,7 @@ export function createHttpLumenApiClient({
     logout: () => request('/api/v1/auth/logout', { method: 'POST' }),
     updateSetting: (key: string, payload: SettingUpdateRequest) =>
       request(`/api/v1/settings/${encodeURIComponent(key)}`, { body: payload, method: 'PUT' }),
+    updateUser: (userId: string, payload: UserUpdateRequest) =>
+      request(`/api/v1/users/${userId}`, { body: payload, method: 'PATCH' }),
   }
 }

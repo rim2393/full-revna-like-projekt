@@ -3,10 +3,15 @@ import { useApiClient } from './apiClientContext'
 import type {
   ApiKeyCreateRequest,
   HostCreateRequest,
+  HostUpdateRequest,
   ProtocolProfileCreateRequest,
+  ProtocolProfileUpdateRequest,
   ProvisioningJobCreateRequest,
   SettingUpdateRequest,
   SquadCreateRequest,
+  UserBulkActionRequest,
+  UserCreateRequest,
+  UserUpdateRequest,
 } from './types'
 
 export const resourceQueryKeys = {
@@ -105,6 +110,31 @@ export function useCreateProfile() {
   })
 }
 
+export function useUpdateProfile() {
+  const apiClient = useApiClient()
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ id, request }: { id: string; request: ProtocolProfileUpdateRequest }) =>
+      apiClient.updateProfile(id, request),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.profiles })
+    },
+  })
+}
+
+export function useDeleteProfile() {
+  const apiClient = useApiClient()
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (id: string) => apiClient.deleteProfile(id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.profiles })
+    },
+  })
+}
+
 export function useHostsPageData() {
   const apiClient = useApiClient()
 
@@ -126,6 +156,31 @@ export function useCreateHost() {
   })
 }
 
+export function useUpdateHost() {
+  const apiClient = useApiClient()
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ id, request }: { id: string; request: HostUpdateRequest }) =>
+      apiClient.updateHost(id, request),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.hosts })
+    },
+  })
+}
+
+export function useDeleteHost() {
+  const apiClient = useApiClient()
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (id: string) => apiClient.deleteHost(id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.hosts })
+    },
+  })
+}
+
 export function useSquadsPageData() {
   const apiClient = useApiClient()
 
@@ -141,6 +196,18 @@ export function useCreateSquad() {
 
   return useMutation({
     mutationFn: (request: SquadCreateRequest) => apiClient.createSquad(request),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.squads })
+    },
+  })
+}
+
+export function useDeleteSquad() {
+  const apiClient = useApiClient()
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (id: string) => apiClient.deleteSquad(id),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.squads })
     },
@@ -197,5 +264,55 @@ export function useUsersPageData() {
   return useQuery({
     queryFn: apiClient.listUsers,
     queryKey: resourceQueryKeys.users,
+  })
+}
+
+export function useCreateUser() {
+  const apiClient = useApiClient()
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (request: UserCreateRequest) => apiClient.createUser(request),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.users })
+    },
+  })
+}
+
+export function useUpdateUser() {
+  const apiClient = useApiClient()
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ id, request }: { id: string; request: UserUpdateRequest }) =>
+      apiClient.updateUser(id, request),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.users })
+    },
+  })
+}
+
+export function useDeleteUser() {
+  const apiClient = useApiClient()
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (id: string) => apiClient.deleteUser(id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.users })
+    },
+  })
+}
+
+export function useBulkUsers() {
+  const apiClient = useApiClient()
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ action, request }: { action: string; request: UserBulkActionRequest }) =>
+      apiClient.bulkUsers(action, request),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.users })
+    },
   })
 }
