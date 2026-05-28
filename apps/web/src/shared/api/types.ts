@@ -637,6 +637,13 @@ export type ResponseRuleTestResponse = {
 export type HwidInspectorRow = {
   device_count: number
   device_limit: number | null
+  device_records: Array<{
+    hwid: string | null
+    id: string
+    label: string
+    platform: string | null
+    status: string
+  }>
   devices: string[]
   email: string
   status: string

@@ -979,6 +979,8 @@ async def test_tools_reports_are_real_database_views(foundation_app: FoundationR
     )
     assert hwid_row["status"] == "over_limit"
     assert hwid_row["device_count"] == 2
+    assert hwid_row["device_records"][0]["id"] == "phone"
+    assert hwid_row["device_records"][0]["hwid"] == "HWID-1"
 
     srh_response = await foundation_app.client.get("/api/v1/tools/srh-inspector")
     assert srh_response.status_code == 200

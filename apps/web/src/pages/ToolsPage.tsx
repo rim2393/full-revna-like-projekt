@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react'
-import { Activity, Fingerprint, Flame, Radar, Route } from 'lucide-react'
+import { Activity, Fingerprint, Flame, Radar, Route, Trash2 } from 'lucide-react'
 import {
+  useClearUserDevices,
+  useDeleteUserDevice,
   useHappRoutingData,
   useHwidInspectorData,
   useSessionInspectorData,
@@ -62,6 +64,8 @@ export function ToolsPage() {
   const sessionsQuery = useSessionInspectorData()
   const torrentQuery = useTorrentReportsData()
   const happQuery = useHappRoutingData()
+  const deleteDevice = useDeleteUserDevice()
+  const clearDevices = useClearUserDevices()
   const queries = [summaryQuery, hwidQuery, srhQuery, sessionsQuery, torrentQuery, happQuery]
   const isLoading = queries.some((query) => query.isLoading)
   const error = queries.find((query) => query.isError)?.error
@@ -69,7 +73,7 @@ export function ToolsPage() {
   const activeTable = useMemo(() => {
     if (activeTool === 'hwid') {
       return {
-        columns: ['User', 'Devices', 'Limit', 'Status', 'HWIDs'],
+        columns: ['User', 'Devices', 'Limit', 'Status', 'HWIDs', 'Actions'],
         empty: 'No HWID records yet.',
         rows: (hwidQuery.data?.items ?? []).map((item) => ({
           cells: [
@@ -80,6 +84,35 @@ export function ToolsPage() {
               {item.status}
             </StatusBadge>,
             item.devices.join(', ') || '-',
+            <div className="inline-actions">
+              {item.device_records.map((device) => (
+                <button
+                  key={device.id}
+                  type="button"
+                  className="icon-button"
+                  aria-label={`Delete device ${device.id} for ${item.email}`}
+                  disabled={deleteDevice.isPending}
+                  onClick={() =>
+                    void deleteDevice.mutateAsync({
+                      deviceId: device.id,
+                      userId: item.user_id,
+                    })
+                  }
+                >
+                  <Trash2 size={16} aria-hidden="true" />
+                </button>
+              ))}
+              {item.device_records.length > 0 ? (
+                <button
+                  type="button"
+                  className="button button--secondary"
+                  disabled={clearDevices.isPending}
+                  onClick={() => void clearDevices.mutateAsync(item.user_id)}
+                >
+                  Clear all
+                </button>
+              ) : null}
+            </div>,
           ],
           id: item.user_id,
         })),
@@ -152,7 +185,16 @@ export function ToolsPage() {
       })),
       title: 'HApp routing',
     }
-  }, [activeTool, happQuery.data, hwidQuery.data, sessionsQuery.data, srhQuery.data, torrentQuery.data])
+  }, [
+    activeTool,
+    clearDevices,
+    deleteDevice,
+    happQuery.data,
+    hwidQuery.data,
+    sessionsQuery.data,
+    srhQuery.data,
+    torrentQuery.data,
+  ])
 
   return (
     <section className="page">

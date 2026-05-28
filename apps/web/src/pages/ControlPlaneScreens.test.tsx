@@ -215,6 +215,80 @@ describe('Control plane resource screens', () => {
     await waitFor(() => expect(clearUserDevices).toHaveBeenCalledWith('usr_devices'))
   })
 
+  it('wires HWID inspector device actions to backend requests', async () => {
+    const user = userEvent.setup()
+    const owner: UserRecord = {
+      created_at: '2026-05-27T00:00:00Z',
+      device_limit: 2,
+      display_name: 'Device Owner',
+      email: 'device-owner@lumen.local',
+      expires_at: null,
+      id: 'usr_hwid_tools',
+      metadata_json: {},
+      role: 'user',
+      status: 'active',
+      tags: [],
+      telegram_id: null,
+      traffic_limit_gb: 100,
+      traffic_used_gb: 1,
+      updated_at: '2026-05-27T00:00:00Z',
+      username: 'device-owner',
+    }
+    const deleteUserDevice = vi.fn(async () => ({
+      accessible_nodes: [],
+      devices: [],
+      request_history: [],
+      subscriptions: [],
+      user: owner,
+    }))
+    const clearUserDevices = vi.fn(async () => ({
+      accessible_nodes: [],
+      devices: [],
+      request_history: [],
+      subscriptions: [],
+      user: owner,
+    }))
+    const apiClient: LumenApiClient = {
+      ...createDevelopmentLumenApiClient(),
+      clearUserDevices,
+      deleteUserDevice,
+      inspectHwid: async () => ({
+        items: [
+          {
+            device_count: 1,
+            device_limit: 2,
+            device_records: [
+              {
+                hwid: 'HWID-1',
+                id: 'phone',
+                label: 'Phone',
+                platform: 'android',
+                status: 'active',
+              },
+            ],
+            devices: ['Phone'],
+            email: 'device-owner@lumen.local',
+            status: 'ok',
+            user_id: 'usr_hwid_tools',
+            username: 'device-owner',
+          },
+        ],
+      }),
+    }
+
+    renderWithRouter('/tools', { apiClient, initialSession: developmentSession })
+
+    expect(await screen.findByRole('table', { name: /operational tools/i })).toBeInTheDocument()
+    await user.click(
+      screen.getByRole('button', { name: /delete device phone for device-owner@lumen.local/i }),
+    )
+    await waitFor(() =>
+      expect(deleteUserDevice).toHaveBeenCalledWith('usr_hwid_tools', 'phone'),
+    )
+    await user.click(screen.getByRole('button', { name: /^clear all$/i }))
+    await waitFor(() => expect(clearUserDevices).toHaveBeenCalledWith('usr_hwid_tools'))
+  })
+
   it('exposes refresh buttons as real accessible controls on resource screens', async () => {
     const apiClient = createDevelopmentLumenApiClient()
 

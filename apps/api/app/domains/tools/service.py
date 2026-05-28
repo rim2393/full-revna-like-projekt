@@ -14,6 +14,7 @@ from app.domains.subscriptions.service import build_subscription_manifest
 from app.domains.tools.schemas import (
     HappRoutingResponse,
     HappRoutingRow,
+    HwidDeviceRecord,
     HwidInspectorResponse,
     HwidInspectorRow,
     SessionInspectorResponse,
@@ -31,8 +32,8 @@ async def inspect_hwid(session: AsyncSession) -> HwidInspectorResponse:
     result = await session.execute(select(User).order_by(User.email))
     rows = []
     for user in result.scalars().all():
-        devices = _device_labels(user.metadata_json)
-        device_count = len(devices)
+        device_records = _device_records(user.metadata_json)
+        device_count = len(device_records)
         if user.device_limit is not None and device_count > user.device_limit:
             status = "over_limit"
         elif user.device_limit is None:
@@ -47,7 +48,8 @@ async def inspect_hwid(session: AsyncSession) -> HwidInspectorResponse:
                 device_limit=user.device_limit,
                 device_count=device_count,
                 status=status,
-                devices=devices,
+                devices=[device.label for device in device_records],
+                device_records=device_records,
             )
         )
     return HwidInspectorResponse(items=rows)
@@ -233,22 +235,37 @@ async def _real_subscription_headers(
         }
 
 
-def _device_labels(metadata: dict[str, object]) -> list[str]:
+def _device_records(metadata: dict[str, object]):
     raw_devices = metadata.get("devices", [])
     if not isinstance(raw_devices, list):
         return []
-    labels = []
+    devices = []
     for index, raw_device in enumerate(raw_devices):
         if not isinstance(raw_device, dict):
             continue
+        device_id = raw_device.get("id") or raw_device.get("hwid") or f"device-{index + 1}"
         label = (
             raw_device.get("label")
             or raw_device.get("hwid")
-            or raw_device.get("id")
+            or device_id
             or f"device-{index + 1}"
         )
-        labels.append(str(label))
-    return labels
+        devices.append(
+            HwidDeviceRecord(
+                id=str(device_id),
+                label=str(label),
+                hwid=_optional_str(raw_device.get("hwid")),
+                platform=_optional_str(raw_device.get("platform")),
+                status=str(raw_device.get("status") or "active"),
+            )
+        )
+    return devices
+
+
+def _optional_str(value: object) -> str | None:
+    if value is None:
+        return None
+    return str(value)
 
 
 def _short_fingerprint(value: str | None) -> str | None:

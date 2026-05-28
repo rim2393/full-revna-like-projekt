@@ -609,16 +609,26 @@ export function createDevelopmentLumenApiClient(): LumenApiClient {
     }),
     inspectHwid: async (): Promise<HwidInspectorResponse> => ({
       items: users.map((user) => {
-        const devices = Array.isArray(user.metadata_json.devices)
-          ? user.metadata_json.devices.map((device) => String(device))
+        const deviceRecords = Array.isArray(user.metadata_json.devices)
+          ? (user.metadata_json.devices as Record<string, unknown>[]).map((device, index) => {
+              const id = String(device.id ?? device.hwid ?? `device-${index + 1}`)
+              return {
+                hwid: device.hwid === undefined ? null : String(device.hwid),
+                id,
+                label: String(device.label ?? device.hwid ?? id),
+                platform: device.platform === undefined ? null : String(device.platform),
+                status: String(device.status ?? 'active'),
+              }
+            })
           : []
         return {
-          device_count: devices.length,
+          device_count: deviceRecords.length,
           device_limit: user.device_limit,
-          devices,
+          device_records: deviceRecords,
+          devices: deviceRecords.map((device) => device.label),
           email: user.email,
           status:
-            user.device_limit !== null && devices.length > user.device_limit
+            user.device_limit !== null && deviceRecords.length > user.device_limit
               ? 'over_limit'
               : 'ok',
           user_id: user.id,

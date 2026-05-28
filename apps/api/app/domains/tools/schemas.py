@@ -4,6 +4,14 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 
+class HwidDeviceRecord(BaseModel):
+    id: str
+    label: str
+    hwid: str | None = None
+    platform: str | None = None
+    status: str = "active"
+
+
 class HwidInspectorRow(BaseModel):
     user_id: UUID
     username: str | None
@@ -12,6 +20,7 @@ class HwidInspectorRow(BaseModel):
     device_count: int
     status: str
     devices: list[str] = Field(default_factory=list)
+    device_records: list[HwidDeviceRecord] = Field(default_factory=list)
 
 
 class HwidInspectorResponse(BaseModel):
