@@ -6,6 +6,7 @@ import {
   ScreenForm,
   SubmitButton,
 } from '../shared/components/ResourceScreen'
+import { OperatorGuide } from '../shared/components/OperatorGuide'
 import { StatusBadge } from '../shared/components/StatusBadge'
 import { placeholderSpecs } from '../shared/data/lumenData'
 import { formatRecord, parseKeyValueInput, toneForStatus } from '../shared/utils/resourceFormat'
@@ -148,23 +149,34 @@ export function ProfilesPage() {
         id: profile.id,
       })}
       rightPanel={
-        <article className="panel">
-          <div className="panel__header">
-            <div>
-              <p className="eyebrow">Adapter catalog</p>
-              <h2>{selectedAdapter?.display_name ?? 'Protocol adapters'}</h2>
+        <div className="side-stack">
+          <OperatorGuide
+            title="Profile workflow"
+            steps={[
+              { detail: 'Pick the protocol adapter that matches the client app and transport.', label: 'Choose adapter' },
+              { detail: 'Reserve an available port and keep exclusive protocols isolated.', label: 'Reserve port' },
+              { detail: 'Attach the profile to a healthy node before sharing subscriptions.', label: 'Attach node', to: '/nodes' },
+              { detail: 'Bind a hostname so client links use the public endpoint.', label: 'Bind host', to: '/hosts' },
+            ]}
+          />
+          <article className="panel">
+            <div className="panel__header">
+              <div>
+                <p className="eyebrow">Adapter catalog</p>
+                <h2>{selectedAdapter?.display_name ?? 'Protocol adapters'}</h2>
+              </div>
+              <StatusBadge>{`${adapters.length} adapters`}</StatusBadge>
             </div>
-            <StatusBadge>{`${adapters.length} adapters`}</StatusBadge>
-          </div>
-          <ul className="feature-list">
-            {(selectedAdapter ? [selectedAdapter] : adapters).map((item) => (
-              <li key={item.protocol}>
-                <span>{item.protocol}</span>
-                <span>{item.capabilities.join(', ')}</span>
-              </li>
-            ))}
-          </ul>
-        </article>
+            <ul className="feature-list">
+              {(selectedAdapter ? [selectedAdapter] : adapters).map((item) => (
+                <li key={item.protocol}>
+                  <span>{item.protocol}</span>
+                  <span>{item.capabilities.join(', ')}</span>
+                </li>
+              ))}
+            </ul>
+          </article>
+        </div>
       }
       spec={placeholderSpecs.profiles}
       tableEyebrow="Client delivery"

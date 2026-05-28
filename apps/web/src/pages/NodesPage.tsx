@@ -4,6 +4,7 @@ import { useCreateNodeProvisioningJob, useNodesPageData } from '../shared/api/re
 import type { NodeResponse, ProvisioningJobResponse } from '../shared/api/types'
 import { DataTable } from '../shared/components/DataTable'
 import { EmptyState, ErrorState, LoadingState } from '../shared/components/DataState'
+import { OperatorGuide } from '../shared/components/OperatorGuide'
 import { PageHeader } from '../shared/components/PageHeader'
 import { StatusBadge } from '../shared/components/StatusBadge'
 import type { MetricTone } from '../shared/data/lumenData'
@@ -593,6 +594,16 @@ export function NodesPage() {
             </li>
           </ul>
         </article>
+
+        <OperatorGuide
+          title="Node workflow"
+          steps={[
+            { detail: 'Start provisioning only with a vault credentials reference, never inline secrets.', label: 'Provision node' },
+            { detail: 'Wait until heartbeat is active before assigning customer traffic.', label: 'Verify heartbeat' },
+            { detail: 'Create a profile on the healthy node and reserve the protocol port.', label: 'Create profile', to: '/profiles' },
+            { detail: 'Bind a public hostname after the profile exists.', label: 'Bind host', to: '/hosts' },
+          ]}
+        />
 
         <ProvisioningJobPanel job={latestJob} />
       </section>

@@ -6,6 +6,7 @@ import {
   ScreenForm,
   SubmitButton,
 } from '../shared/components/ResourceScreen'
+import { OperatorGuide } from '../shared/components/OperatorGuide'
 import { StatusBadge } from '../shared/components/StatusBadge'
 import { placeholderSpecs } from '../shared/data/lumenData'
 import { toneForStatus } from '../shared/utils/resourceFormat'
@@ -130,6 +131,17 @@ export function HostsPage() {
         ],
         id: host.id,
       })}
+      rightPanel={
+        <OperatorGuide
+          title="Host workflow"
+          steps={[
+            { detail: 'Point DNS to the node address before exposing the host to users.', label: 'Check DNS' },
+            { detail: 'Attach the host to the profile that owns protocol and port settings.', label: 'Attach profile', to: '/profiles' },
+            { detail: 'Use tags for client-facing grouping, filters, and routing rules.', label: 'Add tags' },
+            { detail: 'Open subscriptions after the host is active and verify the public links.', label: 'Verify subscription', to: '/subscription' },
+          ]}
+        />
+      }
       spec={placeholderSpecs.hosts}
       tableEyebrow="Ingress hosts"
       tableTitle="Host routing"

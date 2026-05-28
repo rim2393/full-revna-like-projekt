@@ -69,7 +69,7 @@ describe('Lumen admin routing scaffold', () => {
 
     await user.type(screen.getByPlaceholderText(/поиск пользователей, нод, хостов/i), 'ноды')
     await user.keyboard('{Enter}')
-    expect(await screen.findByRole('heading', { name: /ноды/i })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: /ноды/i })).toBeInTheDocument()
   })
 
   it('redirects protected admin routes to real sign in without a session', async () => {

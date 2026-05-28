@@ -3,6 +3,7 @@ import { useUsersPageData } from '../shared/api/resourceHooks'
 import type { UserStatus } from '../shared/api/types'
 import { DataTable } from '../shared/components/DataTable'
 import { EmptyState, ErrorState, LoadingState } from '../shared/components/DataState'
+import { OperatorGuide } from '../shared/components/OperatorGuide'
 import { PageHeader } from '../shared/components/PageHeader'
 import { StatusBadge } from '../shared/components/StatusBadge'
 import type { MetricTone } from '../shared/data/lumenData'
@@ -48,30 +49,40 @@ export function UsersPage() {
         />
       ) : null}
       {query.isSuccess && users.length > 0 ? (
-        <article className="panel">
-          <div className="panel__header">
-            <div>
-              <p className="eyebrow">Identity registry</p>
-              <h2>User directory</h2>
+        <section className="resource-grid">
+          <article className="panel panel--wide">
+            <div className="panel__header">
+              <div>
+                <p className="eyebrow">Identity registry</p>
+                <h2>User directory</h2>
+              </div>
+              <StatusBadge>{query.data.source}</StatusBadge>
             </div>
-            <StatusBadge>{query.data.source}</StatusBadge>
-          </div>
-          <DataTable
-            caption="User directory"
-            columns={['User', 'Role', 'Subscription', 'MFA', 'Traffic', 'Status']}
-            rows={users.map((user) => ({
-              cells: [
-                `${user.displayName} (${user.email})`,
-                user.role,
-                `${user.subscription} until ${user.expiresAt}`,
-                user.mfaEnabled ? 'Enabled' : 'Not enabled',
-                `${user.trafficUsedGb} GB`,
-                <StatusBadge tone={userTone[user.status]}>{user.status}</StatusBadge>,
-              ],
-              id: user.id,
-            }))}
+            <DataTable
+              caption="User directory"
+              columns={['User', 'Role', 'Subscription', 'MFA', 'Traffic', 'Status']}
+              rows={users.map((user) => ({
+                cells: [
+                  `${user.displayName} (${user.email})`,
+                  user.role,
+                  `${user.subscription} until ${user.expiresAt}`,
+                  user.mfaEnabled ? 'Enabled' : 'Not enabled',
+                  `${user.trafficUsedGb} GB`,
+                  <StatusBadge tone={userTone[user.status]}>{user.status}</StatusBadge>,
+                ],
+                id: user.id,
+              }))}
+            />
+          </article>
+          <OperatorGuide
+            title="User workflow"
+            steps={[
+              { detail: 'Create the customer and verify status, expiry, traffic, and MFA.', label: 'Inspect user' },
+              { detail: 'Attach the user to a squad when routing or limits must differ.', label: 'Assign squad', to: '/squads' },
+              { detail: 'Open subscriptions to copy the customer import page.', label: 'Share subscription', to: '/subscription' },
+            ]}
           />
-        </article>
+        </section>
       ) : null}
     </section>
   )

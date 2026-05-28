@@ -1,7 +1,7 @@
 import { ExternalLink, RefreshCw, Rss, Smartphone } from 'lucide-react'
-import { Link } from 'react-router-dom'
 import { useSubscriptionsPageData, useUsersPageData, useNodesPageData } from '../shared/api/resourceHooks'
 import type { SubscriptionRecord } from '../shared/api/types'
+import { OperatorGuide } from '../shared/components/OperatorGuide'
 import { ResourceScreen } from '../shared/components/ResourceScreen'
 import { StatusBadge } from '../shared/components/StatusBadge'
 import { placeholderSpecs } from '../shared/data/lumenData'
@@ -107,35 +107,16 @@ function SubscriptionGuide({ subscription }: { subscription: SubscriptionRecord 
 
   return (
     <div className="side-stack">
-      <article className="panel">
-        <div className="panel__header">
-          <div>
-            <p className="eyebrow">{t('Operator path')}</p>
-            <h2>{t('What to configure')}</h2>
-          </div>
-          <StatusBadge>{t('live')}</StatusBadge>
-        </div>
-        <ol className="workflow-list">
-          {[
-            { label: 'Users', meta: 'Create or inspect the customer account.', to: '/users' },
-            { label: 'Nodes', meta: 'Check the relay node heartbeat and install state.', to: '/nodes' },
-            { label: 'Profiles', meta: 'Select protocol, port, and client transport.', to: '/profiles' },
-            { label: 'Hosts', meta: 'Bind the public domain to the node/profile.', to: '/hosts' },
-            { label: 'Subscription Page', meta: 'Give the customer one import page.', to: '/subscription-page' },
-          ].map((step, index) => (
-            <li key={step.to}>
-              <span className="workflow-list__index">{index + 1}</span>
-              <div>
-                <strong>{t(step.label)}</strong>
-                <small>{t(step.meta)}</small>
-              </div>
-              <Link className="text-link" to={step.to}>
-                {t('Open')}
-              </Link>
-            </li>
-          ))}
-        </ol>
-      </article>
+      <OperatorGuide
+        title="What to configure"
+        steps={[
+          { detail: 'Create or inspect the customer account.', label: 'Users', to: '/users' },
+          { detail: 'Check the relay node heartbeat and install state.', label: 'Nodes', to: '/nodes' },
+          { detail: 'Select protocol, port, and client transport.', label: 'Profiles', to: '/profiles' },
+          { detail: 'Bind the public domain to the node/profile.', label: 'Hosts', to: '/hosts' },
+          { detail: 'Give the customer one import page.', label: 'Subscription Page', to: '/subscription-page' },
+        ]}
+      />
 
       <article className="panel">
         <div className="panel__header">
