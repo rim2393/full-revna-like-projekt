@@ -112,8 +112,37 @@ describe('NodesPage backend wiring', () => {
     expect(screen.getAllByText(/quarantine/i).length).toBeGreaterThan(0)
     expect(screen.getByText(/1 nodes paused by license policy/i)).toBeInTheDocument()
     expect(screen.getByText(/1 nodes isolated from traffic/i)).toBeInTheDocument()
-    expect(screen.getByText(/1 nodes missing heartbeat data/i)).toBeInTheDocument()
+    expect(
+      screen.getByText(/2 of 3 nodes reported heartbeat; 1 node missing heartbeat data/i),
+    ).toBeInTheDocument()
     expect(screen.queryByLabelText(/password/i)).not.toBeInTheDocument()
+  })
+
+  it('does not present node telemetry as healthy before any real heartbeat exists', async () => {
+    const nodes: NodeResponse[] = [
+      {
+        capabilities: {},
+        id: 'node-active-unseen',
+        last_seen_at: null,
+        name: 'edge-active-unseen',
+        public_address: '203.0.113.13',
+        region: 'eu',
+        status: 'active',
+      },
+    ]
+    const apiClient = createTestClient({
+      listNodes: async () => ({
+        items: nodes,
+      }),
+    })
+
+    renderWithRouter('/nodes', { apiClient, initialSession: developmentSession })
+
+    expect(await screen.findByText('edge-active-unseen')).toBeInTheDocument()
+    expect(screen.getByText(/telemetry pending/i)).toBeInTheDocument()
+    expect(
+      screen.getByText(/No node has reported a heartbeat yet; 1 node missing heartbeat data/i),
+    ).toBeInTheDocument()
   })
 
   it('creates a provisioning job with credentials_ref only and safe token templates', async () => {

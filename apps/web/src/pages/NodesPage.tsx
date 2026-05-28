@@ -225,6 +225,10 @@ function hasMissingHeartbeat(node: NodeResponse) {
   return !node.last_seen_at && status !== 'provisioning' && status !== 'installing'
 }
 
+function pluralize(count: number, singular: string, plural = `${singular}s`) {
+  return count === 1 ? singular : plural
+}
+
 function ProvisioningJobPanel({ job }: { job: ProvisioningJobResponse | null }) {
   if (!job) {
     return (
@@ -334,11 +338,53 @@ export function NodesPage() {
   const nodeStateSummary = useMemo(
     () => ({
       heartbeatMissing: nodes.filter(hasMissingHeartbeat).length,
+      heartbeatReported: nodes.filter((node) => Boolean(node.last_seen_at)).length,
       licensePaused: nodes.filter(isLicensePaused).length,
       quarantined: nodes.filter(isQuarantined).length,
+      total: nodes.length,
     }),
     [nodes],
   )
+  const heartbeatStatus = useMemo(() => {
+    if (!query.isSuccess) {
+      return {
+        label: 'loading',
+        text: 'Heartbeat telemetry will be evaluated after the live API responds.',
+        tone: 'neutral' as MetricTone,
+      }
+    }
+
+    if (nodeStateSummary.total === 0) {
+      return {
+        label: 'no nodes',
+        text: 'No nodes registered, so no heartbeat telemetry is available.',
+        tone: 'neutral' as MetricTone,
+      }
+    }
+
+    if (nodeStateSummary.heartbeatReported === 0) {
+      return {
+        label: 'telemetry pending',
+        text: `No node has reported a heartbeat yet; ${nodeStateSummary.heartbeatMissing} ${pluralize(
+          nodeStateSummary.heartbeatMissing,
+          'node',
+        )} missing heartbeat data.`,
+        tone: 'watch' as MetricTone,
+      }
+    }
+
+    return {
+      label: 'heartbeat',
+      text: `${nodeStateSummary.heartbeatReported} of ${nodeStateSummary.total} ${pluralize(
+        nodeStateSummary.total,
+        'node',
+      )} reported heartbeat; ${nodeStateSummary.heartbeatMissing} ${pluralize(
+        nodeStateSummary.heartbeatMissing,
+        'node',
+      )} missing heartbeat data.`,
+      tone: nodeStateSummary.heartbeatMissing > 0 ? ('watch' as MetricTone) : ('good' as MetricTone),
+    }
+  }, [nodeStateSummary, query.isSuccess])
 
   async function handleProvisioningSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -773,10 +819,8 @@ export function NodesPage() {
             <li>
               <HeartPulse size={18} aria-hidden="true" />
               <span>
-                <StatusBadge tone={nodeStateSummary.heartbeatMissing > 0 ? 'watch' : 'good'}>
-                  heartbeat
-                </StatusBadge>{' '}
-                {nodeStateSummary.heartbeatMissing} nodes missing heartbeat data.
+                <StatusBadge tone={heartbeatStatus.tone}>{heartbeatStatus.label}</StatusBadge>{' '}
+                {heartbeatStatus.text}
               </span>
             </li>
           </ul>
