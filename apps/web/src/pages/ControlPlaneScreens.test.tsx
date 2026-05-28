@@ -27,7 +27,9 @@ describe('Control plane resource screens', () => {
 
     const subscription = renderWithRouter('/subscription', { apiClient, initialSession: mockSession })
     expect(await screen.findByRole('table', { name: /subscription inventory/i })).toBeInTheDocument()
-    expect(screen.getByText('sub_pub_default')).toBeInTheDocument()
+    expect(screen.getAllByText('sub_pub_default').length).toBeGreaterThan(0)
+    expect(screen.getByRole('link', { name: /open subscription page/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /users/i })).toHaveAttribute('href', '/users')
     subscription.unmount()
 
     renderWithRouter('/settings', { apiClient, initialSession: mockSession })

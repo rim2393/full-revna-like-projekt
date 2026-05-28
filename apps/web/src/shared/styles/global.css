@@ -147,6 +147,18 @@ h2 {
   border-color: var(--color-line);
 }
 
+.action-cluster,
+.inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.inline-actions {
+  min-width: 180px;
+}
+
 .text-link {
   color: var(--color-accent);
   font-weight: 700;
@@ -711,6 +723,79 @@ h2 {
   color: var(--color-muted);
 }
 
+.side-stack {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.workflow-list {
+  display: grid;
+  gap: var(--space-3);
+  padding: 0;
+  margin: var(--space-4) 0 0;
+  list-style: none;
+}
+
+.workflow-list li {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: center;
+  min-height: 58px;
+  padding: var(--space-3);
+  background: rgb(255 255 255 / 4%);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+}
+
+.workflow-list__index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  color: var(--color-accent);
+  font-family: var(--font-mono);
+  font-weight: 800;
+  background: rgb(83 224 173 / 12%);
+  border: 1px solid rgb(83 224 173 / 34%);
+  border-radius: var(--radius-sm);
+}
+
+.workflow-list small {
+  display: block;
+  margin-top: 3px;
+  color: var(--color-muted);
+  line-height: 1.45;
+}
+
+.client-link-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+
+.client-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  color: var(--color-ink);
+  font-weight: 700;
+  text-decoration: none;
+  background: rgb(255 255 255 / 5%);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+}
+
+.client-link:hover {
+  border-color: rgb(83 224 173 / 45%);
+  background: rgb(83 224 173 / 10%);
+}
+
 .data-table-wrap {
   margin-top: var(--space-5);
   overflow-x: auto;
@@ -1019,6 +1104,15 @@ h2 {
 
   .summary-grid {
     grid-template-columns: 1fr;
+  }
+
+  .workflow-list li,
+  .client-link-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .workflow-list li {
+    align-items: start;
   }
 
   .auth-panel {

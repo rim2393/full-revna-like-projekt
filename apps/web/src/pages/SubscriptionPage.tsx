@@ -1,4 +1,7 @@
+import { ExternalLink, RefreshCw, Rss, Smartphone } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { useSubscriptionsPageData, useUsersPageData, useNodesPageData } from '../shared/api/resourceHooks'
+import type { SubscriptionRecord } from '../shared/api/types'
 import { ResourceScreen } from '../shared/components/ResourceScreen'
 import { StatusBadge } from '../shared/components/StatusBadge'
 import { placeholderSpecs } from '../shared/data/lumenData'
@@ -13,11 +16,39 @@ export function SubscriptionPage() {
   const subscriptions = query.data?.items ?? []
   const users = usersQuery.data?.items ?? []
   const nodes = nodesQuery.data?.items ?? []
+  const activeSubscription = subscriptions.find((subscription) => subscription.status === 'active') ?? subscriptions[0]
+  const subscriptionBaseUrl = activeSubscription ? buildSubscriptionUrl(activeSubscription.public_id) : null
 
   return (
     <ResourceScreen
       caption="Subscription inventory"
-      columns={['Public ID', 'User', 'Node', 'Delivery profile', 'Expires', 'Config hash', 'Status']}
+      actions={
+        <div className="action-cluster">
+          {subscriptionBaseUrl ? (
+            <>
+              <a className="button button--primary" href={subscriptionBaseUrl} target="_blank" rel="noreferrer">
+                <Rss size={18} aria-hidden="true" />
+                {t('Open subscription page')}
+              </a>
+              <a className="button button--secondary" href={`${subscriptionBaseUrl}/happ`} target="_blank" rel="noreferrer">
+                <Smartphone size={18} aria-hidden="true" />
+                Happ
+              </a>
+            </>
+          ) : null}
+          <button
+            type="button"
+            className="button button--secondary"
+            aria-label={t('Refresh subscription')}
+            disabled={query.isFetching}
+            onClick={() => void query.refetch()}
+          >
+            <RefreshCw size={18} aria-hidden="true" />
+            {t('Refresh')}
+          </button>
+        </div>
+      }
+      columns={['Public ID', 'User', 'Node', 'Delivery profile', 'Expires', 'Config hash', 'Status', 'Actions']}
       emptyDescription="Subscription records will appear after user/license/node bindings are created."
       emptyTitle="No subscriptions"
       error={query.error}
@@ -37,31 +68,111 @@ export function SubscriptionPage() {
           subscription.expires_at ? formatDateTime(subscription.expires_at) : t('Not set'),
           subscription.config_hash ?? t('Not generated'),
           <StatusBadge tone={toneForStatus(subscription.status)}>{subscription.status}</StatusBadge>,
+          <SubscriptionActions subscription={subscription} />,
         ],
         id: subscription.id,
       })}
       rightPanel={
-        <article className="panel">
-          <div className="panel__header">
-            <div>
-              <p className="eyebrow">{t('Response rules')}</p>
-              <h2>{t('Client surface')}</h2>
-            </div>
-            <StatusBadge>read-only</StatusBadge>
-          </div>
-          <ul className="feature-list">
-            {placeholderSpecs.subscription.items.map((item) => (
-              <li key={item}>
-                <span aria-hidden="true">-</span>
-                <span>{t(item)}</span>
-              </li>
-            ))}
-          </ul>
-        </article>
+        <SubscriptionGuide subscription={activeSubscription} />
       }
       spec={placeholderSpecs.subscription}
       tableEyebrow="Public config surface"
       tableTitle="Subscription feed records"
     />
   )
+}
+
+function SubscriptionActions({ subscription }: { subscription: SubscriptionRecord }) {
+  const { t } = useI18n()
+  const baseUrl = buildSubscriptionUrl(subscription.public_id)
+
+  return (
+    <div className="inline-actions" aria-label={t('Subscription actions')}>
+      <a className="text-link" href={baseUrl} target="_blank" rel="noreferrer">
+        {t('Page')}
+      </a>
+      <a className="text-link" href={`${baseUrl}/happ`} target="_blank" rel="noreferrer">
+        Happ
+      </a>
+      <a className="text-link" href={`${baseUrl}/mihomo`} target="_blank" rel="noreferrer">
+        Mihomo
+      </a>
+    </div>
+  )
+}
+
+function SubscriptionGuide({ subscription }: { subscription: SubscriptionRecord | undefined }) {
+  const { t } = useI18n()
+  const baseUrl = subscription ? buildSubscriptionUrl(subscription.public_id) : null
+
+  return (
+    <div className="side-stack">
+      <article className="panel">
+        <div className="panel__header">
+          <div>
+            <p className="eyebrow">{t('Operator path')}</p>
+            <h2>{t('What to configure')}</h2>
+          </div>
+          <StatusBadge>{t('live')}</StatusBadge>
+        </div>
+        <ol className="workflow-list">
+          {[
+            { label: 'Users', meta: 'Create or inspect the customer account.', to: '/users' },
+            { label: 'Nodes', meta: 'Check the relay node heartbeat and install state.', to: '/nodes' },
+            { label: 'Profiles', meta: 'Select protocol, port, and client transport.', to: '/profiles' },
+            { label: 'Hosts', meta: 'Bind the public domain to the node/profile.', to: '/hosts' },
+            { label: 'Subscription Page', meta: 'Give the customer one import page.', to: '/subscription-page' },
+          ].map((step, index) => (
+            <li key={step.to}>
+              <span className="workflow-list__index">{index + 1}</span>
+              <div>
+                <strong>{t(step.label)}</strong>
+                <small>{t(step.meta)}</small>
+              </div>
+              <Link className="text-link" to={step.to}>
+                {t('Open')}
+              </Link>
+            </li>
+          ))}
+        </ol>
+      </article>
+
+      <article className="panel">
+        <div className="panel__header">
+          <div>
+            <p className="eyebrow">{t('Client import')}</p>
+            <h2>{subscription ? subscription.public_id : t('No active subscription')}</h2>
+          </div>
+          <ExternalLink size={20} aria-hidden="true" />
+        </div>
+        {baseUrl ? (
+          <div className="client-link-grid">
+            {[
+              ['Page', baseUrl],
+              ['Happ', `${baseUrl}/happ`],
+              ['Hiddify', `${baseUrl}/hiddify`],
+              ['Mihomo', `${baseUrl}/mihomo`],
+              ['Sing-box', `${baseUrl}/sing-box`],
+              ['Amnezia', `${baseUrl}/amnezia`],
+            ].map(([label, href]) => (
+              <a key={href} className="client-link" href={href} target="_blank" rel="noreferrer">
+                <span>{t(label)}</span>
+                <ExternalLink size={15} aria-hidden="true" />
+              </a>
+            ))}
+          </div>
+        ) : (
+          <p className="empty-inline">{t('Create a subscription before sharing client links.')}</p>
+        )}
+      </article>
+    </div>
+  )
+}
+
+function buildSubscriptionUrl(publicId: string) {
+  if (typeof window === 'undefined') {
+    return `/sub/${publicId}`
+  }
+  const host = window.location.host.replace(/^panel\./, 'sub.')
+  return `${window.location.protocol}//${host}/sub/${publicId}`
 }
