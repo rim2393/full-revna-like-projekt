@@ -2,7 +2,6 @@ import { type PropsWithChildren, useMemo } from 'react'
 import { useAuthSession } from '../../features/auth/authSession'
 import { ApiClientContext } from './apiClientContext'
 import { createHttpLumenApiClient } from './httpClient'
-import { createDevelopmentLumenApiClient } from './developmentClient'
 import type { LumenApiClient } from './types'
 
 type ApiClientProviderProps = PropsWithChildren<{
@@ -18,15 +17,6 @@ export function ApiClientProvider({ children, client }: ApiClientProviderProps) 
     }
 
     const configuredBaseUrl = normalizeApiBaseUrl(import.meta.env.VITE_LUMEN_API_BASE_URL)
-    const mode = import.meta.env.VITE_LUMEN_API_MODE?.trim()
-
-    if (mode === 'development') {
-      if (import.meta.env.PROD) {
-        throw new Error('Development API mode is forbidden in production builds.')
-      }
-      return createDevelopmentLumenApiClient()
-    }
-
     const baseUrl =
       configuredBaseUrl || (typeof window === 'undefined' ? '' : window.location.origin)
 

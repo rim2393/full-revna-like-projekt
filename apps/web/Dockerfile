@@ -11,10 +11,8 @@ COPY tsconfig.json tsconfig.app.json tsconfig.node.json ./
 COPY vite.config.ts ./
 COPY src ./src
 
-ARG VITE_LUMEN_API_MODE=api
 ARG VITE_LUMEN_API_BASE_URL=__LUMEN_WEB_API_BASE_URL__
-ENV VITE_LUMEN_API_MODE=${VITE_LUMEN_API_MODE} \
-    VITE_LUMEN_API_BASE_URL=${VITE_LUMEN_API_BASE_URL}
+ENV VITE_LUMEN_API_BASE_URL=${VITE_LUMEN_API_BASE_URL}
 
 RUN npm run build
 

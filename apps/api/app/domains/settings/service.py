@@ -13,6 +13,8 @@ from app.domains.settings.schemas import (
 )
 
 AUTH_PROVIDERS_KEY = "auth.providers"
+LIVE_AUTH_PROVIDERS = frozenset({"password"})
+RESERVED_SETTING_KEYS = frozenset({AUTH_PROVIDERS_KEY})
 DEFAULT_AUTH_PROVIDERS: tuple[dict[str, object], ...] = (
     {
         "provider": "password",
@@ -35,8 +37,8 @@ DEFAULT_AUTH_PROVIDERS: tuple[dict[str, object], ...] = (
         "display_name": "Telegram",
         "enabled": False,
         "status": "disabled",
-        "scopes": ["admin:login", "bot:manage"],
-        "metadata_json": {"bot_binding": "api-key"},
+        "scopes": ["admin:login"],
+        "metadata_json": {"bot_binding": "disabled_until_callback_implemented"},
     },
     {
         "provider": "github",
@@ -105,16 +107,39 @@ async def upsert_setting(
     request: SettingUpdateRequest,
     principal: Principal,
 ) -> PanelSetting:
+    if key in RESERVED_SETTING_KEYS:
+        raise APIError(
+            code="setting_reserved_key",
+            message="This setting is managed by a typed backend endpoint.",
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            details=[key],
+        )
+    await _upsert_setting(session, key=key, value_json=request.value_json, principal=principal)
+    result = await session.execute(select(PanelSetting).where(PanelSetting.key == key))
+    return result.scalar_one()
+
+
+async def _upsert_setting(
+    session: AsyncSession,
+    *,
+    key: str,
+    value_json: dict[str, object],
+    principal: Principal,
+) -> None:
+    _ensure_no_secret_like_keys(
+        value_json,
+        code="setting_secret_like_key",
+        message="Panel settings must reference secret material by backend config, not store it.",
+    )
     result = await session.execute(select(PanelSetting).where(PanelSetting.key == key))
     setting = result.scalar_one_or_none()
     if setting is None:
-        setting = PanelSetting(key=key, value_json=request.value_json, updated_by=principal.subject)
+        setting = PanelSetting(key=key, value_json=value_json, updated_by=principal.subject)
         session.add(setting)
     else:
-        setting.value_json = request.value_json
+        setting.value_json = value_json
         setting.updated_by = principal.subject
     await session.flush()
-    return setting
 
 
 async def list_auth_providers(session: AsyncSession) -> list[AuthProviderResponse]:
@@ -138,9 +163,26 @@ async def update_auth_provider(
             status_code=status.HTTP_404_NOT_FOUND,
         )
     data = request.model_dump(exclude_unset=True)
+    if data.get("enabled") is True and provider not in LIVE_AUTH_PROVIDERS:
+        raise APIError(
+            code="auth_provider_not_live",
+            message=(
+                "This authentication provider is catalog-only until its login callback "
+                "and account-binding flow are implemented."
+            ),
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            details=[provider],
+        )
     metadata = data.get("metadata_json")
     if isinstance(metadata, dict):
-        _ensure_no_secret_like_keys(metadata)
+        _ensure_no_secret_like_keys(
+            metadata,
+            code="auth_provider_secret_like_metadata",
+            message=(
+                "Auth provider metadata must reference secrets by backend config, "
+                "not store them."
+            ),
+        )
     record.update(data)
     await _save_auth_providers(session, providers=providers, principal=principal)
     return _auth_provider_response(record)
@@ -185,24 +227,45 @@ async def _save_auth_providers(
     principal: Principal,
 ) -> None:
     request = SettingUpdateRequest(value_json={"items": providers})
-    await upsert_setting(session, key=AUTH_PROVIDERS_KEY, request=request, principal=principal)
+    await _upsert_setting(session, key=AUTH_PROVIDERS_KEY, value_json=request.value_json, principal=principal)
 
 
 def _auth_provider_response(record: dict[str, object]) -> AuthProviderResponse:
     return AuthProviderResponse.model_validate(record)
 
 
-def _ensure_no_secret_like_keys(metadata: dict[str, object]) -> None:
+def _ensure_no_secret_like_keys(
+    value: object,
+    *,
+    code: str,
+    message: str,
+    path: tuple[str, ...] = (),
+) -> None:
     forbidden = ("secret", "token", "password", "privatekey", "private_key", "clientsecret")
-    for key in metadata:
+    if isinstance(value, list):
+        for index, item in enumerate(value):
+            _ensure_no_secret_like_keys(
+                item,
+                code=code,
+                message=message,
+                path=(*path, str(index)),
+            )
+        return
+    if not isinstance(value, dict):
+        return
+    for key, item in value.items():
         normalized = key.replace("-", "").replace("_", "").lower()
         if any(fragment.replace("_", "") in normalized for fragment in forbidden):
+            detail = ".".join((*path, key))
             raise APIError(
-                code="auth_provider_secret_like_metadata",
-                message=(
-                    "Auth provider metadata must reference secrets by backend config, "
-                    "not store them."
-                ),
+                code=code,
+                message=message,
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                details=[key],
+                details=[detail],
             )
+        _ensure_no_secret_like_keys(
+            item,
+            code=code,
+            message=message,
+            path=(*path, key),
+        )

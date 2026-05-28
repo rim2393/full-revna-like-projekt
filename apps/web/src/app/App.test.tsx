@@ -82,6 +82,8 @@ describe('Lumen admin routing', () => {
 
     expect(screen.getByRole('heading', { name: /verify mfa/i })).toBeInTheDocument()
     expect(screen.getByLabelText(/one-time code/i)).toBeInTheDocument()
+    expect(screen.getByText(/authenticator app registered on this account/i)).toBeInTheDocument()
+    expect(screen.getByText(/active totp method/i)).toBeInTheDocument()
   })
 
   it('renders API-backed resource screens with the isolated development client', async () => {

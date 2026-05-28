@@ -45,7 +45,7 @@ export function MfaPage() {
       <div>
         <p className="eyebrow">Step 2 of 2</p>
         <h2>Verify MFA</h2>
-        <p>Confirm the one-time code from an authenticator or hardware token.</p>
+        <p>Confirm the one-time code from the authenticator app registered on this account.</p>
       </div>
       <label>
         One-time code
@@ -63,7 +63,7 @@ export function MfaPage() {
         <ArrowRight size={18} aria-hidden="true" />
       </button>
       <p className="auth-card__note" aria-live="polite">
-        {status || 'MFA is mandatory for privileged Lumen admin routes.'}
+        {status || 'MFA is enforced for accounts that have an active TOTP method.'}
       </p>
     </form>
   )

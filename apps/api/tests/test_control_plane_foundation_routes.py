@@ -160,6 +160,46 @@ async def test_settings_update_records_audit_event(foundation_app: FoundationRou
         assert persisted_event.actor_email == "owner@example.com"
 
 
+async def test_settings_reject_inline_secret_like_keys(foundation_app: FoundationRouteApp) -> None:
+    update_response = await foundation_app.client.put(
+        "/api/v1/settings/subscription.display",
+        json={
+            "value_json": {
+                "title": "Lumen",
+                "oauth": {"client_secret": "must-not-be-stored"},
+            },
+        },
+    )
+    assert update_response.status_code == 422
+    body = update_response.json()
+    assert body["error"]["code"] == "setting_secret_like_key"
+    assert body["error"]["details"] == ["oauth.client_secret"]
+
+
+async def test_settings_reject_reserved_auth_provider_bypass(
+    foundation_app: FoundationRouteApp,
+) -> None:
+    update_response = await foundation_app.client.put(
+        "/api/v1/settings/auth.providers",
+        json={
+            "value_json": {
+                "items": [
+                    {
+                        "provider": "google",
+                        "display_name": "Google",
+                        "enabled": True,
+                        "status": "active",
+                        "scopes": ["openid"],
+                        "metadata_json": {},
+                    }
+                ]
+            }
+        },
+    )
+    assert update_response.status_code == 422
+    assert update_response.json()["error"]["code"] == "setting_reserved_key"
+
+
 async def test_auth_provider_settings_are_typed_and_audited(
     foundation_app: FoundationRouteApp,
 ) -> None:
@@ -177,6 +217,9 @@ async def test_auth_provider_settings_are_typed_and_audited(
     password_provider = next(item for item in providers if item["provider"] == "password")
     assert password_provider["enabled"] is True
     assert password_provider["metadata_json"]["mfa_required"] is True
+    telegram_provider = next(item for item in providers if item["provider"] == "telegram")
+    assert telegram_provider["scopes"] == ["admin:login"]
+    assert telegram_provider["metadata_json"]["bot_binding"] == "disabled_until_callback_implemented"
 
     patch_response = await foundation_app.client.patch(
         "/api/v1/settings/auth/providers/google",
@@ -186,8 +229,15 @@ async def test_auth_provider_settings_are_typed_and_audited(
             "metadata_json": {"issuer": "https://accounts.google.com"},
         },
     )
-    assert patch_response.status_code == 200
-    assert patch_response.json()["enabled"] is True
+    assert patch_response.status_code == 422
+    assert patch_response.json()["error"]["code"] == "auth_provider_not_live"
+
+    password_patch_response = await foundation_app.client.patch(
+        "/api/v1/settings/auth/providers/password",
+        json={"metadata_json": {"mfa_required": True}},
+    )
+    assert password_patch_response.status_code == 200
+    assert password_patch_response.json()["enabled"] is True
 
     reject_secret_response = await foundation_app.client.patch(
         "/api/v1/settings/auth/providers/github",
@@ -197,18 +247,18 @@ async def test_auth_provider_settings_are_typed_and_audited(
 
     settings_response = await foundation_app.client.get("/api/v1/settings/auth.providers")
     assert settings_response.status_code == 200
-    saved_google = next(
+    saved_password = next(
         item
         for item in settings_response.json()["value_json"]["items"]
-        if item["provider"] == "google"
+        if item["provider"] == "password"
     )
-    assert saved_google["status"] == "active"
+    assert saved_password["metadata_json"]["mfa_required"] is True
 
     audit_response = await foundation_app.client.get("/api/v1/audit/events")
     assert audit_response.status_code == 200
     assert any(
         event["action"] == "auth_provider.updated"
-        and event["resource_id"] == "google"
+        and event["resource_id"] == "password"
         for event in audit_response.json()["items"]
     )
 

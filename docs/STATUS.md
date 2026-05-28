@@ -33,7 +33,7 @@ panel and one live node, replacing non-live code paths with real contracts.
 - Backend Phase 3 node provisioning slice completed with idempotent provisioning
   jobs, SSH credential references only, preflight states, one-time install token
   exchange, node heartbeat token hashing, and route/service tests.
-- Production Reality Contract is active: production web builds reject development API mode,
+- Production Reality Contract is active: runtime web builds have no development API mode,
   public subscriptions require a real node and renderable protocol, catalog-only
   protocol adapters cannot provision live plans, and client renderers no longer
   emit incomplete client configs.

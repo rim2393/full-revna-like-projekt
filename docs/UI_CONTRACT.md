@@ -19,7 +19,7 @@ The current web app lives in `apps/web` and covers the Lumen Guard admin entry p
 - `src/app` owns providers, query client setup, and route definitions.
 - `src/features/auth` owns Guard login/MFA/portal screens and the session provider.
 - `src/pages` owns dashboard and resource screens.
-- `src/shared/api` owns typed API client contracts, the development client, HTTP client, API provider, and page data hooks.
+- `src/shared/api` owns typed API client contracts, the HTTP client, API provider, and page data hooks. The in-memory development client is test-only and must be injected explicitly by tests; runtime bundles must never select it through environment variables.
 - `src/shared/components` owns shell, navigation, metrics, badges, headers, and brand primitives.
 - `src/shared/data` owns local test fixtures and navigation maps.
 - `src/shared/styles` owns CSS design tokens and global layout rules.
@@ -31,7 +31,7 @@ The Lumen look uses graphite surfaces, green safety accents, amber warning state
 
 ## Planned Integration Work
 
-- Set `VITE_LUMEN_API_BASE_URL` to enable the HTTP client. Deployed images must not set `VITE_LUMEN_API_MODE=development`; the production bundle now throws if development API mode is configured.
+- Set `VITE_LUMEN_API_BASE_URL` when the web bundle must call a different API origin. If it is unset, the runtime uses `window.location.origin`. There is no environment switch for fake/development API mode in runtime bundles.
 - Current HTTP paths include `GET/PATCH/DELETE /api/v1/users/{id}`, `POST /api/v1/users/bulk/{action}`, `GET/POST/PATCH/DELETE /api/v1/hosts`, `GET/POST/PATCH/DELETE /api/v1/profiles`, `GET/POST/PATCH/DELETE /api/v1/squads`, `GET /api/admin/license`, `GET /api/admin/api-keys`, `GET /api/v1/nodes`, `POST /api/v1/nodes/provisioning-jobs`, and Remna-compatible aliases under `/api/users`, `/api/hosts`, `/api/config-profiles`, `/api/internal-squads`, `/api/external-squads`, and `/api/tokens`.
 - Node provisioning UI must never collect or render SSH passwords, private keys, install tokens, heartbeat tokens, subscription URLs, or generated runtime configs. It may show safe install-token issue/exchange timestamps and the real heartbeat endpoint path.
 - Replace the hand-written HTTP client with a generated API client once backend contracts are stable.
