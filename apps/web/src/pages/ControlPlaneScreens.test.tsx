@@ -32,6 +32,12 @@ describe('Control plane resource screens', () => {
     expect(screen.getByRole('link', { name: /users/i })).toHaveAttribute('href', '/users')
     subscription.unmount()
 
+    const userDetail = renderWithRouter('/users/usr_mira', { apiClient, initialSession: mockSession })
+    expect(await screen.findByRole('heading', { name: /mira volkova/i })).toBeInTheDocument()
+    expect(screen.getByRole('table', { name: /issued subscriptions/i })).toBeInTheDocument()
+    expect(screen.getAllByText('sub_pub_default').length).toBeGreaterThan(0)
+    userDetail.unmount()
+
     renderWithRouter('/settings', { apiClient, initialSession: mockSession })
     expect(await screen.findByRole('table', { name: /panel setting inventory/i })).toBeInTheDocument()
     expect(screen.getByText('subscription.info')).toBeInTheDocument()

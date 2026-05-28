@@ -11,6 +11,7 @@ from app.domains.users.schemas import (
     UserBulkActionRequest,
     UserBulkActionResponse,
     UserCreateRequest,
+    UserDetailResponse,
     UserListResponse,
     UserResponse,
     UserUpdateRequest,
@@ -19,6 +20,7 @@ from app.domains.users.service import apply_bulk_user_action, user_to_response
 from app.domains.users.service import create_user as create_user_record
 from app.domains.users.service import delete_user as delete_user_record
 from app.domains.users.service import get_user as get_user_record
+from app.domains.users.service import get_user_detail as get_user_detail_record
 from app.domains.users.service import list_users as list_user_records
 from app.domains.users.service import update_user as update_user_record
 
@@ -62,6 +64,15 @@ async def get_user(
 ) -> UserResponse:
     user = await get_user_record(session, user_id)
     return user_to_response(user)
+
+
+@router.get("/{user_id}/detail", response_model=UserDetailResponse)
+async def get_user_detail(
+    user_id: UUID,
+    _: UserManager,
+    session: DbSession,
+) -> UserDetailResponse:
+    return await get_user_detail_record(session, user_id)
 
 
 @router.patch("/{user_id}", response_model=UserResponse)

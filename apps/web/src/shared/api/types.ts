@@ -160,6 +160,43 @@ export type UserBulkActionResponse = {
   updated: number
 }
 
+export type AuditEventRecord = {
+  action: string
+  actor_email: string | null
+  actor_subject: string
+  created_at: string
+  id: string
+  metadata_json: Record<string, string>
+  resource_id: string | null
+  resource_type: string
+}
+
+export type UserDeviceRecord = {
+  hwid: string | null
+  id: string
+  label: string | null
+  last_seen_at: string | null
+  metadata_json: Record<string, unknown>
+  platform: string | null
+  status: string
+}
+
+export type UserAccessibleNodeRecord = {
+  id: string
+  name: string
+  public_address: string
+  region: string
+  status: string
+}
+
+export type UserDetailResponse = {
+  accessible_nodes: UserAccessibleNodeRecord[]
+  devices: UserDeviceRecord[]
+  request_history: AuditEventRecord[]
+  subscriptions: SubscriptionRecord[]
+  user: UserRecord
+}
+
 export type LegacyNodeStatus = 'healthy' | 'degraded' | 'offline'
 
 export type NodeRecord = {
@@ -465,6 +502,8 @@ export type LumenApiClient = {
   deleteSquad: (squadId: string) => Promise<void>
   deleteUser: (userId: string) => Promise<void>
   getSession: () => Promise<AuthSession | null>
+  getUser: (userId: string) => Promise<UserRecord>
+  getUserDetail: (userId: string) => Promise<UserDetailResponse>
   listApiKeys: () => Promise<ResourceListResponse<ApiKeyRecord>>
   listHosts: () => Promise<HostListResponse>
   listNodes: () => Promise<NodeListResponse>

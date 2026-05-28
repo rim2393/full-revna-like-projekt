@@ -273,6 +273,34 @@ export function createMockLumenApiClient(): LumenApiClient {
         users.splice(index, 1)
       }
     },
+    getUser: async (userId: string): Promise<UserRecord> => {
+      const user = users.find((item) => item.id === userId)
+      if (!user) {
+        throw new Error('User not found')
+      }
+      return user
+    },
+    getUserDetail: async (userId: string) => {
+      const user = users.find((item) => item.id === userId)
+      if (!user) {
+        throw new Error('User not found')
+      }
+      return {
+        accessible_nodes: asNodeListResponse().items.map((node) => ({
+          id: node.id,
+          name: node.name,
+          public_address: node.public_address,
+          region: node.region,
+          status: node.status,
+        })),
+        devices: Array.isArray(user.metadata_json.devices)
+          ? (user.metadata_json.devices as never[])
+          : [],
+        request_history: [],
+        subscriptions: subscriptions.filter((subscription) => subscription.user_id === user.id),
+        user,
+      }
+    },
     getSession: async () => mockSession,
     listApiKeys: async () => asListResponse(apiKeys),
     listHosts: async (): Promise<HostListResponse> => ({ items: hosts }),

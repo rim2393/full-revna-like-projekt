@@ -7,7 +7,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import Settings, get_settings
 from app.core.rbac import Permission, Principal, require_permission
 from app.db.session import get_db_session
-from app.domains.subscriptions.models import Subscription
 from app.domains.subscriptions.renderers import (
     normalize_render_target,
     render_subscription_for_target,
@@ -20,6 +19,7 @@ from app.domains.subscriptions.schemas import (
 from app.domains.subscriptions.service import (
     build_public_subscription_manifest,
     build_subscription_manifest,
+    subscription_to_response,
 )
 from app.domains.subscriptions.service import (
     create_subscription as create_subscription_record,
@@ -44,21 +44,6 @@ DatabaseSession = Annotated[AsyncSession, Depends(get_db_session)]
 RuntimeSettings = Annotated[Settings, Depends(get_settings)]
 
 
-def subscription_response(subscription: Subscription) -> SubscriptionResponse:
-    return SubscriptionResponse(
-        id=subscription.id,
-        public_id=subscription.public_id,
-        user_id=subscription.user_id,
-        license_id=subscription.license_id,
-        node_id=subscription.node_id,
-        status=subscription.status,
-        delivery_profile=subscription.delivery_profile,
-        config_hash=subscription.config_hash,
-        expires_at=subscription.expires_at,
-        revoked_at=subscription.revoked_at,
-    )
-
-
 @router.get("", response_model=SubscriptionListResponse)
 async def list_subscriptions(
     _: SubscriptionReader,
@@ -66,7 +51,7 @@ async def list_subscriptions(
 ) -> SubscriptionListResponse:
     subscriptions = await list_subscription_records(session)
     return SubscriptionListResponse(
-        items=[subscription_response(subscription) for subscription in subscriptions]
+        items=[subscription_to_response(subscription) for subscription in subscriptions]
     )
 
 
@@ -78,7 +63,7 @@ async def create_subscription(
 ) -> SubscriptionResponse:
     subscription = await create_subscription_record(session, request=request)
     await session.commit()
-    return subscription_response(subscription)
+    return subscription_to_response(subscription)
 
 
 @router.get("/public/{public_id}/manifest")
@@ -129,7 +114,7 @@ async def get_subscription(
     session: DatabaseSession,
 ) -> SubscriptionResponse:
     subscription = await get_subscription_record(session, subscription_id=subscription_id)
-    return subscription_response(subscription)
+    return subscription_to_response(subscription)
 
 
 @router.get("/{subscription_id}/manifest")

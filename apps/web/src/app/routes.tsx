@@ -18,6 +18,7 @@ import { SubscriptionPublicPage } from '../pages/SubscriptionPublicPage'
 import { SubscriptionPage } from '../pages/SubscriptionPage'
 import { TemplatesPage } from '../pages/TemplatesPage'
 import { ToolsPage } from '../pages/ToolsPage'
+import { UserDetailPage } from '../pages/UserDetailPage'
 import { UsersPage } from '../pages/UsersPage'
 import { AppShell } from '../shared/components/AppShell'
 
@@ -50,6 +51,7 @@ export const appRoutes: RouteObject[] = [
       { index: true, element: <Navigate to="/dashboard" replace /> },
       { path: 'dashboard', element: <DashboardPage /> },
       { path: 'users', element: <UsersPage /> },
+      { path: 'users/:userId', element: <UserDetailPage /> },
       { path: 'nodes', element: <NodesPage /> },
       { path: 'hosts', element: <HostsPage /> },
       { path: 'profiles', element: <ProfilesPage /> },

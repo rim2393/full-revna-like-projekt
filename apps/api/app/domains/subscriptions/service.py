@@ -12,7 +12,7 @@ from app.domains.nodes.models import Node
 from app.domains.protocols.models import Host, ProtocolProfile
 from app.domains.protocols.schemas import VAULT_REF_PREFIX
 from app.domains.subscriptions.models import Subscription
-from app.domains.subscriptions.schemas import SubscriptionCreateRequest
+from app.domains.subscriptions.schemas import SubscriptionCreateRequest, SubscriptionResponse
 from app.domains.users.models import User
 
 SUBSCRIPTION_PUBLIC_ID_PREFIX = "lumen_sub"
@@ -45,6 +45,19 @@ def ensure_no_inline_secret_keys(values: dict[str, str], *, field_name: str) -> 
 
 async def list_subscriptions(session: AsyncSession) -> list[Subscription]:
     result = await session.execute(select(Subscription).order_by(Subscription.created_at.desc()))
+    return list(result.scalars())
+
+
+async def list_subscriptions_for_user(
+    session: AsyncSession,
+    *,
+    user_id: UUID,
+) -> list[Subscription]:
+    result = await session.execute(
+        select(Subscription)
+        .where(Subscription.user_id == user_id)
+        .order_by(Subscription.created_at.desc())
+    )
     return list(result.scalars())
 
 
@@ -240,6 +253,21 @@ async def create_subscription(
     session.add(subscription)
     await session.flush()
     return subscription
+
+
+def subscription_to_response(subscription: Subscription) -> SubscriptionResponse:
+    return SubscriptionResponse(
+        id=subscription.id,
+        public_id=subscription.public_id,
+        user_id=subscription.user_id,
+        license_id=subscription.license_id,
+        node_id=subscription.node_id,
+        status=subscription.status,
+        delivery_profile=subscription.delivery_profile,
+        config_hash=subscription.config_hash,
+        expires_at=subscription.expires_at,
+        revoked_at=subscription.revoked_at,
+    )
 
 
 async def _get_optional_profile(

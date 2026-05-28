@@ -813,6 +813,12 @@ h2 {
   margin-bottom: var(--space-2);
 }
 
+.table-subtext {
+  margin-top: 2px;
+  color: var(--color-muted);
+  font-size: 0.82rem;
+}
+
 .data-table th,
 .data-table td {
   padding: var(--space-3);

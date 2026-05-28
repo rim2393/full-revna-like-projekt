@@ -15,6 +15,8 @@ from app.db.base import Base
 from app.db.session import create_engine, get_db_session
 from app.domains.audit.models import AuditEvent
 from app.domains.auth.service import generate_totp_code
+from app.domains.licenses.models import License
+from app.domains.licenses.service import hash_license_key
 from app.domains.nodes.models import Node
 from app.domains.nodes.service import hash_node_token
 from app.domains.protocols.schemas import WILDCARD_BIND_ADDRESS
@@ -343,6 +345,67 @@ async def test_remna_parity_crud_and_bulk_actions(foundation_app: FoundationRout
     compat_hosts_response = await foundation_app.client.get("/api/hosts")
     assert compat_hosts_response.status_code == 200
     assert compat_hosts_response.json()["items"][0]["name"] == "Parity Host"
+
+
+async def test_user_detail_returns_subscriptions_devices_nodes_and_history(
+    foundation_app: FoundationRouteApp,
+) -> None:
+    node_id = await seeded_node_id(foundation_app)
+
+    create_user_response = await foundation_app.client.post(
+        "/api/v1/users",
+        json={
+            "email": "detail-user@example.com",
+            "username": "detail-user",
+            "display_name": "Detail User",
+            "device_limit": 2,
+            "metadata_json": {
+                "devices": [
+                    {
+                        "id": "hwid-1",
+                        "hwid": "AABBCC",
+                        "platform": "android",
+                        "status": "active",
+                    }
+                ]
+            },
+        },
+    )
+    assert create_user_response.status_code == 201
+    user_id = create_user_response.json()["id"]
+
+    async with foundation_app.sessionmaker() as session:
+        license_record = License(
+            license_key_hash=hash_license_key("detail-user-license"),
+            customer_ref="detail-user",
+            status="active",
+            max_devices=2,
+            starts_at=datetime.now(UTC),
+            metadata_json={},
+        )
+        session.add(license_record)
+        await session.commit()
+        license_id = str(license_record.id)
+
+    subscription_response = await foundation_app.client.post(
+        "/api/v1/subscriptions",
+        json={
+            "user_id": user_id,
+            "license_id": license_id,
+            "node_id": node_id,
+            "delivery_profile": {"format": "happ", "profile_title": "Detail profile"},
+        },
+    )
+    assert subscription_response.status_code == 201
+
+    detail_response = await foundation_app.client.get(f"/api/v1/users/{user_id}/detail")
+    assert detail_response.status_code == 200
+    detail = detail_response.json()
+    assert detail["user"]["email"] == "detail-user@example.com"
+    assert detail["subscriptions"][0]["public_id"].startswith("lumen_sub")
+    assert detail["devices"][0]["hwid"] == "AABBCC"
+    assert detail["accessible_nodes"][0]["id"] == node_id
+    assert [event["action"] for event in detail["request_history"]] == ["user.created"]
 
 
 async def test_protocol_profile_rejects_plaintext_credentials_ref(

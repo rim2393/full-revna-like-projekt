@@ -6,10 +6,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import APIError
 from app.core.security import hash_password
+from app.domains.audit.models import AuditEvent
+from app.domains.audit.service import audit_event_response
+from app.domains.nodes.models import Node
+from app.domains.subscriptions.service import list_subscriptions_for_user, subscription_to_response
 from app.domains.users.models import User
 from app.domains.users.schemas import (
+    UserAccessibleNodeRecord,
     UserBulkActionRequest,
     UserCreateRequest,
+    UserDetailResponse,
+    UserDeviceRecord,
     UserResponse,
     UserUpdateRequest,
 )
@@ -29,6 +36,29 @@ async def get_user(session: AsyncSession, user_id: UUID) -> User:
             status_code=status.HTTP_404_NOT_FOUND,
         )
     return user
+
+
+async def get_user_detail(session: AsyncSession, user_id: UUID) -> UserDetailResponse:
+    user = await get_user(session, user_id)
+    subscriptions = await list_subscriptions_for_user(session, user_id=user.id)
+    nodes = await _list_accessible_nodes(session)
+    request_history = await _list_user_audit_events(session, user_id=user.id)
+    return UserDetailResponse(
+        user=user_to_response(user),
+        subscriptions=[subscription_to_response(subscription) for subscription in subscriptions],
+        devices=_user_devices_from_metadata(user.metadata_json),
+        accessible_nodes=[
+            UserAccessibleNodeRecord(
+                id=node.id,
+                name=node.name,
+                region=node.region,
+                public_address=node.public_address,
+                status=node.status,
+            )
+            for node in nodes
+        ],
+        request_history=[audit_event_response(event) for event in request_history],
+    )
 
 
 async def create_user(session: AsyncSession, *, request: UserCreateRequest) -> User:
@@ -201,3 +231,48 @@ def user_to_response(user: User) -> UserResponse:
         created_at=user.created_at,
         updated_at=user.updated_at,
     )
+
+
+async def _list_accessible_nodes(session: AsyncSession) -> list[Node]:
+    result = await session.execute(select(Node).where(Node.status != "deleted").order_by(Node.name))
+    return list(result.scalars().all())
+
+
+async def _list_user_audit_events(session: AsyncSession, *, user_id: UUID) -> list[AuditEvent]:
+    result = await session.execute(
+        select(AuditEvent)
+        .where(AuditEvent.resource_type == "user", AuditEvent.resource_id == str(user_id))
+        .order_by(AuditEvent.created_at.desc())
+        .limit(100)
+    )
+    return list(result.scalars().all())
+
+
+def _user_devices_from_metadata(metadata: dict[str, object]) -> list[UserDeviceRecord]:
+    raw_devices = metadata.get("devices", [])
+    if not isinstance(raw_devices, list):
+        return []
+    devices: list[UserDeviceRecord] = []
+    for index, raw_device in enumerate(raw_devices):
+        if not isinstance(raw_device, dict):
+            continue
+        device_id = raw_device.get("id") or raw_device.get("hwid") or f"device-{index + 1}"
+        last_seen = raw_device.get("last_seen_at")
+        devices.append(
+            UserDeviceRecord(
+                id=str(device_id),
+                label=_optional_str(raw_device.get("label")),
+                hwid=_optional_str(raw_device.get("hwid")),
+                platform=_optional_str(raw_device.get("platform")),
+                status=str(raw_device.get("status") or "active"),
+                last_seen_at=last_seen if hasattr(last_seen, "isoformat") else None,
+                metadata_json={str(key): value for key, value in raw_device.items()},
+            )
+        )
+    return devices
+
+
+def _optional_str(value: object) -> str | None:
+    if value is None:
+        return None
+    return str(value)

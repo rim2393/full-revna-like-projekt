@@ -4,6 +4,8 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, SecretStr
 
 from app.core.rbac import Role
+from app.domains.audit.schemas import AuditEventResponse
+from app.domains.subscriptions.schemas import SubscriptionResponse
 
 
 class UserCreateRequest(BaseModel):
@@ -77,3 +79,29 @@ class UserListResponse(BaseModel):
 class UserBulkActionResponse(BaseModel):
     updated: int
     items: list[UserResponse]
+
+
+class UserDeviceRecord(BaseModel):
+    id: str
+    label: str | None = None
+    hwid: str | None = None
+    platform: str | None = None
+    status: str = "active"
+    last_seen_at: datetime | None = None
+    metadata_json: dict[str, object] = Field(default_factory=dict)
+
+
+class UserAccessibleNodeRecord(BaseModel):
+    id: UUID
+    name: str
+    region: str
+    public_address: str
+    status: str
+
+
+class UserDetailResponse(BaseModel):
+    user: UserResponse
+    subscriptions: list[SubscriptionResponse]
+    devices: list[UserDeviceRecord]
+    accessible_nodes: list[UserAccessibleNodeRecord]
+    request_history: list[AuditEventResponse]

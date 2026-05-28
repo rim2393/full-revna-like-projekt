@@ -26,6 +26,7 @@ export const resourceQueryKeys = {
   settings: ['resource', 'settings'] as const,
   squads: ['resource', 'squads'] as const,
   subscriptions: ['resource', 'subscriptions'] as const,
+  userDetail: (userId: string) => ['resource', 'users', userId, 'detail'] as const,
   users: ['resource', 'users'] as const,
 }
 
@@ -264,6 +265,16 @@ export function useUsersPageData() {
   return useQuery({
     queryFn: apiClient.listUsers,
     queryKey: resourceQueryKeys.users,
+  })
+}
+
+export function useUserDetailData(userId: string | undefined) {
+  const apiClient = useApiClient()
+
+  return useQuery({
+    enabled: Boolean(userId),
+    queryFn: () => apiClient.getUserDetail(userId as string),
+    queryKey: resourceQueryKeys.userDetail(userId ?? ''),
   })
 }
 

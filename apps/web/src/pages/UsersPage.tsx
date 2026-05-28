@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { Link } from 'react-router-dom'
 import { Ban, RefreshCw, RotateCcw, Save, Trash2 } from 'lucide-react'
 import {
   useBulkUsers,
@@ -179,7 +180,12 @@ export function UsersPage() {
                   type="checkbox"
                   onChange={() => toggleSelected(user.id)}
                 />,
-                `${formatUserName(user)} (${user.email})`,
+                <div>
+                  <Link className="text-link" to={`/users/${user.id}`}>
+                    {formatUserName(user)}
+                  </Link>
+                  <p className="table-subtext">{user.email}</p>
+                </div>,
                 user.role,
                 user.device_limit === null ? t('unlimited') : user.device_limit,
                 formatLimit(user, t),
