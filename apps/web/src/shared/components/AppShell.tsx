@@ -1,5 +1,5 @@
 import { Bell, CircleHelp, Languages, LogOut, Menu, Search, Settings, X } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAuthSession } from '../../features/auth/authSession'
 import { useApiClient } from '../api/apiClientContext'
@@ -12,6 +12,14 @@ const languageOptions: Array<{ label: string; value: AppLanguage }> = [
   { label: 'EN', value: 'en' },
   { label: 'RU', value: 'ru' },
 ]
+
+const searchableRoutes = navigationGroups.flatMap((group) =>
+  group.items.map((item) => ({
+    keywords: `${group.label} ${item.label}`.toLowerCase(),
+    label: item.label,
+    to: item.to,
+  })),
+)
 
 const readInitialLanguage = (): AppLanguage => {
   if (typeof window === 'undefined') {
@@ -27,8 +35,19 @@ export function AppShell() {
   const navigate = useNavigate()
   const { clearSession } = useAuthSession()
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false)
   const [language, setLanguage] = useState<AppLanguage>(readInitialLanguage)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchStatus, setSearchStatus] = useState('')
   const closeSidebar = () => setIsSidebarOpen(false)
+  const searchResults = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase()
+    if (!query) {
+      return []
+    }
+
+    return searchableRoutes.filter((route) => route.keywords.includes(query)).slice(0, 5)
+  }, [searchQuery])
 
   async function handleSignOut() {
     try {
@@ -37,6 +56,19 @@ export function AppShell() {
       clearSession()
       navigate('/guard/login', { replace: true })
     }
+  }
+
+  function handleSearchSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const firstResult = searchResults[0]
+    if (!firstResult) {
+      setSearchStatus('No matching section found.')
+      return
+    }
+
+    setSearchStatus(`Opening ${firstResult.label}.`)
+    setSearchQuery('')
+    navigate(firstResult.to)
   }
 
   useEffect(() => {
@@ -105,11 +137,44 @@ export function AppShell() {
           >
             <Menu size={20} />
           </button>
-          <label className="topbar__search">
+          <form className="topbar__search" onSubmit={handleSearchSubmit}>
             <Search size={18} aria-hidden="true" />
-            <span className="sr-only">Search control plane</span>
-            <input type="search" placeholder="Search users, nodes, hosts" />
-          </label>
+            <label className="sr-only" htmlFor="topbar-search">
+              Search control plane
+            </label>
+            <input
+              id="topbar-search"
+              type="search"
+              placeholder="Search users, nodes, hosts"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+            />
+            {searchQuery ? (
+              <div className="topbar__search-results" role="listbox" aria-label="Search results">
+                {searchResults.length > 0 ? (
+                  searchResults.map((result) => (
+                    <button
+                      key={result.to}
+                      type="button"
+                      role="option"
+                      onClick={() => {
+                        setSearchQuery('')
+                        setSearchStatus(`Opening ${result.label}.`)
+                        navigate(result.to)
+                      }}
+                    >
+                      {result.label}
+                    </button>
+                  ))
+                ) : (
+                  <span>No matches</span>
+                )}
+              </div>
+            ) : null}
+            <span className="sr-only" aria-live="polite">
+              {searchStatus}
+            </span>
+          </form>
           <nav className="topbar__actions" aria-label="Admin actions">
             <label className="language-switcher">
               <Languages size={18} aria-hidden="true" />
@@ -126,9 +191,21 @@ export function AppShell() {
                 ))}
               </select>
             </label>
-            <button type="button" className="icon-button" aria-label="Notifications" disabled>
+            <button
+              type="button"
+              className="icon-button"
+              aria-expanded={isNotificationsOpen}
+              aria-label="Notifications"
+              onClick={() => setIsNotificationsOpen((current) => !current)}
+            >
               <Bell size={18} />
             </button>
+            {isNotificationsOpen ? (
+              <div className="notification-popover" role="status">
+                <strong>No active notifications</strong>
+                <span>Node heartbeat, license, and API health alerts are clear.</span>
+              </div>
+            ) : null}
             <Link to="/settings" className="icon-button" aria-label="Settings">
               <Settings size={18} />
             </Link>

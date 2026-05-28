@@ -25,9 +25,14 @@ export function LicensePage() {
         title={spec.title}
         description="Read-only entitlement health with no license keys or activation secrets persisted in the UI."
         actions={
-          <button type="button" className="button button--secondary">
+          <button
+            type="button"
+            className="button button--secondary"
+            disabled={query.isFetching}
+            onClick={() => void query.refetch()}
+          >
             <RefreshCw size={18} aria-hidden="true" />
-            {spec.primaryAction}
+            {query.isFetching ? 'Checking...' : spec.primaryAction}
           </button>
         }
       />

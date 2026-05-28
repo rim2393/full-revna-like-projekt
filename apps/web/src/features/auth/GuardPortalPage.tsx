@@ -1,8 +1,23 @@
 import { ArrowRight, Fingerprint, ShieldCheck } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { useApiClient } from '../../shared/api/apiClientContext'
 import { StatusBadge } from '../../shared/components/StatusBadge'
+import { useAuthSession } from './authSession'
 
 export function GuardPortalPage() {
+  const apiClient = useApiClient()
+  const navigate = useNavigate()
+  const { clearSession } = useAuthSession()
+
+  async function handleStartOver() {
+    try {
+      await apiClient.logout()
+    } finally {
+      clearSession()
+      navigate('/guard/login', { replace: true })
+    }
+  }
+
   return (
     <article className="auth-card auth-card--portal">
       <div className="auth-card__icon" aria-hidden="true">
@@ -27,9 +42,9 @@ export function GuardPortalPage() {
         Enter dashboard
         <ArrowRight size={18} aria-hidden="true" />
       </Link>
-      <Link to="/guard/login" className="text-link">
+      <button type="button" className="text-link text-link--button" onClick={handleStartOver}>
         Start over
-      </Link>
+      </button>
     </article>
   )
 }
