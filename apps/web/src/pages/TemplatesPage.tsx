@@ -29,7 +29,7 @@ const formats: SubscriptionTemplateFormat[] = [
 
 const templatesSpec = {
   ...sectionSpecs.subscription,
-  description: 'Manage persisted subscription renderer templates for all client formats.',
+  description: 'Manage active renderer wrappers that are applied to public subscription output.',
   eyebrow: 'Subscription templates',
   primaryAction: 'New template',
   status: 'api-backed',
@@ -45,7 +45,9 @@ export function TemplatesPage() {
   const templates = query.data?.items ?? []
   const [name, setName] = useState('')
   const [format, setFormat] = useState<SubscriptionTemplateFormat>('mihomo')
-  const [content, setContent] = useState('{"profile_title":"Lumen"}')
+  const [content, setContent] = useState(
+    '{"prepend":"# Lumen managed profile\\n","append":"","headers":{"X-Lumen-Template":"default"},"filename":"lumen.yaml"}',
+  )
   const [formError, setFormError] = useState<string | null>(null)
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -73,7 +75,7 @@ export function TemplatesPage() {
           <div>
             <p className="eyebrow">Create template</p>
             <h2>Renderer profile</h2>
-            <p>Persist client-specific renderer defaults and metadata.</p>
+            <p>Persist safe prepend, append, headers, content_type, and filename overrides.</p>
           </div>
           <label htmlFor="template-name">
             Name

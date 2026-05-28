@@ -51,6 +51,7 @@ async def route_app(tmp_path) -> AsyncIterator[RouteTestApp]:
                 Permission.LICENSE_MANAGE,
                 Permission.SUBSCRIPTION_READ,
                 Permission.SUBSCRIPTION_MANAGE,
+                Permission.USER_MANAGE,
             },
         )
 
@@ -365,6 +366,22 @@ async def test_public_subscription_renderers_emit_client_compatible_formats(
     assert create_response.status_code == 201
     public_id = create_response.json()["public_id"]
 
+    template_response = await route_app.client.post(
+        "/api/v1/subscription-templates",
+        json={
+            "name": "Mihomo production template",
+            "format": "mihomo",
+            "content_json": {
+                "prepend": "# Lumen managed profile\n",
+                "append": "# end\n",
+                "filename": "lumen-managed.yaml",
+                "headers": {"X-Lumen-Template": "mihomo-production"},
+            },
+        },
+    )
+    assert template_response.status_code == 201
+    template_id = template_response.json()["id"]
+
     raw_response = await route_app.client.get(
         f"/api/v1/subscriptions/public/{public_id}/render?target=hiddify",
     )
@@ -383,6 +400,11 @@ async def test_public_subscription_renderers_emit_client_compatible_formats(
         f"/api/v1/subscriptions/public/{public_id}/render?target=mihomo",
     )
     assert mihomo_response.status_code == 200
+    assert mihomo_response.headers["x-lumen-template-id"] == template_id
+    assert mihomo_response.headers["x-lumen-template"] == "mihomo-production"
+    assert "lumen-managed.yaml" in mihomo_response.headers["content-disposition"]
+    assert mihomo_response.text.startswith("# Lumen managed profile\n")
+    assert mihomo_response.text.endswith("# end\n")
     assert "proxies:" in mihomo_response.text
     assert 'type: "vless"' in mihomo_response.text
     assert "reality-opts:" in mihomo_response.text
@@ -407,6 +429,68 @@ async def test_public_subscription_renderers_emit_client_compatible_formats(
     xray = xray_response.json()
     assert xray["outbounds"][0]["protocol"] == "vless"
     assert xray["outbounds"][0]["streamSettings"]["security"] == "reality"
+
+
+async def test_public_subscription_response_rules_apply_to_blocked_subscriptions(
+    route_app: RouteTestApp,
+) -> None:
+    user, license_record, node = await seed_subscription_dependencies(route_app)
+    create_response = await route_app.client.post(
+        "/api/v1/subscriptions",
+        json={
+            "user_id": str(user.id),
+            "license_id": str(license_record.id),
+            "node_id": str(node.id),
+            "delivery_profile": {
+                "protocol": "vless-tcp-tls",
+                "adapter": "vless-tcp-tls",
+                "profile_title": "Blocked User",
+                "server_name": "blocked.example.test",
+            },
+            "config_hash": "sha256:blocked",
+        },
+    )
+    assert create_response.status_code == 201
+    subscription = create_response.json()
+
+    rule_response = await route_app.client.post(
+        "/api/v1/response-rules",
+        json={
+            "name": "Disabled subscription message",
+            "trigger_status": "disabled",
+            "status_code": 451,
+            "body": "Subscription disabled by policy",
+            "headers": {
+                "X-Lumen-Rule": "disabled",
+                "Set-Cookie": "must-not-pass=1",
+                "Cache-Control": "public",
+            },
+        },
+    )
+    assert rule_response.status_code == 201
+    rule_id = rule_response.json()["id"]
+
+    patch_response = await route_app.client.patch(
+        f"/api/v1/subscriptions/{subscription['id']}",
+        json={"status": "disabled"},
+    )
+    assert patch_response.status_code == 200
+
+    public_response = await route_app.client.get(
+        f"/api/v1/subscriptions/public/{subscription['public_id']}/render?target=happ",
+    )
+    assert public_response.status_code == 451
+    assert public_response.text == "Subscription disabled by policy"
+    assert public_response.headers["x-lumen-rule"] == "disabled"
+    assert public_response.headers["x-lumen-response-rule-id"] == rule_id
+    assert public_response.headers["cache-control"] == "no-store"
+    assert "set-cookie" not in public_response.headers
+
+    public_manifest_response = await route_app.client.get(
+        f"/api/v1/subscriptions/public/{subscription['public_id']}/manifest",
+    )
+    assert public_manifest_response.status_code == 451
+    assert public_manifest_response.text == "Subscription disabled by policy"
 
 
 async def test_public_subscription_manifest_rejects_plaintext_profile_credential(
