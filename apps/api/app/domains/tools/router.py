@@ -10,6 +10,7 @@ from app.db.session import get_db_session
 from app.domains.tools.schemas import (
     HappRoutingResponse,
     HwidInspectorResponse,
+    NodeKeyResponse,
     SessionInspectorResponse,
     SrhInspectorResponse,
     ToolSnippetCreateRequest,
@@ -23,6 +24,7 @@ from app.domains.tools.schemas import (
 from app.domains.tools.service import (
     create_tool_snippet,
     delete_tool_snippet,
+    generate_node_key,
     generate_x25519_keypair,
     inspect_happ_routing,
     inspect_hwid,
@@ -108,6 +110,17 @@ async def create_x25519_keypair(
     session: DatabaseSession,
 ) -> X25519KeypairResponse:
     response = await generate_x25519_keypair(session, principal=principal)
+    await session.commit()
+    return response
+
+
+@router.post("/node-key", response_model=NodeKeyResponse)
+async def create_node_key(
+    principal: UtilityManager,
+    session: DatabaseSession,
+    settings: AppSettings,
+) -> NodeKeyResponse:
+    response = await generate_node_key(session, principal=principal, settings=settings)
     await session.commit()
     return response
 

@@ -17,6 +17,7 @@ from app.domains.audit.service import record_audit_event
 from app.domains.auth.models import UserSession
 from app.domains.auth.service import revoke_session
 from app.domains.nodes.models import Node
+from app.domains.nodes.service import NODE_TOKEN_PREFIX, generate_node_token
 from app.domains.settings.models import PanelSetting
 from app.domains.subscriptions.models import Subscription
 from app.domains.subscriptions.renderers import build_subscription_headers
@@ -27,6 +28,7 @@ from app.domains.tools.schemas import (
     HwidDeviceRecord,
     HwidInspectorResponse,
     HwidInspectorRow,
+    NodeKeyResponse,
     SessionInspectorResponse,
     SessionInspectorRow,
     SrhInspectorResponse,
@@ -333,6 +335,31 @@ async def generate_x25519_keypair(
         private_key=_base64url_nopad(private_raw),
         public_key=_base64url_nopad(public_raw),
     )
+
+
+async def generate_node_key(
+    session: AsyncSession,
+    *,
+    principal: Principal,
+    settings: Settings,
+) -> NodeKeyResponse:
+    token, token_prefix, _token_hash = generate_node_token(
+        prefix=NODE_TOKEN_PREFIX,
+        settings=settings,
+    )
+    await record_audit_event(
+        session,
+        principal=principal,
+        action="tool.node_key.generated",
+        resource_type="tool",
+        resource_id="node-key",
+        metadata_json={
+            "token_prefix": token_prefix,
+            "hash_algorithm": "hmac-sha256",
+            "stored": "false",
+        },
+    )
+    return NodeKeyResponse(token=token, token_prefix=token_prefix)
 
 
 async def list_tool_snippets(session: AsyncSession) -> ToolSnippetListResponse:

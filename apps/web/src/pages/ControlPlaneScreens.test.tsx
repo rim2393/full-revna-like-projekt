@@ -364,25 +364,35 @@ describe('Control plane resource screens', () => {
     await waitFor(() => expect(truncateTorrentReports).toHaveBeenCalledTimes(1))
   })
 
-  it('wires X25519 keypair generation to backend requests', async () => {
+  it('wires key utility generation to backend requests', async () => {
     const user = userEvent.setup()
     const generateX25519Keypair = vi.fn(async () => ({
       encoding: 'base64url-nopad',
       private_key: 'private-key',
       public_key: 'public-key',
     }))
+    const generateNodeKey = vi.fn(async () => ({
+      hash_algorithm: 'hmac-sha256',
+      stored: false,
+      token: 'lumen_node_real_once',
+      token_prefix: 'lumen_node_real_on',
+    }))
     const apiClient: LumenApiClient = {
       ...createDevelopmentLumenApiClient(),
+      generateNodeKey,
       generateX25519Keypair,
     }
 
     renderWithRouter('/tools', { apiClient, initialSession: developmentSession })
 
-    await user.click(await screen.findByRole('button', { name: /happ routing/i }))
+    await user.click(await screen.findByRole('button', { name: /key utilities/i }))
     await user.click(screen.getByRole('button', { name: /generate x25519/i }))
     await waitFor(() => expect(generateX25519Keypair).toHaveBeenCalledTimes(1))
-    expect(await screen.findByText('public-key')).toBeInTheDocument()
+    expect(await screen.findAllByText('public-key')).toHaveLength(2)
     expect(screen.getByText('private-key')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /generate node key/i }))
+    await waitFor(() => expect(generateNodeKey).toHaveBeenCalledTimes(1))
+    expect(await screen.findByText('lumen_node_real_once')).toBeInTheDocument()
   })
 
   it('wires tool snippet CRUD actions to backend requests', async () => {

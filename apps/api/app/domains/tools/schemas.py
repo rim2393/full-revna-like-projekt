@@ -101,6 +101,13 @@ class X25519KeypairResponse(BaseModel):
     encoding: str = "base64url-nopad"
 
 
+class NodeKeyResponse(BaseModel):
+    token: str
+    token_prefix: str
+    hash_algorithm: str = "hmac-sha256"
+    stored: bool = False
+
+
 class ToolSnippetRecord(BaseModel):
     id: UUID
     name: str

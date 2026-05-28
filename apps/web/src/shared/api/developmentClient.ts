@@ -677,6 +677,12 @@ export function createDevelopmentLumenApiClient(): LumenApiClient {
       private_key: 'development-private-key-not-for-production-use',
       public_key: 'development-public-key-not-for-production-use',
     }),
+    generateNodeKey: async () => ({
+      hash_algorithm: 'hmac-sha256',
+      stored: false,
+      token: `lumen_node_development_${Date.now()}`,
+      token_prefix: 'lumen_node_develop',
+    }),
     listToolSnippets: async () => ({
       items: [],
     }),

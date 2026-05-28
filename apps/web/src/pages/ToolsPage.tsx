@@ -1,10 +1,12 @@
 import { useMemo, useState } from 'react'
-import { Activity, Fingerprint, Flame, Radar, Route, ScrollText, Trash2 } from 'lucide-react'
+import type { ReactNode } from 'react'
+import { Activity, Fingerprint, Flame, KeyRound, Radar, Route, ScrollText, Trash2 } from 'lucide-react'
 import {
   useClearUserDevices,
   useCreateToolSnippet,
   useDeleteToolSnippet,
   useDeleteUserDevice,
+  useGenerateNodeKey,
   useGenerateX25519Keypair,
   useHappRoutingData,
   useHwidInspectorData,
@@ -23,7 +25,7 @@ import { PageHeader } from '../shared/components/PageHeader'
 import { StatusBadge } from '../shared/components/StatusBadge'
 import { formatDateTime, formatRecord, toneForStatus } from '../shared/utils/resourceFormat'
 
-type ToolId = 'hwid' | 'srh' | 'sessions' | 'torrent' | 'happ' | 'snippets'
+type ToolId = 'hwid' | 'srh' | 'sessions' | 'torrent' | 'happ' | 'utilities' | 'snippets'
 
 const tools: Array<{
   detail: string
@@ -62,6 +64,12 @@ const tools: Array<{
     name: 'HApp routing',
   },
   {
+    detail: 'Generate one-time operational keys without storing plaintext.',
+    icon: KeyRound,
+    id: 'utilities',
+    name: 'Key utilities',
+  },
+  {
     detail: 'Store reusable operational snippets in the control-plane database.',
     icon: ScrollText,
     id: 'snippets',
@@ -88,6 +96,7 @@ export function ToolsPage() {
   const revokeToolSession = useRevokeToolSession()
   const truncateTorrentReports = useTruncateTorrentReports()
   const generateX25519Keypair = useGenerateX25519Keypair()
+  const generateNodeKey = useGenerateNodeKey()
   const createSnippet = useCreateToolSnippet()
   const updateSnippet = useUpdateToolSnippet()
   const deleteSnippet = useDeleteToolSnippet()
@@ -259,6 +268,35 @@ export function ToolsPage() {
         title: 'Snippets',
       }
     }
+    if (activeTool === 'utilities') {
+      const rows: Array<{ cells: ReactNode[]; id: string }> = []
+      if (generateX25519Keypair.data) {
+        rows.push({
+          cells: [
+            'X25519 keypair',
+            generateX25519Keypair.data.encoding,
+            generateX25519Keypair.data.public_key,
+          ],
+          id: 'x25519-keypair',
+        })
+      }
+      if (generateNodeKey.data) {
+        rows.push({
+          cells: [
+            'Node token',
+            generateNodeKey.data.hash_algorithm,
+            `${generateNodeKey.data.token_prefix}...`,
+          ],
+          id: 'node-key',
+        })
+      }
+      return {
+        columns: ['Utility', 'Algorithm / encoding', 'Public value'],
+        empty: 'No generated keys in this browser session.',
+        rows,
+        title: 'Key utilities',
+      }
+    }
     return {
       columns: ['Subscription', 'User', 'Node', 'Route', 'Delivery profile'],
       empty: 'No HApp routes recorded.',
@@ -282,6 +320,7 @@ export function ToolsPage() {
     happQuery.data,
     hwidQuery.data,
     generateX25519Keypair,
+    generateNodeKey.data,
     revokeToolSession,
     sessionsQuery.data,
     snippetsQuery.data,
@@ -329,7 +368,7 @@ export function ToolsPage() {
                   Truncate
                 </button>
               ) : null}
-              {activeTool === 'happ' ? (
+              {activeTool === 'utilities' ? (
                 <button
                   type="button"
                   className="button button--secondary"
@@ -337,6 +376,16 @@ export function ToolsPage() {
                   onClick={() => void generateX25519Keypair.mutateAsync()}
                 >
                   Generate X25519
+                </button>
+              ) : null}
+              {activeTool === 'utilities' ? (
+                <button
+                  type="button"
+                  className="button button--secondary"
+                  disabled={generateNodeKey.isPending}
+                  onClick={() => void generateNodeKey.mutateAsync()}
+                >
+                  Generate node key
                 </button>
               ) : null}
               {activeTool === 'snippets' ? (
@@ -376,7 +425,7 @@ export function ToolsPage() {
             ) : (
               <EmptyState title="No data" description={activeTable.empty} />
             )}
-            {activeTool === 'happ' && generateX25519Keypair.data ? (
+            {activeTool === 'utilities' && generateX25519Keypair.data ? (
               <div className="details-card">
                 <h3>X25519 keypair</h3>
                 <dl className="detail-list">
@@ -391,6 +440,25 @@ export function ToolsPage() {
                   <div>
                     <dt>Encoding</dt>
                     <dd>{generateX25519Keypair.data.encoding}</dd>
+                  </div>
+                </dl>
+              </div>
+            ) : null}
+            {activeTool === 'utilities' && generateNodeKey.data ? (
+              <div className="details-card">
+                <h3>Node key</h3>
+                <dl className="detail-list">
+                  <div>
+                    <dt>Token</dt>
+                    <dd>{generateNodeKey.data.token}</dd>
+                  </div>
+                  <div>
+                    <dt>Prefix</dt>
+                    <dd>{generateNodeKey.data.token_prefix}</dd>
+                  </div>
+                  <div>
+                    <dt>Stored</dt>
+                    <dd>{generateNodeKey.data.stored ? 'yes' : 'no'}</dd>
                   </div>
                 </dl>
               </div>

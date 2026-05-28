@@ -1087,6 +1087,27 @@ async def test_tools_reports_are_real_database_views(foundation_app: FoundationR
         ).scalar_one()
         assert keygen_audit.metadata_json["private_key_stored"] == "false"
 
+    node_key_response = await foundation_app.client.post("/api/v1/tools/node-key")
+    assert node_key_response.status_code == 200
+    node_key = node_key_response.json()
+    assert node_key["token"].startswith("lumen_node_")
+    assert node_key["token_prefix"] == node_key["token"][:18]
+    assert node_key["hash_algorithm"] == "hmac-sha256"
+    assert node_key["stored"] is False
+    assert hash_node_token(node_key["token"], foundation_app.settings)
+    async with foundation_app.sessionmaker() as session:
+        node_key_audit = (
+            await session.execute(
+                select(AuditEvent).where(AuditEvent.action == "tool.node_key.generated")
+            )
+        ).scalar_one()
+        assert node_key_audit.metadata_json == {
+            "token_prefix": node_key["token_prefix"],
+            "hash_algorithm": "hmac-sha256",
+            "stored": "false",
+        }
+        assert node_key["token"] not in str(node_key_audit.metadata_json)
+
     empty_snippets_response = await foundation_app.client.get("/api/v1/tools/snippets")
     assert empty_snippets_response.status_code == 200
     assert empty_snippets_response.json()["items"] == []

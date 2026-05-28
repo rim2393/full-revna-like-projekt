@@ -619,6 +619,14 @@ export function useGenerateX25519Keypair() {
   })
 }
 
+export function useGenerateNodeKey() {
+  const apiClient = useApiClient()
+
+  return useMutation({
+    mutationFn: apiClient.generateNodeKey,
+  })
+}
+
 export function useHappRoutingData() {
   const apiClient = useApiClient()
 

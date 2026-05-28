@@ -729,6 +729,13 @@ export type X25519KeypairResponse = {
   public_key: string
 }
 
+export type NodeKeyResponse = {
+  hash_algorithm: string
+  stored: boolean
+  token: string
+  token_prefix: string
+}
+
 export type ToolSnippetRecord = {
   content: string
   description: string | null
@@ -902,6 +909,7 @@ export type LumenApiClient = {
   inspectHappRouting: () => Promise<HappRoutingResponse>
   truncateTorrentReports: () => Promise<TorrentReportResponse>
   generateX25519Keypair: () => Promise<X25519KeypairResponse>
+  generateNodeKey: () => Promise<NodeKeyResponse>
   listToolSnippets: () => Promise<ToolSnippetListResponse>
   createToolSnippet: (request: ToolSnippetCreateRequest) => Promise<ToolSnippetRecord>
   updateToolSnippet: (

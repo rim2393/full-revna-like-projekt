@@ -176,6 +176,7 @@ export function createHttpLumenApiClient({
     truncateTorrentReports: () =>
       request('/api/v1/tools/torrent-blocker-reports', { method: 'DELETE' }),
     generateX25519Keypair: () => request('/api/v1/tools/x25519-keypair', { method: 'POST' }),
+    generateNodeKey: () => request('/api/v1/tools/node-key', { method: 'POST' }),
     listToolSnippets: () => request('/api/v1/tools/snippets'),
     createToolSnippet: (payload: ToolSnippetCreateRequest) =>
       request('/api/v1/tools/snippets', { body: payload, method: 'POST' }),
