@@ -7,6 +7,8 @@ import {
   Download,
   Edit3,
   FileJson,
+  GripVertical,
+  Layers3,
   Plus,
   RefreshCw,
   Search,
@@ -17,6 +19,7 @@ import {
 import {
   useCreateProfile,
   useDeleteProfile,
+  useGlobalProfileInbounds,
   useHostsPageData,
   useNodesPageData,
   useProfileComputedConfig,
@@ -26,7 +29,7 @@ import {
   useSquadsPageData,
   useUpdateProfile,
 } from '../shared/api/resourceHooks'
-import type { HostRecord, PortReservation, ProtocolProfileRecord } from '../shared/api/types'
+import type { HostRecord, PortReservation, ProfileInboundRecord, ProtocolProfileRecord } from '../shared/api/types'
 import { useApiClient } from '../shared/api/apiClientContext'
 import { EmptyState, ErrorState, LoadingState } from '../shared/components/DataState'
 import { DataTable } from '../shared/components/DataTable'
@@ -46,6 +49,7 @@ type ProfileFormState = {
   name: string
   nodeId: string
   port: string
+  portProtocol: 'tcp' | 'udp'
   security: string
   squadId: string
   status: string
@@ -70,6 +74,7 @@ const defaultForm: ProfileFormState = {
   name: '',
   nodeId: '',
   port: '443',
+  portProtocol: 'tcp',
   security: 'reality',
   squadId: '',
   status: 'active',
@@ -85,6 +90,7 @@ export function ProfilesPage() {
   const nodesQuery = useNodesPageData()
   const squadsQuery = useSquadsPageData()
   const hostsQuery = useHostsPageData()
+  const globalInboundsQuery = useGlobalProfileInbounds()
   const createProfile = useCreateProfile()
   const updateProfile = useUpdateProfile()
   const deleteProfile = useDeleteProfile()
@@ -157,9 +163,15 @@ export function ProfilesPage() {
     adaptersQuery.isLoading ||
     nodesQuery.isLoading ||
     squadsQuery.isLoading ||
-    hostsQuery.isLoading
+    hostsQuery.isLoading ||
+    globalInboundsQuery.isLoading
   const error =
-    profilesQuery.error ?? adaptersQuery.error ?? nodesQuery.error ?? squadsQuery.error ?? hostsQuery.error
+    profilesQuery.error ??
+    adaptersQuery.error ??
+    nodesQuery.error ??
+    squadsQuery.error ??
+    hostsQuery.error ??
+    globalInboundsQuery.error
   const profileStats = {
     active: profiles.filter((profile) => profile.status === 'active').length,
     disabled: profiles.filter((profile) => profile.status !== 'active').length,
@@ -265,6 +277,7 @@ export function ProfilesPage() {
               onClick={() => {
                 void profilesQuery.refetch()
                 void hostsQuery.refetch()
+                void globalInboundsQuery.refetch()
                 void inboundsQuery.refetch()
                 void computedQuery.refetch()
               }}
@@ -333,7 +346,30 @@ export function ProfilesPage() {
                   description={t('Create the first profile after registering a node.')}
                 />
               ) : (
-                <div className="profile-card-grid">
+                <>
+                  <ProfileInventoryTable
+                    hostsByProfile={profileHosts}
+                    nodeNameFor={(profile) =>
+                      nodes.find((node) => node.id === profile.node_id)?.name ?? profile.node_id
+                    }
+                    onDelete={handleDelete}
+                    onEdit={startEdit}
+                    onExport={(profile) => downloadJson(`${profile.name}-profile.json`, profileExport(profile))}
+                    onSelect={setSelectedProfileId}
+                    onToggle={(item) =>
+                      void updateProfile.mutateAsync({
+                        id: item.id,
+                        request: { status: item.status === 'active' ? 'disabled' : 'active' },
+                      })
+                    }
+                    profiles={filteredProfiles}
+                    selectedProfileId={selectedProfile?.id}
+                    squadNameFor={(profile) =>
+                      squads.find((squad) => squad.id === profile.squad_id)?.name ?? t('None')
+                    }
+                    t={t}
+                  />
+                  <div className="profile-card-grid">
                   {filteredProfiles.map((profile) => (
                     <ProfileCard
                       key={profile.id}
@@ -354,7 +390,8 @@ export function ProfilesPage() {
                       t={t}
                     />
                   ))}
-                </div>
+                  </div>
+                </>
               )}
               {profiles.length > 0 && filteredProfiles.length === 0 ? (
                 <EmptyState title={t('No matches')} description={t('No profiles match the current search.')} />
@@ -378,6 +415,11 @@ export function ProfilesPage() {
               }
               profile={selectedProfile}
               squadName={selectedSquad?.name ?? null}
+              t={t}
+            />
+
+            <GlobalInboundRegistry
+              inbounds={globalInboundsQuery.data?.items ?? []}
               t={t}
             />
 
@@ -407,6 +449,91 @@ export function ProfilesPage() {
         </>
       ) : null}
     </section>
+  )
+}
+
+function ProfileInventoryTable({
+  hostsByProfile,
+  nodeNameFor,
+  onDelete,
+  onEdit,
+  onExport,
+  onSelect,
+  onToggle,
+  profiles,
+  selectedProfileId,
+  squadNameFor,
+  t,
+}: {
+  hostsByProfile: Map<string, HostRecord[]>
+  nodeNameFor: (profile: ProtocolProfileRecord) => string
+  onDelete: (profile: ProtocolProfileRecord) => void
+  onEdit: (profile: ProtocolProfileRecord) => void
+  onExport: (profile: ProtocolProfileRecord) => void
+  onSelect: (profileId: string) => void
+  onToggle: (profile: ProtocolProfileRecord) => void
+  profiles: ProtocolProfileRecord[]
+  selectedProfileId: string | undefined
+  squadNameFor: (profile: ProtocolProfileRecord) => string
+  t: (value: string, params?: Record<string, string | number>) => string
+}) {
+  return (
+    <DataTable
+      caption={t('Profile inventory')}
+      columns={[
+        t('Name'),
+        t('Adapter'),
+        t('Node'),
+        t('Squad'),
+        t('Ports'),
+        t('Hosts'),
+        t('Config'),
+        t('Status'),
+        t('Actions'),
+      ]}
+      rows={profiles.map((profile) => ({
+        id: profile.id,
+        cells: [
+          <button
+            key="name"
+            type="button"
+            className="table-link-button"
+            aria-current={profile.id === selectedProfileId ? 'true' : undefined}
+            onClick={() => onSelect(profile.id)}
+          >
+            {profile.name}
+          </button>,
+          profile.adapter,
+          nodeNameFor(profile),
+          squadNameFor(profile),
+          portsLabel(profile, t),
+          t('profile.hosts.count', { count: hostsByProfile.get(profile.id)?.length ?? 0 }),
+          <code key="config">{configSummary(profile)}</code>,
+          <StatusBadge key="status" tone={toneForStatus(profile.status)}>
+            {t(profile.status)}
+          </StatusBadge>,
+          <div key="actions" className="inline-actions inline-actions--compact">
+            <button type="button" className="icon-button" aria-label={t('Edit {name}', { name: profile.name })} onClick={() => onEdit(profile)}>
+              <Edit3 size={16} aria-hidden="true" />
+            </button>
+            <button type="button" className="icon-button" aria-label={t('Export {name}', { name: profile.name })} onClick={() => onExport(profile)}>
+              <FileJson size={16} aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              className="icon-button"
+              aria-label={profile.status === 'active' ? t('Disable {name}', { name: profile.name }) : t('Enable {name}', { name: profile.name })}
+              onClick={() => onToggle(profile)}
+            >
+              {profile.status === 'active' ? <Ban size={16} aria-hidden="true" /> : <CheckCircle2 size={16} aria-hidden="true" />}
+            </button>
+            <button type="button" className="icon-button" aria-label={t('Delete {name}', { name: profile.name })} onClick={() => onDelete(profile)}>
+              <Trash2 size={16} aria-hidden="true" />
+            </button>
+          </div>,
+        ],
+      }))}
+    />
   )
 }
 
@@ -450,7 +577,8 @@ function ProfileCard({
           <small>{nodeName}</small>
         </span>
         <span className="profile-card__drag" aria-hidden="true">
-          ⋮⋮
+          <GripVertical size={18} />
+          <GripVertical size={18} />
         </span>
       </button>
       <div className="profile-card__badges">
@@ -648,6 +776,55 @@ function ProfileDetailPanel({
   )
 }
 
+function GlobalInboundRegistry({
+  inbounds,
+  t,
+}: {
+  inbounds: ProfileInboundRecord[]
+  t: (value: string, params?: Record<string, string | number>) => string
+}) {
+  return (
+    <article className="panel panel--wide">
+      <div className="panel__header">
+        <div>
+          <p className="eyebrow">
+            <Layers3 size={14} aria-hidden="true" /> {t('Global registry')}
+          </p>
+          <h2>{t('Inbound registry')}</h2>
+        </div>
+        <StatusBadge tone={inbounds.length > 0 ? 'good' : 'neutral'}>
+          {t('inbounds.count', { count: inbounds.length })}
+        </StatusBadge>
+      </div>
+      {inbounds.length === 0 ? (
+        <EmptyState
+          title={t('No generated inbounds')}
+          description={t('Create a profile with a real node and reserved port to generate inbounds.')}
+        />
+      ) : (
+        <DataTable
+          caption={t('Global profile inbounds')}
+          columns={[t('Tag'), t('Profile'), t('Node'), t('Listen'), t('Port'), t('Protocol'), t('Transport'), t('Security'), t('Hosts')]}
+          rows={inbounds.map((inbound) => ({
+            id: `${inbound.profile_id}-${inbound.tag}`,
+            cells: [
+              inbound.tag,
+              inbound.profile_name,
+              inbound.node_name,
+              inbound.listen,
+              String(inbound.port),
+              inbound.protocol,
+              inbound.transport,
+              inbound.security,
+              String(inbound.hosts.length),
+            ],
+          }))}
+        />
+      )}
+    </article>
+  )
+}
+
 function ProfileEditor({
   adapters,
   editing,
@@ -704,8 +881,12 @@ function ProfileEditor({
             onChange={(event) => patch({ adapter: event.target.value })}
           >
             {adapters.map((adapter) => (
-              <option key={adapter.protocol} value={adapter.protocol}>
-                {adapter.display_name}
+              <option
+                key={adapter.protocol}
+                value={adapter.protocol}
+                disabled={adapter.status !== 'active' && form.status === 'active'}
+              >
+                {adapter.display_name} {adapter.status === 'active' ? '' : `(${t('Unavailable')})`}
               </option>
             ))}
           </select>
@@ -741,6 +922,20 @@ function ProfileEditor({
             ))}
           </select>
         </label>
+        <label htmlFor="profile-status">
+          {t('Status')}
+          <select
+            id="profile-status"
+            value={form.status}
+            onChange={(event) => patch({ status: event.target.value })}
+          >
+            {['active', 'disabled'].map((status) => (
+              <option key={status} value={status}>
+                {t(status)}
+              </option>
+            ))}
+          </select>
+        </label>
         <label htmlFor="profile-port">
           {t('Port')}
           <input
@@ -750,6 +945,17 @@ function ProfileEditor({
             value={form.port}
             onChange={(event) => patch({ port: event.target.value })}
           />
+        </label>
+        <label htmlFor="profile-port-protocol">
+          {t('Port protocol')}
+          <select
+            id="profile-port-protocol"
+            value={form.portProtocol}
+            onChange={(event) => patch({ portProtocol: event.target.value as 'tcp' | 'udp' })}
+          >
+            <option value="tcp">tcp</option>
+            <option value="udp">udp</option>
+          </select>
         </label>
         <label htmlFor="profile-transport">
           {t('Transport')}
@@ -854,6 +1060,7 @@ function profileToForm(profile: ProtocolProfileRecord): ProfileFormState {
     name: profile.name,
     nodeId: profile.node_id,
     port: String(reservation.port ?? ''),
+    portProtocol: reservation.protocol === 'udp' ? 'udp' : 'tcp',
     security: String(profile.config_json.security ?? 'reality'),
     squadId: profile.squad_id ?? '',
     status: profile.status,
@@ -893,7 +1100,7 @@ function formToRequest(form: ProfileFormState, t: (value: string) => string) {
     credentials_ref: form.credentialsRef.trim() || null,
     name: form.name.trim(),
     node_id: form.nodeId,
-    port_reservations: [{ address: '0.0.0.0', exclusive: true, port, protocol: 'tcp' as const }],
+    port_reservations: [{ address: '0.0.0.0', exclusive: true, port, protocol: form.portProtocol }],
     squad_id: form.squadId || null,
     status: form.status,
   }
@@ -938,6 +1145,13 @@ function profileExport(profile: ProtocolProfileRecord) {
     squad_id: profile.squad_id,
     status: profile.status,
   }
+}
+
+function configSummary(profile: ProtocolProfileRecord): string {
+  const transport = String(profile.config_json.transport ?? profile.config_json.network ?? 'transport?')
+  const security = String(profile.config_json.security ?? 'security?')
+  const smoke = profile.config_json.smoke === true ? ', smoke=true' : ''
+  return `transport=${transport}, security=${security}${smoke}`
 }
 
 function portsLabel(profile: ProtocolProfileRecord, t: (value: string) => string): string {

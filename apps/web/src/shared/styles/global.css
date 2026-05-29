@@ -159,6 +159,29 @@ h2 {
   min-width: 180px;
 }
 
+.inline-actions--compact {
+  min-width: 0;
+  flex-wrap: nowrap;
+}
+
+.table-link-button {
+  max-width: 220px;
+  padding: 0;
+  overflow-wrap: anywhere;
+  color: var(--color-ink-strong);
+  font: inherit;
+  font-weight: 800;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.table-link-button:hover,
+.table-link-button[aria-current='true'] {
+  color: var(--color-accent);
+}
+
 .toolbar-search {
   display: inline-flex;
   align-items: center;

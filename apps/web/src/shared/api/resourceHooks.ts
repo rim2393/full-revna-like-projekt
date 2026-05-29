@@ -39,6 +39,7 @@ export const resourceQueryKeys = {
   nodeCommands: (nodeId: string) => ['resource', 'nodes', nodeId, 'commands'] as const,
   nodeMetrics: (nodeId: string) => ['resource', 'nodes', nodeId, 'metrics'] as const,
   profiles: ['resource', 'profiles'] as const,
+  profileGlobalInbounds: ['resource', 'profiles', 'inbounds'] as const,
   profileComputedConfig: (profileId: string) =>
     ['resource', 'profiles', profileId, 'computed-config'] as const,
   profileInbounds: (profileId: string) => ['resource', 'profiles', profileId, 'inbounds'] as const,
@@ -224,6 +225,15 @@ export function useProfileInbounds(profileId: string | undefined) {
   })
 }
 
+export function useGlobalProfileInbounds() {
+  const apiClient = useApiClient()
+
+  return useQuery({
+    queryFn: apiClient.listGlobalProfileInbounds,
+    queryKey: resourceQueryKeys.profileGlobalInbounds,
+  })
+}
+
 export function useCreateProfile() {
   const apiClient = useApiClient()
   const queryClient = useQueryClient()
@@ -232,6 +242,7 @@ export function useCreateProfile() {
     mutationFn: (request: ProtocolProfileCreateRequest) => apiClient.createProfile(request),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.profiles })
+      void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.profileGlobalInbounds })
     },
   })
 }
@@ -249,6 +260,7 @@ export function useUpdateProfile() {
         queryKey: resourceQueryKeys.profileComputedConfig(variables.id),
       })
       void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.profileInbounds(variables.id) })
+      void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.profileGlobalInbounds })
     },
   })
 }
@@ -261,6 +273,7 @@ export function useDeleteProfile() {
     mutationFn: (id: string) => apiClient.deleteProfile(id),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.profiles })
+      void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.profileGlobalInbounds })
     },
   })
 }

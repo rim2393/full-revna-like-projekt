@@ -559,6 +559,15 @@ export function createDevelopmentLumenApiClient(): LumenApiClient {
       const node = nodeList.find((item) => item.id === profile.node_id) ?? nodeList[0]
       return { items: buildDevelopmentProfileInbounds(profile, node) }
     },
+    listGlobalProfileInbounds: async () => {
+      const nodeList = asNodeListResponse().items
+      return {
+        items: profiles.flatMap((profile) => {
+          const node = nodeList.find((item) => item.id === profile.node_id) ?? nodeList[0]
+          return buildDevelopmentProfileInbounds(profile, node)
+        }),
+      }
+    },
     getUserDetail: async (userId: string) => {
       const user = users.find((item) => item.id === userId)
       if (!user) {

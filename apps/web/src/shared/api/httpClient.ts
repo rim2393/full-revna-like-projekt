@@ -157,6 +157,7 @@ export function createHttpLumenApiClient({
     getProfileComputedConfig: (profileId: string) =>
       request(`/api/v1/profiles/${profileId}/computed-config`),
     listProfileInbounds: (profileId: string) => request(`/api/v1/profiles/${profileId}/inbounds`),
+    listGlobalProfileInbounds: () => request('/api/v1/profiles/inbounds'),
     getSquadDetail: (squadId: string) => request(`/api/v1/squads/${squadId}/detail`),
     listApiKeys: () => request('/api/admin/api-keys'),
     listHosts: () => request('/api/v1/hosts'),

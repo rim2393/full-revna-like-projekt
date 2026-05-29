@@ -912,6 +912,7 @@ export type LumenApiClient = {
   getProfile: (profileId: string) => Promise<ProtocolProfileRecord>
   getProfileComputedConfig: (profileId: string) => Promise<ProfileComputedConfigResponse>
   listProfileInbounds: (profileId: string) => Promise<ProfileInboundListResponse>
+  listGlobalProfileInbounds: () => Promise<ProfileInboundListResponse>
   listApiKeys: () => Promise<ResourceListResponse<ApiKeyRecord>>
   listHosts: () => Promise<HostListResponse>
   listNodes: () => Promise<NodeListResponse>

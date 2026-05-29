@@ -23,7 +23,8 @@ describe('Control plane resource screens', () => {
 
     const profiles = renderWithRouter('/profiles', { apiClient, initialSession: developmentSession })
     expect(await screen.findByRole('heading', { name: /^profiles$/i })).toBeInTheDocument()
-    expect(await screen.findByRole('table', { name: /profile inbounds/i })).toBeInTheDocument()
+    expect(await screen.findByRole('table', { name: /^profile inbounds$/i })).toBeInTheDocument()
+    expect(await screen.findByRole('table', { name: /^global profile inbounds$/i })).toBeInTheDocument()
     expect(screen.getAllByText('StealConfig').length).toBeGreaterThan(0)
     profiles.unmount()
 
