@@ -161,7 +161,6 @@ export function SubscriptionPublicPage() {
             Support link
             <input
               id="subscription-support-url"
-              placeholder="https://t.me/support"
               type="url"
               value={form.supportUrl}
               onChange={(event) =>
@@ -173,7 +172,6 @@ export function SubscriptionPublicPage() {
             Public profile page URL
             <input
               id="subscription-profile-url"
-              placeholder="https://sub.example.com"
               type="url"
               value={form.profilePageUrl}
               onChange={(event) =>

@@ -24,4 +24,13 @@ describe('production reality import boundaries', () => {
 
     expect(offenders).toEqual([])
   })
+
+  it('keeps sample public URLs out of production modules', () => {
+    const offenders = Object.entries(sourceFiles)
+      .filter(([path]) => !/(\.test\.(ts|tsx)|shared\/data\/developmentFixtures\.ts|^\.\.\/data\/developmentFixtures\.ts)$/.test(path))
+      .filter(([, source]) => /https:\/\/t\.me\/support|https:\/\/sub\.example\.com/.test(source))
+      .map(([path]) => path)
+
+    expect(offenders).toEqual([])
+  })
 })
