@@ -42,4 +42,19 @@ describe('production reality import boundaries', () => {
 
     expect(offenders).toEqual([])
   })
+
+  it('keeps pseudo-backend placeholder status labels out of production modules', () => {
+    const forbidden = [
+      'Backend render status not exposed',
+      'Backend does not expose device registry',
+      'Backend does not expose subscription request history',
+      'Backend unavailable',
+    ]
+    const offenders = Object.entries(sourceFiles)
+      .filter(([path]) => !/shared\/data\/productionReality\.test\.ts$/.test(path))
+      .filter(([, source]) => forbidden.some((label) => source.includes(label)))
+      .map(([path]) => path)
+
+    expect(offenders).toEqual([])
+  })
 })

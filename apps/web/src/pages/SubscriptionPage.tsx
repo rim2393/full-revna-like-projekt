@@ -385,7 +385,7 @@ function SubscriptionGuide({ subscription }: { subscription: SubscriptionRecord 
         </div>
         {baseUrl && renderability ? (
           <div className="client-link-grid">
-            <StatusBadge tone="watch">{t('Backend render status not exposed')}</StatusBadge>
+            <StatusBadge tone="good">{t('Renderable')}</StatusBadge>
             {buildRenderableLinks(baseUrl, renderability.formats).map(([label, href]) => (
               <a key={href} className="client-link" href={href} target="_blank" rel="noreferrer">
                 <span>{t(label)}</span>
