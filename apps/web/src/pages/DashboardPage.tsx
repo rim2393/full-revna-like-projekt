@@ -85,7 +85,6 @@ export function DashboardPage() {
   const metrics = buildDashboardMetrics({ license, nodes, subscriptions, t, users })
   const activityRows = buildActivityRows({ apiKeys, language, license, nodes, subscriptions, t, users })
   const riskRows = buildRiskRows({ apiKeys, license, nodes, subscriptions, t, users })
-  const sourceKey = usersQuery.data?.source === 'development' ? 'Development API' : 'Live API'
 
   return (
     <section className="page">
@@ -119,7 +118,7 @@ export function DashboardPage() {
                   <p className="eyebrow">{t('Recent operations')}</p>
                   <h2>{t('Live activity')}</h2>
                 </div>
-                <StatusBadge tone={sourceKey === 'Live API' ? 'good' : 'watch'}>{t(sourceKey)}</StatusBadge>
+                <StatusBadge tone="good">{t('Live API')}</StatusBadge>
               </div>
               {activityRows.length > 0 ? (
                 <ul className="activity-list">

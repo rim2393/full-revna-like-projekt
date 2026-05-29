@@ -33,4 +33,13 @@ describe('production reality import boundaries', () => {
 
     expect(offenders).toEqual([])
   })
+
+  it('keeps development API status labels out of production modules', () => {
+    const offenders = Object.entries(sourceFiles)
+      .filter(([path]) => !/(\.test\.(ts|tsx)|shared\/api\/developmentClient\.ts|^\.\.\/api\/developmentClient\.ts|shared\/data\/productionReality\.test\.ts)$/.test(path))
+      .filter(([, source]) => source.includes('Development API'))
+      .map(([path]) => path)
+
+    expect(offenders).toEqual([])
+  })
 })

@@ -117,7 +117,6 @@ const ru: Record<string, string> = {
   'Nodes not active': 'Ноды не активны',
   'no expiry': 'без срока',
   'recorded by API': 'записано API',
-  'Development API': 'API разработки',
   'Users limited or in grace': 'Пользователи с лимитом или grace-периодом',
   'Revoked subscriptions': 'Отозванные подписки',
   'activity.active_users': '{count} активных',
