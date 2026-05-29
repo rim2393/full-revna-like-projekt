@@ -159,6 +159,32 @@ h2 {
   min-width: 180px;
 }
 
+.toolbar-search {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: min(320px, 100%);
+  min-height: 40px;
+  padding: 0 var(--space-3);
+  color: var(--color-muted);
+  background: rgb(255 255 255 / 5%);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+}
+
+.toolbar-search input {
+  width: 100%;
+  min-width: 120px;
+  padding: 0;
+  color: var(--color-ink);
+  background: transparent;
+  border: 0;
+}
+
+.toolbar-search input:focus-visible {
+  outline: 0;
+}
+
 .text-link {
   color: var(--color-accent);
   font-weight: 700;
@@ -927,17 +953,15 @@ h2 {
 
 .profile-card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(270px, 100%), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(330px, 100%), 1fr));
   gap: var(--space-3);
   margin-top: var(--space-5);
 }
 
 .profile-card {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: var(--space-3);
-  align-items: center;
-  min-height: 92px;
+  gap: var(--space-4);
+  min-height: 176px;
   padding: var(--space-4);
   color: var(--color-ink);
   text-align: left;
@@ -951,6 +975,19 @@ h2 {
 .profile-card--selected {
   background: rgb(83 224 173 / 9%);
   border-color: rgb(83 224 173 / 48%);
+}
+
+.profile-card__select {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: start;
+  width: 100%;
+  padding: 0;
+  color: inherit;
+  text-align: left;
+  background: transparent;
+  border: 0;
 }
 
 .profile-card__icon {
@@ -979,6 +1016,31 @@ h2 {
 
 .profile-card__body small {
   color: var(--color-muted);
+}
+
+.profile-card__drag {
+  color: var(--color-accent);
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 0;
+  opacity: 0.85;
+}
+
+.profile-card__badges,
+.profile-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.profile-card__actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) repeat(3, 40px);
+}
+
+.profile-card__actions .button {
+  min-width: 0;
 }
 
 .profile-facts {

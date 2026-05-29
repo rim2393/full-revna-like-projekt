@@ -336,6 +336,12 @@ const ru: Record<string, string> = {
   'Vault ref': 'Ссылка на секреты',
   'Xray computed config': 'Вычисленный Xray config',
   'Xray config wrapper': 'Обертка Xray config',
+  'Bound hosts': 'Привязанные хосты',
+  'Config Xray': 'Конфиг Xray',
+  'Export {name}': 'Экспортировать {name}',
+  'No profiles match the current search.': 'Профили не совпадают с текущим поиском.',
+  'Search profiles': 'Поиск профилей',
+  'profile.hosts.count': '{count} хостов',
   'no ports': 'без портов',
 }
 

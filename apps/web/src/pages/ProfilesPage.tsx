@@ -6,8 +6,10 @@ import {
   Copy,
   Download,
   Edit3,
+  FileJson,
   Plus,
   RefreshCw,
+  Search,
   Server,
   ShieldCheck,
   Trash2,
@@ -15,6 +17,7 @@ import {
 import {
   useCreateProfile,
   useDeleteProfile,
+  useHostsPageData,
   useNodesPageData,
   useProfileComputedConfig,
   useProfileInbounds,
@@ -23,7 +26,7 @@ import {
   useSquadsPageData,
   useUpdateProfile,
 } from '../shared/api/resourceHooks'
-import type { PortReservation, ProtocolProfileRecord } from '../shared/api/types'
+import type { HostRecord, PortReservation, ProtocolProfileRecord } from '../shared/api/types'
 import { useApiClient } from '../shared/api/apiClientContext'
 import { EmptyState, ErrorState, LoadingState } from '../shared/components/DataState'
 import { DataTable } from '../shared/components/DataTable'
@@ -81,6 +84,7 @@ export function ProfilesPage() {
   const adaptersQuery = useProtocolAdaptersData()
   const nodesQuery = useNodesPageData()
   const squadsQuery = useSquadsPageData()
+  const hostsQuery = useHostsPageData()
   const createProfile = useCreateProfile()
   const updateProfile = useUpdateProfile()
   const deleteProfile = useDeleteProfile()
@@ -88,8 +92,11 @@ export function ProfilesPage() {
   const adapters = adaptersQuery.data?.items ?? []
   const nodes = nodesQuery.data?.items ?? []
   const squads = squadsQuery.data?.items ?? []
+  const hosts = hostsQuery.data?.items ?? []
   const [selectedProfileId, setSelectedProfileId] = useState('')
   const [editingProfileId, setEditingProfileId] = useState<string | null>(null)
+  const [showEditor, setShowEditor] = useState(false)
+  const [search, setSearch] = useState('')
   const [form, setForm] = useState<ProfileFormState>(defaultForm)
   const [formError, setFormError] = useState<string | null>(null)
   const [portCheckMessage, setPortCheckMessage] = useState<string | null>(null)
@@ -97,6 +104,30 @@ export function ProfilesPage() {
     () => profiles.find((profile) => profile.id === selectedProfileId) ?? profiles[0],
     [profiles, selectedProfileId],
   )
+  const profileHosts = useMemo(() => groupHostsByProfile(hosts), [hosts])
+  const filteredProfiles = useMemo(() => {
+    const needle = search.trim().toLowerCase()
+    if (!needle) {
+      return profiles
+    }
+    return profiles.filter((profile) => {
+      const node = nodes.find((item) => item.id === profile.node_id)
+      const squad = squads.find((item) => item.id === profile.squad_id)
+      const haystack = [
+        profile.name,
+        profile.adapter,
+        profile.status,
+        node?.name,
+        squad?.name,
+        portsLabel(profile, t),
+        ...(profileHosts.get(profile.id) ?? []).map((host) => host.hostname),
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+      return haystack.includes(needle)
+    })
+  }, [nodes, profileHosts, profiles, search, squads, t])
   const computedQuery = useProfileComputedConfig(selectedProfile?.id)
   const inboundsQuery = useProfileInbounds(selectedProfile?.id)
 
@@ -122,16 +153,23 @@ export function ProfilesPage() {
   const selectedNode = nodes.find((node) => node.id === selectedProfile?.node_id)
   const selectedSquad = squads.find((squad) => squad.id === selectedProfile?.squad_id)
   const isLoading =
-    profilesQuery.isLoading || adaptersQuery.isLoading || nodesQuery.isLoading || squadsQuery.isLoading
-  const error = profilesQuery.error ?? adaptersQuery.error ?? nodesQuery.error ?? squadsQuery.error
+    profilesQuery.isLoading ||
+    adaptersQuery.isLoading ||
+    nodesQuery.isLoading ||
+    squadsQuery.isLoading ||
+    hostsQuery.isLoading
+  const error =
+    profilesQuery.error ?? adaptersQuery.error ?? nodesQuery.error ?? squadsQuery.error ?? hostsQuery.error
   const profileStats = {
     active: profiles.filter((profile) => profile.status === 'active').length,
     disabled: profiles.filter((profile) => profile.status !== 'active').length,
+    hosts: hosts.filter((host) => host.protocol_profile_id).length,
     ports: profiles.reduce((total, profile) => total + profile.port_reservations.length, 0),
   }
 
   function startEdit(profile: ProtocolProfileRecord) {
     setEditingProfileId(profile.id)
+    setShowEditor(true)
     setSelectedProfileId(profile.id)
     setForm(profileToForm(profile))
     setFormError(null)
@@ -140,6 +178,7 @@ export function ProfilesPage() {
 
   function resetCreate() {
     setEditingProfileId(null)
+    setShowEditor(true)
     setForm({
       ...defaultForm,
       adapter: adapters[0]?.protocol ?? defaultForm.adapter,
@@ -185,6 +224,7 @@ export function ProfilesPage() {
       }
       resetCreate()
       await profilesQuery.refetch()
+      setShowEditor(false)
     } catch (error) {
       setFormError(error instanceof Error ? error.message : t('Profile could not be saved.'))
     }
@@ -222,7 +262,12 @@ export function ProfilesPage() {
               type="button"
               className="button button--secondary"
               aria-label={t('Refresh profiles')}
-              onClick={() => void profilesQuery.refetch()}
+              onClick={() => {
+                void profilesQuery.refetch()
+                void hostsQuery.refetch()
+                void inboundsQuery.refetch()
+                void computedQuery.refetch()
+              }}
             >
               <RefreshCw size={18} aria-hidden="true" />
               {t('Refresh')}
@@ -253,19 +298,34 @@ export function ProfilesPage() {
               <strong>{profileStats.ports}</strong>
             </div>
             <div>
+              <span>{t('Bound hosts')}</span>
+              <strong>{profileStats.hosts}</strong>
+            </div>
+            <div>
               <span>{t('Disabled')}</span>
               <strong>{profileStats.disabled}</strong>
             </div>
           </section>
 
           <section className="profile-layout">
-            <article className="panel panel--wide">
+            <article className="panel panel--wide profile-inventory">
               <div className="panel__header">
                 <div>
                   <p className="eyebrow">{t('Client delivery')}</p>
                   <h2>{t('Profiles')}</h2>
                 </div>
-                <StatusBadge>{t('real API')}</StatusBadge>
+                <div className="inline-actions">
+                  <label className="toolbar-search" htmlFor="profile-search">
+                    <Search size={16} aria-hidden="true" />
+                    <input
+                      id="profile-search"
+                      value={search}
+                      placeholder={t('Search profiles')}
+                      onChange={(event) => setSearch(event.target.value)}
+                    />
+                  </label>
+                  <StatusBadge>{t('Live API')}</StatusBadge>
+                </div>
               </div>
               {profiles.length === 0 ? (
                 <EmptyState
@@ -274,31 +334,31 @@ export function ProfilesPage() {
                 />
               ) : (
                 <div className="profile-card-grid">
-                  {profiles.map((profile) => (
-                    <button
+                  {filteredProfiles.map((profile) => (
+                    <ProfileCard
                       key={profile.id}
-                      type="button"
-                      className={
-                        profile.id === selectedProfile?.id
-                          ? 'profile-card profile-card--selected'
-                          : 'profile-card'
+                      hosts={profileHosts.get(profile.id) ?? []}
+                      nodeName={nodes.find((node) => node.id === profile.node_id)?.name ?? profile.node_id}
+                      onDelete={handleDelete}
+                      onEdit={startEdit}
+                      onExport={() => downloadJson(`${profile.name}-profile.json`, profileExport(profile))}
+                      onSelect={setSelectedProfileId}
+                      onToggle={(item) =>
+                        void updateProfile.mutateAsync({
+                          id: item.id,
+                          request: { status: item.status === 'active' ? 'disabled' : 'active' },
+                        })
                       }
-                      onClick={() => setSelectedProfileId(profile.id)}
-                    >
-                      <span className="profile-card__icon">
-                        <ShieldCheck size={20} aria-hidden="true" />
-                      </span>
-                      <span className="profile-card__body">
-                        <strong>{profile.name}</strong>
-                        <small>
-                          {profile.adapter} · {portsLabel(profile, t)}
-                        </small>
-                      </span>
-                      <StatusBadge tone={toneForStatus(profile.status)}>{t(profile.status)}</StatusBadge>
-                    </button>
+                      profile={profile}
+                      selected={profile.id === selectedProfile?.id}
+                      t={t}
+                    />
                   ))}
                 </div>
               )}
+              {profiles.length > 0 && filteredProfiles.length === 0 ? (
+                <EmptyState title={t('No matches')} description={t('No profiles match the current search.')} />
+              ) : null}
             </article>
 
             <ProfileDetailPanel
@@ -321,25 +381,114 @@ export function ProfilesPage() {
               t={t}
             />
 
-            <ProfileEditor
-              adapters={adapters}
-              editing={Boolean(editingProfileId)}
-              error={formError}
-              form={form}
-              onCancel={resetCreate}
-              onChange={setForm}
-              onSubmit={handleSubmit}
-              pending={createProfile.isPending || updateProfile.isPending}
-              portCheckMessage={portCheckMessage}
-              selectedAdapterCapabilities={selectedAdapter?.capabilities ?? []}
-              nodes={nodes}
-              squads={squads}
-              t={t}
-            />
+            {showEditor ? (
+              <ProfileEditor
+                adapters={adapters}
+                editing={Boolean(editingProfileId)}
+                error={formError}
+                form={form}
+                onCancel={() => {
+                  setShowEditor(false)
+                  setEditingProfileId(null)
+                  setFormError(null)
+                  setPortCheckMessage(null)
+                }}
+                onChange={setForm}
+                onSubmit={handleSubmit}
+                pending={createProfile.isPending || updateProfile.isPending}
+                portCheckMessage={portCheckMessage}
+                selectedAdapterCapabilities={selectedAdapter?.capabilities ?? []}
+                nodes={nodes}
+                squads={squads}
+                t={t}
+              />
+            ) : null}
           </section>
         </>
       ) : null}
     </section>
+  )
+}
+
+function ProfileCard({
+  hosts,
+  nodeName,
+  onDelete,
+  onEdit,
+  onExport,
+  onSelect,
+  onToggle,
+  profile,
+  selected,
+  t,
+}: {
+  hosts: HostRecord[]
+  nodeName: string
+  onDelete: (profile: ProtocolProfileRecord) => void
+  onEdit: (profile: ProtocolProfileRecord) => void
+  onExport: () => void
+  onSelect: (profileId: string) => void
+  onToggle: (profile: ProtocolProfileRecord) => void
+  profile: ProtocolProfileRecord
+  selected: boolean
+  t: (value: string, params?: Record<string, string | number>) => string
+}) {
+  return (
+    <article className={selected ? 'profile-card profile-card--selected' : 'profile-card'}>
+      <button
+        type="button"
+        className="profile-card__select"
+        aria-label={t('Select {name}', { name: profile.name })}
+        onClick={() => onSelect(profile.id)}
+      >
+        <span className="profile-card__icon">
+          <ShieldCheck size={20} aria-hidden="true" />
+        </span>
+        <span className="profile-card__body">
+          <strong>{profile.name}</strong>
+          <small>{profile.adapter}</small>
+          <small>{nodeName}</small>
+        </span>
+        <span className="profile-card__drag" aria-hidden="true">
+          ⋮⋮
+        </span>
+      </button>
+      <div className="profile-card__badges">
+        <StatusBadge tone="info">{portsLabel(profile, t)}</StatusBadge>
+        <StatusBadge tone="good">{t('profile.hosts.count', { count: hosts.length })}</StatusBadge>
+        <StatusBadge tone={toneForStatus(profile.status)}>{t(profile.status)}</StatusBadge>
+      </div>
+      <div className="profile-card__actions">
+        <button type="button" className="button button--secondary" onClick={() => onEdit(profile)}>
+          <Edit3 size={16} aria-hidden="true" />
+          {t('Config Xray')}
+        </button>
+        <button
+          type="button"
+          className="icon-button"
+          aria-label={t('Export {name}', { name: profile.name })}
+          onClick={onExport}
+        >
+          <FileJson size={16} aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          className="icon-button"
+          aria-label={profile.status === 'active' ? t('Disable') : t('Enable')}
+          onClick={() => onToggle(profile)}
+        >
+          <Ban size={16} aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          className="icon-button"
+          aria-label={t('Delete {name}', { name: profile.name })}
+          onClick={() => onDelete(profile)}
+        >
+          <Trash2 size={16} aria-hidden="true" />
+        </button>
+      </div>
+    </article>
   )
 }
 
@@ -385,17 +534,7 @@ function ProfileDetailPanel({
     )
   }
 
-  const rawProfileExport = {
-    adapter: profile.adapter,
-    config_json: profile.config_json,
-    credentials_ref: profile.credentials_ref,
-    id: profile.id,
-    name: profile.name,
-    node_id: profile.node_id,
-    port_reservations: profile.port_reservations,
-    squad_id: profile.squad_id,
-    status: profile.status,
-  }
+  const rawProfileExport = profileExport(profile)
 
   return (
     <article className="panel">
@@ -771,6 +910,34 @@ function parseProfileConfigJson(value: string, t: (value: string) => string): Re
     throw new Error(t('Profile config JSON must be an object.'))
   }
   return { ...(parsed as Record<string, unknown>) }
+}
+
+function groupHostsByProfile(hosts: HostRecord[]) {
+  const groups = new Map<string, HostRecord[]>()
+  for (const host of hosts) {
+    if (!host.protocol_profile_id) {
+      continue
+    }
+    const items = groups.get(host.protocol_profile_id) ?? []
+    items.push(host)
+    groups.set(host.protocol_profile_id, items)
+  }
+  return groups
+}
+
+function profileExport(profile: ProtocolProfileRecord) {
+  return {
+    adapter: profile.adapter,
+    config_json: profile.config_json,
+    credentials_ref: profile.credentials_ref,
+    id: profile.id,
+    metadata_json: profile.metadata_json,
+    name: profile.name,
+    node_id: profile.node_id,
+    port_reservations: profile.port_reservations,
+    squad_id: profile.squad_id,
+    status: profile.status,
+  }
 }
 
 function portsLabel(profile: ProtocolProfileRecord, t: (value: string) => string): string {
