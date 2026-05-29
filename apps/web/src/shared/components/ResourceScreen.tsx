@@ -4,7 +4,7 @@ import { EmptyState, ErrorState, LoadingState } from './DataState'
 import { DataTable } from './DataTable'
 import { PageHeader } from './PageHeader'
 import { StatusBadge } from './StatusBadge'
-import type { SectionSpec } from '../data/lumenData'
+import type { SectionSpec } from '../data/resourceMeta'
 import { useI18n } from '../i18n/I18nProvider'
 
 type ResourceScreenProps<TItem> = {

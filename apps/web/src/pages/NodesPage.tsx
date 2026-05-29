@@ -16,8 +16,8 @@ import { EmptyState, ErrorState, LoadingState } from '../shared/components/DataS
 import { OperatorGuide } from '../shared/components/OperatorGuide'
 import { PageHeader } from '../shared/components/PageHeader'
 import { StatusBadge } from '../shared/components/StatusBadge'
-import type { MetricTone } from '../shared/data/lumenData'
-import { sectionSpecs } from '../shared/data/lumenData'
+import type { MetricTone } from '../shared/data/resourceMeta'
+import { sectionSpecs } from '../shared/data/resourceMeta'
 
 type ProvisioningFormState = {
   capabilities: string

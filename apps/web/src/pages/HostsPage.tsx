@@ -20,7 +20,7 @@ import {
 } from '../shared/components/ResourceScreen'
 import { OperatorGuide } from '../shared/components/OperatorGuide'
 import { StatusBadge } from '../shared/components/StatusBadge'
-import { sectionSpecs } from '../shared/data/lumenData'
+import { sectionSpecs } from '../shared/data/resourceMeta'
 import { toneForStatus } from '../shared/utils/resourceFormat'
 
 export function HostsPage() {

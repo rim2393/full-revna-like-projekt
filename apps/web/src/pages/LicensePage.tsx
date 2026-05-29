@@ -4,8 +4,8 @@ import type { LicenseStatus } from '../shared/api/types'
 import { EmptyState, ErrorState, LoadingState } from '../shared/components/DataState'
 import { PageHeader } from '../shared/components/PageHeader'
 import { StatusBadge } from '../shared/components/StatusBadge'
-import type { MetricTone } from '../shared/data/lumenData'
-import { sectionSpecs } from '../shared/data/lumenData'
+import type { MetricTone } from '../shared/data/resourceMeta'
+import { sectionSpecs } from '../shared/data/resourceMeta'
 
 const licenseTone: Record<LicenseStatus, MetricTone> = {
   expiring: 'watch',

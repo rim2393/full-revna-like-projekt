@@ -30,7 +30,7 @@ import { DataTable } from '../shared/components/DataTable'
 import { FormError, SubmitButton } from '../shared/components/ResourceScreen'
 import { PageHeader } from '../shared/components/PageHeader'
 import { StatusBadge } from '../shared/components/StatusBadge'
-import { sectionSpecs } from '../shared/data/lumenData'
+import { sectionSpecs } from '../shared/data/resourceMeta'
 import { useI18n } from '../shared/i18n/I18nProvider'
 import { toneForStatus } from '../shared/utils/resourceFormat'
 

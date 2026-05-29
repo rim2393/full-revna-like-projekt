@@ -7,8 +7,8 @@ import { EmptyState, ErrorState, LoadingState } from '../shared/components/DataS
 import { PageHeader } from '../shared/components/PageHeader'
 import { FormError, ScreenForm, SubmitButton } from '../shared/components/ResourceScreen'
 import { StatusBadge } from '../shared/components/StatusBadge'
-import type { MetricTone } from '../shared/data/lumenData'
-import { sectionSpecs } from '../shared/data/lumenData'
+import type { MetricTone } from '../shared/data/resourceMeta'
+import { sectionSpecs } from '../shared/data/resourceMeta'
 
 const statusTone: Record<ApiKeyStatus, MetricTone> = {
   active: 'good',

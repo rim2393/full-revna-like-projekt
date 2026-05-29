@@ -10,7 +10,7 @@ import {
   squadRecords,
   subscriptionRecords,
   userRecords,
-} from '../data/lumenData'
+} from '../data/developmentFixtures'
 import type {
   ApiKeyCreateRequest,
   ApiKeyCreateResponse,

@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createDevelopmentLumenApiClient } from '../shared/api/developmentClient'
 import type { LumenApiClient } from '../shared/api/types'
-import { developmentSession } from '../shared/data/lumenData'
+import { developmentSession } from '../shared/data/developmentFixtures'
 import { renderWithRouter } from '../test/renderWithRouter'
 
 describe('Lumen admin routing', () => {

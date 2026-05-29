@@ -13,7 +13,7 @@ import { ErrorState, LoadingState } from '../shared/components/DataState'
 import { MetricCard } from '../shared/components/MetricCard'
 import { PageHeader } from '../shared/components/PageHeader'
 import { StatusBadge } from '../shared/components/StatusBadge'
-import type { DashboardMetric } from '../shared/data/lumenData'
+import type { DashboardMetric } from '../shared/data/resourceMeta'
 import { useI18n } from '../shared/i18n/I18nProvider'
 
 type DashboardQueryResult<TData> = {

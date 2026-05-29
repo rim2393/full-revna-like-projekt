@@ -1,4 +1,4 @@
-import type { MetricTone } from '../data/lumenData'
+import type { MetricTone } from '../data/resourceMeta'
 
 export function formatDateTime(value: string | null | undefined) {
   if (!value) {

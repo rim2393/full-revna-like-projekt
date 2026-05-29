@@ -1,4 +1,4 @@
-import type { DashboardMetric } from '../data/lumenData'
+import type { DashboardMetric } from '../data/resourceMeta'
 import { useI18n } from '../i18n/I18nProvider'
 import { StatusBadge } from './StatusBadge'
 

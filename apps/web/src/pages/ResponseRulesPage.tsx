@@ -15,7 +15,7 @@ import {
   SubmitButton,
 } from '../shared/components/ResourceScreen'
 import { StatusBadge } from '../shared/components/StatusBadge'
-import { sectionSpecs } from '../shared/data/lumenData'
+import { sectionSpecs } from '../shared/data/resourceMeta'
 import { formatRecord } from '../shared/utils/resourceFormat'
 
 const rulesSpec = {

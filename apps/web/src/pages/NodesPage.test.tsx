@@ -8,7 +8,7 @@ import type {
   ProvisioningJobCreateRequest,
   ProvisioningJobResponse,
 } from '../shared/api/types'
-import { developmentSession } from '../shared/data/lumenData'
+import { developmentSession } from '../shared/data/developmentFixtures'
 import { renderWithRouter } from '../test/renderWithRouter'
 
 function createTestClient(overrides: Partial<LumenApiClient> = {}): LumenApiClient {

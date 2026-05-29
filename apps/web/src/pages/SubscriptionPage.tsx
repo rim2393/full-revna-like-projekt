@@ -19,7 +19,7 @@ import {
   SubmitButton,
 } from '../shared/components/ResourceScreen'
 import { StatusBadge } from '../shared/components/StatusBadge'
-import { sectionSpecs } from '../shared/data/lumenData'
+import { sectionSpecs } from '../shared/data/resourceMeta'
 import { useI18n } from '../shared/i18n/I18nProvider'
 import { formatDateTime, formatRecord, toneForStatus } from '../shared/utils/resourceFormat'
 
