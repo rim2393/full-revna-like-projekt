@@ -5,6 +5,7 @@ import {
   useUpdateAuthProvider,
   useUpdateSetting,
 } from '../shared/api/resourceHooks'
+import type { AuthProviderRecord } from '../shared/api/types'
 import {
   FormError,
   ResourceScreen,
@@ -133,25 +134,12 @@ export function SettingsPage() {
           ) : null}
           <div className="resource-list">
             {providers.map((provider) => (
-              <div className="resource-list__item" key={provider.provider}>
-                <span>
-                  {provider.display_name}
-                  <small>{provider.scopes.join(', ') || 'no scopes'}</small>
-                </span>
-                <span className="inline-actions">
-                  <StatusBadge tone={provider.enabled ? 'good' : 'neutral'}>
-                    {provider.enabled ? 'enabled' : 'disabled'}
-                  </StatusBadge>
-                  <button
-                    type="button"
-                    className="button button--secondary"
-                    disabled={updateProvider.isPending}
-                    onClick={() => void toggleProvider(provider.provider, !provider.enabled)}
-                  >
-                    {provider.enabled ? 'Disable' : 'Enable'}
-                  </button>
-                </span>
-              </div>
+              <AuthProviderRow
+                key={provider.provider}
+                provider={provider}
+                pending={updateProvider.isPending}
+                onToggle={toggleProvider}
+              />
             ))}
           </div>
         </article>
@@ -160,5 +148,46 @@ export function SettingsPage() {
       tableEyebrow="Instance settings"
       tableTitle="Settings registry"
     />
+  )
+}
+
+function AuthProviderRow({
+  onToggle,
+  pending,
+  provider,
+}: {
+  onToggle: (provider: string, enabled: boolean) => Promise<void>
+  pending: boolean
+  provider: AuthProviderRecord
+}) {
+  const canToggle = provider.status === 'active' || provider.status === 'disabled'
+  const actionLabel = provider.enabled ? 'Disable' : canToggle ? 'Enable' : 'Unavailable'
+
+  return (
+    <div className="resource-list__item">
+      <span>
+        {provider.display_name}
+        <small>{provider.provider}</small>
+        <small>{provider.scopes.join(', ') || 'no scopes'}</small>
+        {Object.keys(provider.metadata_json).length > 0 ? (
+          <small>{formatRecord(provider.metadata_json)}</small>
+        ) : null}
+      </span>
+      <span className="inline-actions">
+        <StatusBadge tone={provider.enabled ? 'good' : 'neutral'}>
+          {provider.enabled ? 'enabled' : 'disabled'}
+        </StatusBadge>
+        <StatusBadge tone={canToggle ? 'good' : 'watch'}>{provider.status}</StatusBadge>
+        <button
+          type="button"
+          className="button button--secondary"
+          disabled={pending || !canToggle}
+          title={canToggle ? undefined : 'Provider has no live login callback and cannot be enabled yet.'}
+          onClick={() => void onToggle(provider.provider, !provider.enabled)}
+        >
+          {actionLabel}
+        </button>
+      </span>
+    </div>
   )
 }

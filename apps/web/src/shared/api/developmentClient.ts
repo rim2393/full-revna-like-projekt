@@ -178,15 +178,15 @@ export function createDevelopmentLumenApiClient(): LumenApiClient {
       metadata_json: { webauthn: 'disabled_until_registered' },
       provider: 'passkey',
       scopes: ['admin:login'],
-      status: 'configured',
+      status: 'unimplemented',
     },
     {
       display_name: 'Telegram',
       enabled: false,
-      metadata_json: { bot_binding: 'api-key' },
+      metadata_json: { bot_binding: 'disabled_until_callback_implemented' },
       provider: 'telegram',
-      scopes: ['admin:login', 'bot:manage'],
-      status: 'disabled',
+      scopes: ['admin:login'],
+      status: 'unimplemented',
     },
     {
       display_name: 'GitHub',
@@ -194,7 +194,7 @@ export function createDevelopmentLumenApiClient(): LumenApiClient {
       metadata_json: {},
       provider: 'github',
       scopes: ['read:user', 'user:email'],
-      status: 'disabled',
+      status: 'unimplemented',
     },
     {
       display_name: 'Google',
@@ -202,7 +202,15 @@ export function createDevelopmentLumenApiClient(): LumenApiClient {
       metadata_json: {},
       provider: 'google',
       scopes: ['openid', 'email', 'profile'],
-      status: 'disabled',
+      status: 'unimplemented',
+    },
+    {
+      display_name: 'Pocket ID',
+      enabled: false,
+      metadata_json: {},
+      provider: 'pocketid',
+      scopes: ['openid', 'email', 'profile'],
+      status: 'unimplemented',
     },
     {
       display_name: 'Keycloak',
@@ -210,7 +218,7 @@ export function createDevelopmentLumenApiClient(): LumenApiClient {
       metadata_json: {},
       provider: 'keycloak',
       scopes: ['openid', 'email', 'profile'],
-      status: 'disabled',
+      status: 'unimplemented',
     },
     {
       display_name: 'Generic OAuth2',
@@ -218,7 +226,7 @@ export function createDevelopmentLumenApiClient(): LumenApiClient {
       metadata_json: {},
       provider: 'generic_oauth2',
       scopes: ['openid', 'email', 'profile'],
-      status: 'disabled',
+      status: 'unimplemented',
     },
   ]
   const users = [...userRecords]
@@ -1062,6 +1070,9 @@ export function createDevelopmentLumenApiClient(): LumenApiClient {
       const record = authProviders.find((item) => item.provider === provider)
       if (!record) {
         throw new Error('Auth provider not found')
+      }
+      if (request.enabled === true && record.status === 'unimplemented') {
+        throw new Error('Auth provider is catalog-only until its live login callback is implemented.')
       }
       Object.assign(record, request)
       return record

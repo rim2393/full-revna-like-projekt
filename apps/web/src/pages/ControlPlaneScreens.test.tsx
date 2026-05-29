@@ -588,4 +588,21 @@ describe('Control plane resource screens', () => {
     await user.click(screen.getByRole('button', { name: /save setting/i }))
     expect(await screen.findByRole('alert')).toHaveTextContent(/secret-like/i)
   })
+
+  it('does not offer enable actions for catalog-only auth providers', async () => {
+    const updateAuthProvider = vi.fn()
+    const apiClient: LumenApiClient = {
+      ...createDevelopmentLumenApiClient(),
+      updateAuthProvider,
+    }
+
+    renderWithRouter('/settings', { apiClient, initialSession: developmentSession })
+
+    expect(await screen.findByRole('heading', { name: /provider toggles/i })).toBeInTheDocument()
+    expect(screen.getByText('Passkey')).toBeInTheDocument()
+    const unavailableButtons = await screen.findAllByRole('button', { name: /unavailable/i })
+    expect(unavailableButtons.length).toBeGreaterThan(0)
+    expect(unavailableButtons[0]).toBeDisabled()
+    expect(updateAuthProvider).not.toHaveBeenCalled()
+  })
 })
