@@ -45,7 +45,7 @@ describe('Control plane resource screens', () => {
     expect(screen.getByRole('table', { name: /issued subscriptions/i })).toBeInTheDocument()
     expect(screen.getAllByText('sub_pub_default').length).toBeGreaterThan(0)
     expect(screen.getByText(/no devices are registered/i)).toBeInTheDocument()
-    expect(screen.getByText(/backend does not expose subscription request history/i)).toBeInTheDocument()
+    expect(screen.getByText(/no request history is recorded/i)).toBeInTheDocument()
     userDetail.unmount()
 
     renderWithRouter('/settings', { apiClient, initialSession: developmentSession })

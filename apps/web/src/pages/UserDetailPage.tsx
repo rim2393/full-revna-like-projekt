@@ -230,14 +230,12 @@ export function UserDetailPage() {
           <div className="panel__header">
             <div>
               <p className="eyebrow">{t('History')}</p>
-              <h2>{detail.request_history.length > 0 ? t('Backend request audit') : t('Request history')}</h2>
+              <h2>{t('Subscription request history')}</h2>
             </div>
-            <StatusBadge tone={detail.request_history.length > 0 ? 'info' : 'watch'}>
-              {detail.request_history.length > 0 ? String(detail.request_history.length) : t('Backend unavailable')}
-            </StatusBadge>
+            <StatusBadge tone="info">{String(detail.request_history.length)}</StatusBadge>
           </div>
           {detail.request_history.length === 0 ? (
-            <p className="empty-inline">{t('Backend does not expose subscription request history for this user.')}</p>
+            <p className="empty-inline">{t('No request history is recorded for this user yet.')}</p>
           ) : (
             <DataTable
               caption={t('Backend request audit')}

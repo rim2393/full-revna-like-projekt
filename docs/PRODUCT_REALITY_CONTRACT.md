@@ -62,3 +62,15 @@ Before committing or marking any item complete, verify:
   build and installer pipeline.
 
 If any check fails, the work is incomplete.
+
+## Release Gate
+
+A release is blocked if any production-facing route, page, script, API endpoint,
+node-agent command, protocol adapter, subscription renderer, metric, button, or
+installer/update path still depends on fake data, placeholders, demo state,
+mock-only code, optimistic hardcoded success, or unreachable backend behavior.
+
+Empty real state is allowed and must be shown honestly. For example, zero
+traffic, zero request-history events, one connected node, or one real user must
+be displayed as exactly that state, not as an error, demo value, or unavailable
+backend unless the backend explicitly reports a real failure.
