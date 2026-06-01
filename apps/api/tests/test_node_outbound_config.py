@@ -208,6 +208,32 @@ def test_shadowsocks_payload_uses_concrete_runtime_password():
     }
 
 
+def test_shadowsocks_2022_payload_uses_sing_box_runtime_password():
+    expected_runtime_key = "base64-2022-key"
+    payload = build_node_outbound_payload(
+        _profile("shadowsocks-2022", {"method": "2022-blake3-aes-128-gcm"}),
+        _inbounds(
+            8389,
+            protocol="shadowsocks",
+            config_json={"method": "2022-blake3-aes-128-gcm"},
+        ),
+        runtime_clients=[
+            {
+                "public_id": "lumen_sub_live",
+                "password": "unused-generic-password",
+                "shadowsocks_password": expected_runtime_key,
+            }
+        ],
+    )
+
+    assert "xrayConfig" not in payload
+    config = payload["singBoxShadowsocksConfig"]
+    assert config["listen_port"] == 8389
+    assert config["method"] == "2022-blake3-aes-128-gcm"
+    assert config["password"] == expected_runtime_key
+    assert "clientsRef" not in config
+
+
 def test_socks_payload_uses_concrete_runtime_accounts():
     payload = build_node_outbound_payload(
         _profile("socks5"),

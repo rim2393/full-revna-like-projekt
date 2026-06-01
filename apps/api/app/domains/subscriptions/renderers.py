@@ -82,6 +82,7 @@ class ClientCredential:
     uuid: str
     password: str
     shadowsocks_password: str
+    shadowsocks_2022_password: str
     hysteria_password: str
     hysteria_obfs_password: str
     wireguard_private_key: str
@@ -277,8 +278,9 @@ def render_share_uri(entry: dict[str, Any], *, settings: Settings) -> str | None
 
     if protocol_type == "shadowsocks":
         method = protocol.get("rendererHints", {}).get("method") or "2022-blake3-aes-128-gcm"
+        password = shadowsocks_password_for_method(credentials, str(method))
         userinfo = base64.urlsafe_b64encode(
-            f"{method}:{credentials.shadowsocks_password}".encode()
+            f"{method}:{password}".encode()
         ).decode("ascii").rstrip("=")
         return build_uri("ss", userinfo, protocol, {}, label)
 
@@ -464,12 +466,12 @@ def mihomo_proxy(entry: dict[str, Any], *, settings: Settings) -> dict[str, Any]
         return base
 
     if protocol_type == "shadowsocks":
+        method = protocol.get("rendererHints", {}).get("method") or "2022-blake3-aes-128-gcm"
         base.update(
             {
                 "type": "ss",
-                "cipher": protocol.get("rendererHints", {}).get("method")
-                or "2022-blake3-aes-128-gcm",
-                "password": credentials.shadowsocks_password,
+                "cipher": method,
+                "password": shadowsocks_password_for_method(credentials, str(method)),
                 "udp": True,
             }
         )
@@ -622,11 +624,11 @@ def sing_box_outbound(entry: dict[str, Any], *, settings: Settings) -> dict[str,
         )
         return compact_object(base)
     if protocol_type == "shadowsocks":
+        method = protocol.get("rendererHints", {}).get("method") or "2022-blake3-aes-128-gcm"
         base.update(
             {
-                "method": protocol.get("rendererHints", {}).get("method")
-                or "2022-blake3-aes-128-gcm",
-                "password": credentials.shadowsocks_password,
+                "method": method,
+                "password": shadowsocks_password_for_method(credentials, str(method)),
             }
         )
         return compact_object(base)
@@ -1014,11 +1016,20 @@ def derive_client_credentials(
         uuid=str(UUID(bytes=bytes(mutable))),
         password=password,
         shadowsocks_password=_secret_text(seed, f"{base}|ss", 32),
+        shadowsocks_2022_password=base64.b64encode(
+            hmac.new(seed, f"{base}|ss-2022-aes128".encode(), hashlib.sha256).digest()[:16]
+        ).decode("ascii"),
         hysteria_password=_secret_text(seed, f"{base}|hy2", 24),
         hysteria_obfs_password=_secret_text(seed, f"{base}|hy2-obfs", 24),
         wireguard_private_key=wireguard_private_key,
         wireguard_public_key=wireguard_public_key,
     )
+
+
+def shadowsocks_password_for_method(credentials: ClientCredential, method: str) -> str:
+    if method == "2022-blake3-aes-128-gcm":
+        return credentials.shadowsocks_2022_password
+    return credentials.shadowsocks_password
 
 
 def _derive_wireguard_keypair(seed: bytes, base: str) -> tuple[str, str]:

@@ -40,7 +40,10 @@ from app.domains.protocols.schemas import (
     SquadUserResponse,
 )
 from app.domains.subscriptions.models import Subscription
-from app.domains.subscriptions.renderers import derive_client_credentials
+from app.domains.subscriptions.renderers import (
+    derive_client_credentials,
+    shadowsocks_password_for_method,
+)
 from app.domains.users.models import User
 
 
@@ -1382,6 +1385,7 @@ def _compact_object(value: dict[str, object]) -> dict[str, object]:
 
 _NODE_CONFIG_KEY_BY_FAMILY = {
     "hysteria2": "hysteria2Config",
+    "sing-box-shadowsocks": "singBoxShadowsocksConfig",
     "tuic": "tuicConfig",
     "wireguard": "wireguardConfig",
     "xray": "xrayConfig",
@@ -1391,6 +1395,8 @@ _DEFAULT_NODE_TLS_KEY_PATH = "/var/lib/lumen-node/runtime/tls/live.key"
 
 
 def _adapter_family(adapter: str) -> str:
+    if adapter == "shadowsocks-2022":
+        return "sing-box-shadowsocks"
     protocol = _inbound_protocol(adapter)
     if protocol in {"hysteria2", "tuic", "wireguard"}:
         return protocol
@@ -1474,12 +1480,20 @@ async def list_profile_runtime_clients(
             protocol_id=delivery.get("protocol_id") or protocol_type,
             protocol_type=protocol_type,
         )
+        shadowsocks_method = str(
+            profile.config_json.get("method")
+            or delivery.get("method")
+            or "2022-blake3-aes-128-gcm"
+        )
         clients.append(
             {
                 "public_id": subscription.public_id,
                 "uuid": credentials.uuid,
                 "password": credentials.password,
-                "shadowsocks_password": credentials.shadowsocks_password,
+                "shadowsocks_password": shadowsocks_password_for_method(
+                    credentials,
+                    shadowsocks_method,
+                ),
                 "hysteria_password": credentials.hysteria_password,
                 "hysteria_obfs_password": credentials.hysteria_obfs_password,
                 "wireguard_private_key": credentials.wireguard_private_key,
@@ -1539,6 +1553,26 @@ def _computed_tuic_config(
     return config
 
 
+def _computed_sing_box_shadowsocks_config(
+    profile: ProtocolProfile,
+    port: int | None,
+    *,
+    runtime_clients: list[dict[str, object]] | None = None,
+) -> dict[str, object]:
+    config = _profile_config_dict(profile)
+    config.setdefault("listen", "::")
+    config.setdefault("listen_port", port or 8388)
+    config.setdefault("method", "2022-blake3-aes-128-gcm")
+    config.setdefault("network", "tcp")
+    clients = runtime_clients or []
+    if clients:
+        config["password"] = str(clients[0]["shadowsocks_password"])
+        config.pop("clientsRef", None)
+    else:
+        config["clientsRef"] = profile.credentials_ref
+    return config
+
+
 def _computed_wireguard_config(
     profile: ProtocolProfile,
     port: int | None,
@@ -1580,6 +1614,12 @@ def compute_node_outbound_config(
         )
     if family == "tuic":
         return _computed_tuic_config(
+            profile,
+            _first_inbound_port(inbounds),
+            runtime_clients=runtime_clients,
+        )
+    if family == "sing-box-shadowsocks":
+        return _computed_sing_box_shadowsocks_config(
             profile,
             _first_inbound_port(inbounds),
             runtime_clients=runtime_clients,

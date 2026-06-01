@@ -27,6 +27,11 @@ import { readSecretFromEnv } from "./secret-input.js";
 import { createTcpDiagnosticListenerPlan, startTcpDiagnosticListener, stopLiveListener } from "./live-listeners.js";
 import { applyXrayConfig, createXrayApplyPlan, ensureManagedXrayProcess } from "./xray-runtime.js";
 import { applyHysteria2Config, createHysteria2ApplyPlan, ensureManagedHysteria2Process } from "./hysteria2-runtime.js";
+import {
+  applySingBoxShadowsocksConfig,
+  createSingBoxShadowsocksApplyPlan,
+  ensureManagedSingBoxShadowsocksProcess
+} from "./sing-box-shadowsocks-runtime.js";
 import { applyTuicConfig, createTuicApplyPlan, ensureManagedTuicProcess } from "./tuic-runtime.js";
 import { applyWireguardConfig, createWireguardApplyPlan } from "./wireguard-runtime.js";
 import { applyNodePolicy, createNodePolicyApplyPlan } from "./policy-runtime.js";
@@ -40,6 +45,7 @@ const PROVISIONING_STATE_FILE = "provisioning-state.json";
 const APPLY_FAILURE_CODES = Object.freeze({
   "xray.apply": "xray_apply_failed",
   "hysteria2.apply": "hysteria2_apply_failed",
+  "sing-box-shadowsocks.apply": "shadowsocks_apply_failed",
   "tuic.apply": "tuic_apply_failed",
   "wireguard.apply": "wireguard_apply_failed",
   "node-policy.apply": "node_policy_apply_failed"
@@ -48,6 +54,7 @@ const APPLY_FAILURE_CODES = Object.freeze({
 const APPLY_DRY_RUN_STATUS = Object.freeze({
   "xray.apply": "xray-dry-run",
   "hysteria2.apply": "hysteria2-dry-run",
+  "sing-box-shadowsocks.apply": "shadowsocks-dry-run",
   "tuic.apply": "tuic-dry-run",
   "wireguard.apply": "wireguard-dry-run",
   "node-policy.apply": "node-policy-dry-run"
@@ -56,6 +63,7 @@ const APPLY_DRY_RUN_STATUS = Object.freeze({
 const APPLY_PENDING_STATUS = Object.freeze({
   "xray.apply": "xray-apply-pending",
   "hysteria2.apply": "hysteria2-apply-pending",
+  "sing-box-shadowsocks.apply": "shadowsocks-apply-pending",
   "tuic.apply": "tuic-apply-pending",
   "wireguard.apply": "wireguard-apply-pending",
   "node-policy.apply": "node-policy-apply-pending"
@@ -234,6 +242,17 @@ function hysteria2ApplyPlanFromEnvelope(envelope) {
   });
 }
 
+function singBoxShadowsocksApplyPlanFromEnvelope(envelope) {
+  if (!envelope.payload.singBoxShadowsocksConfig) {
+    return null;
+  }
+  return createSingBoxShadowsocksApplyPlan({
+    id: envelope.payload.profileId ?? envelope.payload.profile_id ?? envelope.payload.outboundId ?? envelope.id,
+    singBoxShadowsocksConfig: envelope.payload.singBoxShadowsocksConfig,
+    configPath: envelope.payload.singBoxShadowsocksConfigPath
+  });
+}
+
 function tuicApplyPlanFromEnvelope(envelope) {
   if (!envelope.payload.tuicConfig) {
     return null;
@@ -347,6 +366,16 @@ async function applyRuntimeEffects(command, commandResult, input = {}) {
       });
       const policy = policyPlan ? await applyNodePolicy(policyPlan, input) : null;
       return withResultOutputs(commandResult, policy ? { ...hysteria2, nodePolicy: policy } : hysteria2);
+    }
+    if (commandResult.runtimeAction.type === "sing-box-shadowsocks.apply") {
+      const shadowsocks = await applySingBoxShadowsocksConfig(commandResult.runtimeAction.plan, {
+        dryRun: input.dryRun,
+        env: input.env,
+        execFileImpl: input.execFileImpl,
+        spawnImpl: input.spawnImpl
+      });
+      const policy = policyPlan ? await applyNodePolicy(policyPlan, input) : null;
+      return withResultOutputs(commandResult, policy ? { ...shadowsocks, nodePolicy: policy } : shadowsocks);
     }
     if (commandResult.runtimeAction.type === "tuic.apply") {
       const tuic = await applyTuicConfig(commandResult.runtimeAction.plan, {
@@ -508,6 +537,15 @@ export function applyNodeCommand(command, currentState, input = {}) {
             }
           }
           if (!runtimeAction) {
+            const shadowsocksPlan = singBoxShadowsocksApplyPlanFromEnvelope(envelope);
+            if (shadowsocksPlan) {
+              runtimeAction = Object.freeze({
+                type: "sing-box-shadowsocks.apply",
+                plan: shadowsocksPlan
+              });
+            }
+          }
+          if (!runtimeAction) {
             const tuicPlan = tuicApplyPlanFromEnvelope(envelope);
             if (tuicPlan) {
               runtimeAction = Object.freeze({
@@ -658,8 +696,9 @@ export async function runNodeAgentOnce(input = {}) {
     };
     const xray = await ensureManagedXrayProcess(restoreInput);
     const hysteria2 = await ensureManagedHysteria2Process(restoreInput);
+    const shadowsocks = await ensureManagedSingBoxShadowsocksProcess(restoreInput);
     const tuic = await ensureManagedTuicProcess(restoreInput);
-    runtimeRestore = Object.freeze({ xray, hysteria2, tuic });
+    runtimeRestore = Object.freeze({ xray, hysteria2, shadowsocks, tuic });
   } catch (error) {
     runtimeRestore = Object.freeze({
       implementationStatus: "managed-process-restore-failed",

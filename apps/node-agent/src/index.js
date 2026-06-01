@@ -108,6 +108,13 @@ export {
   createXrayApplyPlan
 } from "./xray-runtime.js";
 export {
+  DEFAULT_SING_BOX_SHADOWSOCKS_BINARY,
+  DEFAULT_SING_BOX_SHADOWSOCKS_CONFIG_PATH,
+  SING_BOX_SHADOWSOCKS_RUNTIME_MODEL_VERSION,
+  applySingBoxShadowsocksConfig,
+  createSingBoxShadowsocksApplyPlan
+} from "./sing-box-shadowsocks-runtime.js";
+export {
   LIVE_LISTENER_MODEL_VERSION,
   TCP_DIAGNOSTIC_LISTENER_KIND,
   createTcpDiagnosticListenerPlan,

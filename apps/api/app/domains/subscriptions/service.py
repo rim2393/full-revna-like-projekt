@@ -16,7 +16,10 @@ from app.domains.protocols.models import Host, ProtocolProfile
 from app.domains.protocols.schemas import VAULT_REF_PREFIX
 from app.domains.settings.models import PanelSetting
 from app.domains.subscriptions.models import Subscription
-from app.domains.subscriptions.renderers import derive_client_credentials
+from app.domains.subscriptions.renderers import (
+    derive_client_credentials,
+    shadowsocks_password_for_method,
+)
 from app.domains.subscriptions.schemas import (
     SubscriptionCreateRequest,
     SubscriptionResponse,
@@ -263,7 +266,14 @@ async def build_subscription_manifest(
                         or _profile_config_string(profile, "serviceName")
                         or _profile_config_string(profile, "service_name"),
                         "credentialsRef": credentials_ref,
-                        "credentials": _manifest_credentials(credentials),
+                        "credentials": _manifest_credentials(
+                            credentials,
+                            method=(
+                                delivery.get("method")
+                                or _profile_config_string(profile, "method")
+                                or "2022-blake3-aes-128-gcm"
+                            ),
+                        ),
                         "capabilities": _manifest_capabilities(protocol_type),
                         "rendererHints": _manifest_renderer_hints(
                             delivery=delivery,
@@ -684,11 +694,11 @@ def _manifest_renderer_hints(
     return hints
 
 
-def _manifest_credentials(credentials) -> dict[str, str]:
+def _manifest_credentials(credentials, *, method: str) -> dict[str, str]:
     return {
         "uuid": credentials.uuid,
         "password": credentials.password,
-        "shadowsocksPassword": credentials.shadowsocks_password,
+        "shadowsocksPassword": shadowsocks_password_for_method(credentials, method),
         "hysteriaPassword": credentials.hysteria_password,
         "hysteriaObfsPassword": credentials.hysteria_obfs_password,
         "wireguardPrivateKey": credentials.wireguard_private_key,
