@@ -6,6 +6,10 @@ This file tracks the live parity audit. A row is closed only when code, tests,
 release/update flow and live VPS validation prove the feature is real. Fake
 counts, placeholder actions and DB-only buttons do not count.
 
+Execution tracker: `docs/EXECUTION_TRACKER.md`. Update that tracker with task
+IDs, status and evidence before starting a new parity slice, so completed work
+is not repeated after context compaction.
+
 ## Current P0 Findings
 
 | Area | Finding | Status |

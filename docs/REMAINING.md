@@ -2,6 +2,10 @@
 
 This file must contain every known incomplete area before a handoff or release.
 
+Primary execution tracker: `docs/EXECUTION_TRACKER.md`. Use that file for
+task IDs, status, done criteria, evidence and the next implementation slice.
+This file remains a broad backlog summary.
+
 ## Current
 
 - Remnawave parity is still being closed screen by screen; no admin-visible
