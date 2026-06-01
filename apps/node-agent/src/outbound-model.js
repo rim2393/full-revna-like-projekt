@@ -20,6 +20,7 @@ const RUNTIME_CREDENTIAL_PAYLOAD_ROOTS = Object.freeze([
   "$.payload.xrayConfig",
   "$.payload.hysteria2Config",
   "$.payload.singBoxShadowsocksConfig",
+  "$.payload.shadowsocksPluginConfig",
   "$.payload.tuicConfig",
   "$.payload.wireguardConfig"
 ]);

@@ -115,6 +115,13 @@ export {
   createSingBoxShadowsocksApplyPlan
 } from "./sing-box-shadowsocks-runtime.js";
 export {
+  DEFAULT_SHADOWSOCKS_PLUGIN_CONFIG_PATH,
+  DEFAULT_SHADOWSOCKS_SERVER_BINARY,
+  SHADOWSOCKS_PLUGIN_RUNTIME_MODEL_VERSION,
+  applyShadowsocksPluginConfig,
+  createShadowsocksPluginApplyPlan
+} from "./shadowsocks-plugin-runtime.js";
+export {
   LIVE_LISTENER_MODEL_VERSION,
   TCP_DIAGNOSTIC_LISTENER_KIND,
   createTcpDiagnosticListenerPlan,

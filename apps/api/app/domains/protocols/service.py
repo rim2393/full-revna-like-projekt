@@ -202,6 +202,7 @@ PROTOCOL_ADAPTERS = (
     _adapter(
         "shadowsocks-v2ray-plugin",
         "Shadowsocks v2ray-plugin",
+        status="experimental",
         capabilities=["shadowsocks", "plugin", "websocket", "tls", "subscription"],
         required_credential_refs=["password", "plugin_opts"],
     ),
@@ -1386,6 +1387,7 @@ def _compact_object(value: dict[str, object]) -> dict[str, object]:
 _NODE_CONFIG_KEY_BY_FAMILY = {
     "hysteria2": "hysteria2Config",
     "sing-box-shadowsocks": "singBoxShadowsocksConfig",
+    "shadowsocks-plugin": "shadowsocksPluginConfig",
     "tuic": "tuicConfig",
     "wireguard": "wireguardConfig",
     "xray": "xrayConfig",
@@ -1397,6 +1399,8 @@ _DEFAULT_NODE_TLS_KEY_PATH = "/var/lib/lumen-node/runtime/tls/live.key"
 def _adapter_family(adapter: str) -> str:
     if adapter == "shadowsocks-2022":
         return "sing-box-shadowsocks"
+    if adapter == "shadowsocks-v2ray-plugin":
+        return "shadowsocks-plugin"
     protocol = _inbound_protocol(adapter)
     if protocol in {"hysteria2", "tuic", "wireguard"}:
         return protocol
@@ -1573,6 +1577,28 @@ def _computed_sing_box_shadowsocks_config(
     return config
 
 
+def _computed_shadowsocks_plugin_config(
+    profile: ProtocolProfile,
+    port: int | None,
+    *,
+    runtime_clients: list[dict[str, object]] | None = None,
+) -> dict[str, object]:
+    config = _profile_config_dict(profile)
+    config.setdefault("listen", "::")
+    config.setdefault("listen_port", port or 8388)
+    config.setdefault("method", "aes-256-gcm")
+    config.setdefault("network", "tcp")
+    config["plugin"] = "v2ray-plugin"
+    config.setdefault("plugin_opts", "server")
+    clients = runtime_clients or []
+    if clients:
+        config["password"] = str(clients[0]["shadowsocks_password"])
+        config.pop("clientsRef", None)
+    else:
+        config["clientsRef"] = profile.credentials_ref
+    return config
+
+
 def _computed_wireguard_config(
     profile: ProtocolProfile,
     port: int | None,
@@ -1620,6 +1646,12 @@ def compute_node_outbound_config(
         )
     if family == "sing-box-shadowsocks":
         return _computed_sing_box_shadowsocks_config(
+            profile,
+            _first_inbound_port(inbounds),
+            runtime_clients=runtime_clients,
+        )
+    if family == "shadowsocks-plugin":
+        return _computed_shadowsocks_plugin_config(
             profile,
             _first_inbound_port(inbounds),
             runtime_clients=runtime_clients,
