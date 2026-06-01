@@ -1,11 +1,13 @@
 # Continuation Checkpoint
 
-Last audited: 2026-06-01 13:25 Europe/Moscow.
+Last audited: 2026-06-01 15:31 Europe/Moscow.
 
 ## Current Working Copy
 
 - Repo: `D:\android-app-new\_work\full-revna-like-projekt`
-- Main branch state: clean after `12ae7fd Expand live protocol JS contract`.
+- Main branch state: clean after `16aa332 Prevent branch builds from deploying prod manifest`.
+- Current signed production manifest: `v0.1.40`.
+- Live production panel and node were validated on `v0.1.40` after the manifest was restored from a temporary `main-...` overwrite.
 - 5.3 added backend domains/routes/migrations for:
   - `metrics`
   - `ip_control`
@@ -32,6 +34,14 @@ Last audited: 2026-06-01 13:25 Europe/Moscow.
   - Incomplete `wireguard://` links are importable but explicitly not connectable; they no longer fall through as empty sing-box/WireGuard runtime configs.
   - JS `@lumen/protocol-registry` now exposes live plan adapters for `trojan`, `shadowsocks`, `wireguard`, and `hysteria2` instead of leaving them catalog-only.
   - JS `@lumen/subscription-renderers` now renders real derived-credential sing-box/Mihomo client configs for `trojan`, `shadowsocks`, and `hysteria2`; `wireguard` remains intentionally rejected there until real key material is available.
+- 2026-06-01 live release hardening pass:
+  - `v0.1.35` added real license sync/update API and live-validated activation without direct DB edits.
+  - `v0.1.36` fixed Xray multi-inbound apply so applying one Xray-family profile no longer drops sibling inbounds on the same node.
+  - `v0.1.37` made HWID/device limits real on public subscription requests.
+  - `v0.1.38` added node-authenticated event ingestion for plugin/torrent reports.
+  - `v0.1.39` added node-agent runtime log telemetry from real policy files and persisted offsets.
+  - `v0.1.40` added Xray inbound sniffing for torrent-blocker enforcement and live-validated blackhole routing plus `xray -test`.
+  - CI fix `16aa332`: branch push image builds no longer dispatch the public installer/prod deploy pipeline. Only workflow dispatch/tag releases should change `release/prod.json`.
 - 2026-06-01 Clash/Mihomo Android pass:
   - supported Clash aliases now become concrete runtime profiles: `hy2` -> Hysteria2, TUIC hyphen fields -> runtime keys, SOCKS4/SOCKS4A version preserved, packet-encoding normalized.
   - `clash://install-config?url=<inline-yaml>` now decodes form-encoded spaces only for structured inline Clash payloads while keeping normal subscription URL token handling unchanged.
@@ -47,6 +57,9 @@ Last audited: 2026-06-01 13:25 Europe/Moscow.
 - Android: `:app:testDebugUnitTest` passed with the workspace JDK. Focused `SubscriptionParserTest`, `:app:assembleDebug`, and `:app:assembleRelease` also passed after the WireGuard URI fix.
 - JS package gates after live contract sync: `packages/protocol-registry npm test` passed; `packages/subscription-renderers npm test` passed.
 - Android focused gate after Clash/Mihomo conversion: `SubscriptionParserTest` and `SubscriptionSourceResolverTest` passed; `:app:assembleDebug` and `:app:assembleRelease` passed.
+- Node-agent gate after runtime telemetry: `node --test`, 86 passed.
+- API gate after Xray sniffing enforcement: full API `pytest tests`, 142 passed; focused ruff clean.
+- Live prod evidence after `v0.1.40`: panel `LUMEN_VERSION=v0.1.40`, node-agent image pinned to `v0.1.40`, HTTP-proxy profile apply succeeded with `dryRun=false`, Xray config contains `blackhole`, `protocol=["bittorrent"]`, sniffing on all active inbounds, and `xray -test` passed.
 - Alembic heads: single head `0008_infra_billing`.
 
 ## Fixes Applied During Audit
@@ -64,6 +77,6 @@ Last audited: 2026-06-01 13:25 Europe/Moscow.
 ## Next Suggested Work
 
 1. Continue the remaining real-runtime protocol gaps: OpenVPN over Shadowsocks bridge and Android IKEv2/IPsec.
-2. Continue Remnawave parity UI pages only against live API state; no fake counters or static placeholder rows.
-3. Extend non-Xray protocol runtimes to actively consume the persisted policy file where native protocol support exists.
+2. Extend non-Xray protocol runtimes to actively consume the persisted policy file where native protocol support exists.
+3. Continue Remnawave parity UI pages only against live API state; no fake counters or static placeholder rows.
 4. Keep official release/update path mandatory for production validation.
