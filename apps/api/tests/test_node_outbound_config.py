@@ -14,7 +14,13 @@ def _profile(adapter: str, config_json: dict | None = None) -> ProtocolProfile:
     )
 
 
-def _inbounds(port: int, *, protocol: str = "vless", config_json: dict | None = None):
+def _inbounds(
+    port: int,
+    *,
+    protocol: str = "vless",
+    security: str = "none",
+    config_json: dict | None = None,
+):
     return [
         SimpleNamespace(
             tag="inbound-test",
@@ -22,7 +28,7 @@ def _inbounds(port: int, *, protocol: str = "vless", config_json: dict | None = 
             port=port,
             protocol=protocol,
             transport="tcp",
-            security="none",
+            security=security,
             credentials_ref="vault://subscriptions/p/creds",
             config_json=config_json or {},
         )
@@ -85,6 +91,44 @@ def test_xray_payload_uses_concrete_runtime_clients_when_available():
             "flow": "xtls-rprx-vision",
         }
     ]
+
+
+def test_xray_reality_profile_builds_server_stream_settings():
+    security = {
+        "type": "reality",
+        "serverName": "www.example.test",
+        "dest": "www.example.test:443",
+        "privateKey": "server-private-key",
+        "publicKey": "client-public-key",
+        "shortId": "abcd1234",
+    }
+    payload = build_node_outbound_payload(
+        _profile("vless-reality", {"security": security}),
+        _inbounds(
+            18443,
+            protocol="vless",
+            security="reality",
+            config_json={"security": security},
+        ),
+        runtime_clients=[
+            {
+                "public_id": "lumen_sub_live",
+                "uuid": "11111111-1111-4111-8111-111111111111",
+                "flow": "xtls-rprx-vision",
+            }
+        ],
+    )
+
+    stream = payload["xrayConfig"]["inbounds"][0]["streamSettings"]
+    assert stream["security"] == "reality"
+    assert stream["realitySettings"] == {
+        "show": False,
+        "dest": "www.example.test:443",
+        "xver": 0,
+        "serverNames": ["www.example.test"],
+        "privateKey": "server-private-key",
+        "shortIds": ["abcd1234"],
+    }
 
 
 def test_shadowsocks_payload_uses_concrete_runtime_password():

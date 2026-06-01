@@ -1204,10 +1204,7 @@ def _xray_inbound(
         "port": inbound.port,
         "protocol": inbound.protocol,
         "settings": _xray_inbound_settings(inbound, runtime_clients=runtime_clients),
-        "streamSettings": {
-            "network": inbound.transport,
-            "security": inbound.security,
-        },
+        "streamSettings": _xray_inbound_stream_settings(inbound),
     }
 
 
@@ -1292,6 +1289,46 @@ def _xray_inbound_settings(
     if not clients and inbound.credentials_ref is not None:
         settings["clientsRef"] = inbound.credentials_ref
     return settings
+
+
+def _xray_inbound_stream_settings(inbound: ProfileInboundResponse) -> dict[str, object]:
+    stream: dict[str, object] = {
+        "network": inbound.transport,
+        "security": inbound.security,
+    }
+    security = inbound.config_json.get("security")
+    security_config = security if isinstance(security, dict) else {}
+    if inbound.security == "reality":
+        server_name = str(
+            security_config.get("serverName")
+            or security_config.get("server_name")
+            or "www.cloudflare.com"
+        )
+        short_id = str(security_config.get("shortId") or security_config.get("short_id") or "")
+        stream["realitySettings"] = _compact_object(
+            {
+                "show": bool(security_config.get("show", False)),
+                "dest": str(security_config.get("dest") or f"{server_name}:443"),
+                "xver": int(security_config.get("xver") or 0),
+                "serverNames": [server_name],
+                "privateKey": security_config.get("privateKey")
+                or security_config.get("private_key"),
+                "shortIds": [short_id],
+            }
+        )
+    elif inbound.security == "tls":
+        certificates = security_config.get("certificates")
+        if isinstance(certificates, list) and certificates:
+            stream["tlsSettings"] = {"certificates": certificates}
+    return _compact_object(stream)
+
+
+def _compact_object(value: dict[str, object]) -> dict[str, object]:
+    return {
+        key: child
+        for key, child in value.items()
+        if child is not None and child != [] and child != {}
+    }
 
 
 # -- node runtime config generation (panel -> node outbound.apply payload) -----
