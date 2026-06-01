@@ -270,7 +270,8 @@ export function SquadsPage() {
                 <div key={profile.id} className="resource-list__item">
                   <span>{profile.name}</span>
                   <small>
-                    {profile.adapter} | {profile.status} | {formatTags(profile.inbounds)}
+                    {profile.adapter} | {profile.status} |{' '}
+                    {profile.inbounds.length > 0 ? formatTags(profile.inbounds) : t('No inbounds')}
                   </small>
                 </div>
               ))}
@@ -294,7 +295,8 @@ export function SquadsPage() {
                 <div key={host.id} className="resource-list__item">
                   <span>{host.hostname}</span>
                   <small>
-                    {host.name} | {host.inbound_tag ?? 'no inbound'} | {host.port ?? 'auto'} | {host.status}
+                    {host.name} | {host.inbound_tag ?? t('No inbound')} | {host.port ?? t('Automatic port')} |{' '}
+                    {host.status}
                   </small>
                 </div>
               ))}
@@ -430,7 +432,7 @@ function SquadEditor({
         />
       </label>
       <label htmlFor="editor-squad-metadata">
-        Editor JSON
+        {t('Editor JSON')}
         <textarea
           id="editor-squad-metadata"
           rows={6}
@@ -439,7 +441,7 @@ function SquadEditor({
         />
       </label>
       <FormError message={error} />
-      <SubmitButton pending={pending || !squad}>Save squad</SubmitButton>
+      <SubmitButton pending={pending || !squad}>{t('Save squad')}</SubmitButton>
     </ScreenForm>
   )
 }
