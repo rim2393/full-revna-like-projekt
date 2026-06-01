@@ -440,7 +440,9 @@ const ru: Record<string, string> = {
   'License ID': 'ID лицензии',
   'Select user': 'Выберите пользователя',
   'Subscription could not be created.': 'Не удалось создать подписку.',
+  'Subscription server name could not be derived.': 'Не удалось определить server_name для подписки.',
   'User and license are required.': 'Пользователь и лицензия обязательны.',
+  'Expires at': 'Истекает',
   Adapter: 'Адаптер',
   'Adapter capabilities': 'Возможности адаптера',
   'All fields are persisted through the profile API and validated before save.':

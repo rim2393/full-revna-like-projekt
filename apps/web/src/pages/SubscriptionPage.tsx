@@ -10,7 +10,7 @@ import {
   useUpdateSubscription,
   useUsersPageData,
 } from '../shared/api/resourceHooks'
-import type { HostRecord, ProtocolProfileRecord, SubscriptionRecord } from '../shared/api/types'
+import type { HostRecord, ProtocolProfileRecord, SubscriptionCreateRequest, SubscriptionRecord } from '../shared/api/types'
 import { OperatorGuide } from '../shared/components/OperatorGuide'
 import {
   FormError,
@@ -187,13 +187,8 @@ function SubscriptionCreateForm({
 }: {
   defaultLicenseId: string
   hosts: HostRecord[]
-  nodes: Array<{ id: string; name: string }>
-  onCreate: (request: {
-    delivery_profile: Record<string, string>
-    license_id: string
-    node_id: string
-    user_id: string
-  }) => Promise<void>
+  nodes: Array<{ id: string; name: string; public_address: string }>
+  onCreate: (request: SubscriptionCreateRequest) => Promise<void>
   pending: boolean
   profiles: ProtocolProfileRecord[]
   users: Array<{ email: string; id: string; username: string | null }>
@@ -204,6 +199,8 @@ function SubscriptionCreateForm({
   const [nodeId, setNodeId] = useState(nodes[0]?.id ?? '')
   const [profileId, setProfileId] = useState('')
   const [hostId, setHostId] = useState('')
+  const [expiresAt, setExpiresAt] = useState('')
+  const [configHash, setConfigHash] = useState('')
   const [clientPreset, setClientPreset] = useState('happ')
   const [deliveryProfile, setDeliveryProfile] = useState(
     [
@@ -212,7 +209,6 @@ function SubscriptionCreateForm({
       'format=happ',
       'profile_title=Lumen',
       'security=tls',
-      'server_name=panel.89-185-85-184.sslip.io',
       'alpn=h2,http/1.1',
       'traffic_limit_gb=500',
     ].join(', '),
@@ -237,8 +233,18 @@ function SubscriptionCreateForm({
       if (hostId) {
         parsedDeliveryProfile.host_id = hostId
       }
+      const selectedHost = hosts.find((host) => host.id === hostId)
+      const selectedNode = nodes.find((node) => node.id === nodeId)
+      if (!parsedDeliveryProfile.server_name) {
+        parsedDeliveryProfile.server_name = selectedHost?.hostname ?? selectedNode?.public_address ?? ''
+      }
+      if (!parsedDeliveryProfile.server_name) {
+        throw new Error(t('Subscription server name could not be derived.'))
+      }
       await onCreate({
+        config_hash: configHash.trim() || null,
         delivery_profile: parsedDeliveryProfile,
+        expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
         license_id: licenseId.trim(),
         node_id: nodeId,
         user_id: userId,
@@ -321,6 +327,23 @@ function SubscriptionCreateForm({
           <option value="sing-box">Sing-box / NekoBox</option>
           <option value="amnezia">Amnezia / Xray JSON</option>
         </select>
+      </label>
+      <label htmlFor="subscription-expires-at">
+        {t('Expires at')}
+        <input
+          id="subscription-expires-at"
+          type="datetime-local"
+          value={expiresAt}
+          onChange={(event) => setExpiresAt(event.target.value)}
+        />
+      </label>
+      <label htmlFor="subscription-config-hash">
+        {t('Config hash')}
+        <input
+          id="subscription-config-hash"
+          value={configHash}
+          onChange={(event) => setConfigHash(event.target.value)}
+        />
       </label>
       <label htmlFor="subscription-delivery">
         {t('Delivery profile')}

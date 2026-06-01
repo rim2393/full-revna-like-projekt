@@ -78,6 +78,11 @@ Last audited: 2026-06-01 20:32 Europe/Moscow.
     `1..65535`.
   - Host bulk set-port validates integer `1..65535` before mutation and shows a
     translated error hint.
+- 2026-06-01 Subscription create follow-up:
+  - Removed the static panel-domain `server_name` default from the create form.
+  - If `server_name` is omitted, the UI derives it from the selected host
+    hostname or selected node public address before creating the backend record.
+  - Exposed backend `expires_at` and `config_hash` fields in the create form.
 
 ## Verification Done
 
@@ -110,6 +115,8 @@ Last audited: 2026-06-01 20:32 Europe/Moscow.
   build passed.
 - Hosts validation local gates: web TypeScript passed; `productionReality.test.ts`
   passed with 7 tests; web production build passed.
+- Subscription create local gates: web TypeScript passed;
+  `productionReality.test.ts` passed with 7 tests; web production build passed.
 - Live prod evidence after `v0.1.40`: panel `LUMEN_VERSION=v0.1.40`, node-agent image pinned to `v0.1.40`, HTTP-proxy profile apply succeeded with `dryRun=false`, Xray config contains `blackhole`, `protocol=["bittorrent"]`, sniffing on all active inbounds, and `xray -test` passed.
 - Live prod evidence after `v0.1.41`: panel `LUMEN_VERSION=v0.1.41`, node-agent image pinned to `v0.1.41`, `shadowsocks-2022` profile apply succeeded with `dryRun=false`, node policy applied, generated sing-box Shadowsocks config contains the policy block route, `sing-box check -c` passed against the live config, and TCP `24081` listened on the node.
 - Live prod evidence after `v0.1.49`: panel `LUMEN_VERSION=v0.1.49`, node-agent image pinned to `v0.1.49`, public installer persisted host IP forwarding, direct OpenVPN UDP profile apply succeeded with `dryRun=false`, node listened on UDP `24103`, OpenVPN auth files were readable/executable by the dropped `nobody` user without exposing raw credentials, NAT had exactly one `10.90.3.0/24` MASQUERADE rule after repeated apply, and a disposable OpenVPN client connected from the panel VPS using the rendered subscription.

@@ -15,7 +15,7 @@ counts, placeholder actions and DB-only buttons do not count.
 | Profiles and hosts | CRUD exists, but profile/host changes do not auto-sync node runtime except explicit profile apply. | Open |
 | Hosts | Host model is narrower than required Remnawave parity fields: path, SNI, security, mux, sockopt, xHTTP, exclusions, final mask and Mihomo X25519. | Open |
 | Subscriptions | Admin API lacks delete/clone/raw/connection keys/subpage config and lookup by username or short UUID. | Open |
-| Subscriptions | Create UI covers only a narrow part of the backend subscription contract and still has a static `server_name` default. | Open |
+| Subscriptions | Create UI covers only a narrow part of the backend subscription contract and still has a static `server_name` default. | Partially closed locally: static `server_name` removed, `expires_at` and `config_hash` added; remaining parity gaps are clone/delete/raw/connection keys and richer subscription settings. |
 | Settings | Auth providers with `unimplemented` status are deliberately read-only; this is not Remnawave-level parity until the real callback/config flow exists. | Open |
 | Tools | Several tools are inspector-only; drop connections, top users, node user IPs and full HApp routing encryption remain incomplete. | Open |
 | Settings | Settings are generic key/value; typed Remnawave/Lumen groups with validation are incomplete. | Open |
@@ -68,3 +68,13 @@ Closure evidence:
   backend contract; subscription delivery profile still has a static
   `server_name` default; auth-provider parity is incomplete while providers are
   `unimplemented`/read-only.
+
+## Subscription Follow-Up Findings
+
+- Subscription create form no longer bakes in a panel-domain `server_name`.
+  When not provided explicitly in `delivery_profile`, the UI derives
+  `server_name` from the selected host hostname or selected node public address
+  before creating the backend record.
+- Subscription create form now exposes backend `expires_at` and `config_hash`
+  fields in addition to `user_id`, `license_id`, `node_id`, and
+  `delivery_profile`.
