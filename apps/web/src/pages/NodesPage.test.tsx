@@ -174,6 +174,70 @@ describe('NodesPage backend wiring', () => {
     ).toBeInTheDocument()
   })
 
+  it('shows real node action results and blocks control buttons while a command is pending', async () => {
+    const user = userEvent.setup()
+    const restartNode = vi.fn(async (nodeId: string) => ({
+      claimed_at: null,
+      command_type: 'node.restart',
+      completed_at: null,
+      created_at: '2026-05-27T10:00:00Z',
+      error_code: null,
+      error_message: null,
+      id: 'cmd_restart_1',
+      node_id: nodeId,
+      payload_json: { reason: 'operator requested restart' },
+      result_json: null,
+      status: 'queued',
+      updated_at: '2026-05-27T10:00:00Z',
+    }))
+    const nodes: NodeResponse[] = [
+      {
+        capabilities: {},
+        id: 'node-action',
+        last_seen_at: '2026-05-27T09:30:00Z',
+        name: 'edge-action',
+        public_address: '203.0.113.20',
+        region: 'eu',
+        sort_order: 0,
+        status: 'active',
+      },
+      {
+        capabilities: {
+          pending_control_command_id: 'cmd_pending',
+          pending_control_command_type: 'node.restart',
+          pending_control_target_status: 'offline',
+        },
+        id: 'node-pending',
+        last_seen_at: '2026-05-27T09:31:00Z',
+        name: 'edge-pending',
+        public_address: '203.0.113.21',
+        region: 'us',
+        sort_order: 1,
+        status: 'active',
+      },
+    ]
+    const apiClient = createTestClient({
+      listNodeCommands: async () => ({ items: [] }),
+      listNodeMetrics: async () => ({ items: [] }),
+      listNodes: async () => ({ items: nodes }),
+      restartNode,
+    })
+
+    renderWithRouter('/nodes', { apiClient, initialSession: developmentSession })
+
+    expect(await screen.findByText('edge-action')).toBeInTheDocument()
+    expect(screen.getByText(/Pending control command/i)).toBeInTheDocument()
+    const restartButtons = screen.getAllByRole('button', { name: 'Restart' })
+    expect(restartButtons[0]).toBeEnabled()
+    expect(restartButtons[1]).toBeDisabled()
+
+    await user.click(restartButtons[0])
+
+    await waitFor(() => expect(restartNode).toHaveBeenCalledWith('node-action'))
+    expect(await screen.findByText(/Last node action/i)).toBeInTheDocument()
+    expect(screen.getByText(/node.restart queued as cmd_restart_1/i)).toBeInTheDocument()
+  })
+
   it('creates a provisioning job with credentials_ref only and safe token templates', async () => {
     const createProvisioningJob = vi.fn(async (request: ProvisioningJobCreateRequest) =>
       buildProvisioningJob(request),

@@ -16,7 +16,7 @@ import {
   useRestartNode,
   useResumeNode,
 } from '../shared/api/resourceHooks'
-import type { NodeResponse, ProvisioningJobResponse } from '../shared/api/types'
+import type { NodeCommandRecord, NodeResponse, ProvisioningJobResponse } from '../shared/api/types'
 import { DataTable } from '../shared/components/DataTable'
 import { EmptyState, ErrorState, LoadingState } from '../shared/components/DataState'
 import { OperatorGuide } from '../shared/components/OperatorGuide'
@@ -41,6 +41,13 @@ type ProvisioningFormState = {
 type NodeStatePresentation = {
   detail: string
   label: string
+  tone: MetricTone
+}
+
+type NodeActionResult = {
+  detail: string
+  label: string
+  nodeName: string
   tone: MetricTone
 }
 
@@ -245,6 +252,45 @@ function hasMissingHeartbeat(node: NodeResponse) {
   return !node.last_seen_at && status !== 'provisioning' && status !== 'installing'
 }
 
+function pendingControlCommand(node: NodeResponse) {
+  const commandId = node.capabilities.pending_control_command_id
+  const commandType = node.capabilities.pending_control_command_type
+  if (!commandId && !commandType) {
+    return null
+  }
+  return {
+    commandId,
+    commandType,
+    targetStatus: node.capabilities.pending_control_target_status,
+  }
+}
+
+function nodeActionResultFromNode(
+  label: string,
+  node: NodeResponse,
+  detail: string,
+): NodeActionResult {
+  return {
+    detail,
+    label,
+    nodeName: node.name,
+    tone: getNodeState(node.status).tone,
+  }
+}
+
+function nodeActionResultFromCommand(
+  label: string,
+  node: NodeResponse,
+  command: NodeCommandRecord,
+): NodeActionResult {
+  return {
+    detail: `${command.command_type} queued as ${command.id}; status ${formatStatus(command.status)}.`,
+    label,
+    nodeName: node.name,
+    tone: 'info',
+  }
+}
+
 function pluralize(count: number, singular: string, plural = `${singular}s`) {
   return count === 1 ? singular : plural
 }
@@ -348,6 +394,8 @@ export function NodesPage() {
   const [commandType, setCommandType] = useState('capabilities.report')
   const [commandPayload, setCommandPayload] = useState('{}')
   const [commandError, setCommandError] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
+  const [actionResult, setActionResult] = useState<NodeActionResult | null>(null)
   const createCommand = useCreateNodeCommand()
   const pauseNode = usePauseNode()
   const resumeNode = useResumeNode()
@@ -494,13 +542,51 @@ export function NodesPage() {
       return
     }
     try {
-      await createCommand.mutateAsync({
+      const command = await createCommand.mutateAsync({
         id: effectiveNodeId,
         request: { command_type: commandType.trim(), payload_json: payload },
       })
+      setActionResult(nodeActionResultFromCommand('command queued', selectedNode, command))
       await commandsQuery.refetch()
     } catch {
       // Mutation error is rendered below.
+    }
+  }
+
+  async function runNodeAction<T>(
+    label: string,
+    node: NodeResponse,
+    action: () => Promise<T>,
+    describe: (result: T) => NodeActionResult,
+  ) {
+    setActionError(null)
+    setActionResult(null)
+    try {
+      const result = await action()
+      setActionResult(describe(result))
+      await query.refetch()
+      if (effectiveNodeId === node.id) {
+        await commandsQuery.refetch()
+        await metricsQuery.refetch()
+      }
+    } catch (error) {
+      setActionError(`${label} failed for ${node.name}: ${getErrorMessage(error)}`)
+    }
+  }
+
+  async function runGlobalNodeAction<T>(
+    label: string,
+    action: () => Promise<T>,
+    describe: (result: T) => NodeActionResult,
+  ) {
+    setActionError(null)
+    setActionResult(null)
+    try {
+      const result = await action()
+      setActionResult(describe(result))
+      await query.refetch()
+    } catch (error) {
+      setActionError(`${label} failed: ${getErrorMessage(error)}`)
     }
   }
 
@@ -526,7 +612,18 @@ export function NodesPage() {
               type="button"
               className="button button--secondary"
               disabled={restartAllNodes.isPending || nodes.length === 0}
-              onClick={() => void restartAllNodes.mutateAsync()}
+              onClick={() =>
+                void runGlobalNodeAction(
+                  'Restart all nodes',
+                  () => restartAllNodes.mutateAsync(),
+                  (commands) => ({
+                    detail: `${commands.items.length} restart commands queued through the real node command API.`,
+                    label: 'restart all queued',
+                    nodeName: 'All nodes',
+                    tone: 'info',
+                  }),
+                )
+              }
             >
               {t('Restart all')}
             </button>
@@ -536,6 +633,30 @@ export function NodesPage() {
 
       {query.isLoading ? <LoadingState label="Loading nodes..." /> : null}
       {query.isError ? <ErrorState title="Nodes unavailable" error={query.error} /> : null}
+      {actionError ? (
+        <article className="panel" role="alert">
+          <div className="panel__header">
+            <div>
+              <p className="eyebrow">{t('Node action failed')}</p>
+              <h2>{t('Action result')}</h2>
+            </div>
+            <StatusBadge tone="danger">{t('failed')}</StatusBadge>
+          </div>
+          <p>{actionError}</p>
+        </article>
+      ) : null}
+      {actionResult ? (
+        <article className="panel" aria-live="polite">
+          <div className="panel__header">
+            <div>
+              <p className="eyebrow">{t('Last node action')}</p>
+              <h2>{actionResult.nodeName}</h2>
+            </div>
+            <StatusBadge tone={actionResult.tone}>{actionResult.label}</StatusBadge>
+          </div>
+          <p>{actionResult.detail}</p>
+        </article>
+      ) : null}
 
       <section className="resource-grid">
         {query.isSuccess && nodes.length === 0 ? (
@@ -567,6 +688,8 @@ export function NodesPage() {
               ]}
               rows={nodes.map((node) => {
                 const state = getNodeState(node.status)
+                const pendingControl = pendingControlCommand(node)
+                const hasPendingControl = pendingControl !== null
 
                 return {
                   cells: [
@@ -579,6 +702,15 @@ export function NodesPage() {
                       <StatusBadge tone={state.tone}>{state.label}</StatusBadge>
                       <br />
                       <small>{t(state.detail)}</small>
+                      {pendingControl ? (
+                        <>
+                          <br />
+                          <small>
+                            {t('Pending control command')}: {pendingControl.commandType ?? 'unknown'}{' '}
+                            {pendingControl.targetStatus ? `-> ${pendingControl.targetStatus}` : ''}
+                          </small>
+                        </>
+                      ) : null}
                     </>,
                     <div className="inline-actions">
                       <button
@@ -594,22 +726,45 @@ export function NodesPage() {
                         type="button"
                         className="button button--secondary"
                         disabled={
-                          normalizeStatus(node.status) === 'active'
+                          hasPendingControl ||
+                          (normalizeStatus(node.status) === 'active'
                             ? pauseNode.isPending
-                            : resumeNode.isPending
+                            : resumeNode.isPending)
                         }
                         onClick={() => {
                           if (normalizeStatus(node.status) === 'active') {
-                            void pauseNode.mutateAsync({
-                              id: node.id,
-                              request: { reason: 'operator disabled node', license_enforced: false },
-                            })
+                            void runNodeAction(
+                              'Disable node',
+                              node,
+                              () =>
+                                pauseNode.mutateAsync({
+                                  id: node.id,
+                                  request: { reason: 'operator disabled node', license_enforced: false },
+                                }),
+                              (updatedNode) =>
+                                nodeActionResultFromNode(
+                                  'disabled',
+                                  updatedNode,
+                                  'Node pause command was recorded and runtime traffic will stop after node-agent applies it.',
+                                ),
+                            )
                             return
                           }
-                          void resumeNode.mutateAsync({
-                            id: node.id,
-                            request: { clear_quarantine: isQuarantined(node), target_status: 'offline' },
-                          })
+                          void runNodeAction(
+                            'Enable node',
+                            node,
+                            () =>
+                              resumeNode.mutateAsync({
+                                id: node.id,
+                                request: { clear_quarantine: isQuarantined(node), target_status: 'offline' },
+                              }),
+                            (updatedNode) =>
+                              nodeActionResultFromNode(
+                                'enabled',
+                                updatedNode,
+                                'Node resume command was recorded; heartbeat must return before customer traffic is healthy.',
+                              ),
+                          )
                         }}
                       >
                         {normalizeStatus(node.status) === 'active' ? t('Disable') : t('Enable')}
@@ -617,12 +772,23 @@ export function NodesPage() {
                       <button
                         type="button"
                         className="button button--secondary"
-                        disabled={!canPauseNode(node) || pauseNode.isPending}
+                        disabled={hasPendingControl || !canPauseNode(node) || pauseNode.isPending}
                         onClick={() =>
-                          void pauseNode.mutateAsync({
-                            id: node.id,
-                            request: { reason: 'operator requested', license_enforced: false },
-                          })
+                          void runNodeAction(
+                            'Pause node',
+                            node,
+                            () =>
+                              pauseNode.mutateAsync({
+                                id: node.id,
+                                request: { reason: 'operator requested', license_enforced: false },
+                              }),
+                            (updatedNode) =>
+                              nodeActionResultFromNode(
+                                'paused',
+                                updatedNode,
+                                'Node pause command was recorded against the real control plane.',
+                              ),
+                          )
                         }
                       >
                         {t('Pause')}
@@ -630,15 +796,26 @@ export function NodesPage() {
                       <button
                         type="button"
                         className="button button--secondary"
-                        disabled={!canResumeNode(node) || resumeNode.isPending}
+                        disabled={hasPendingControl || !canResumeNode(node) || resumeNode.isPending}
                         onClick={() =>
-                          void resumeNode.mutateAsync({
-                            id: node.id,
-                            request: {
-                              clear_quarantine: isQuarantined(node),
-                              target_status: 'offline',
-                            },
-                          })
+                          void runNodeAction(
+                            'Resume node',
+                            node,
+                            () =>
+                              resumeNode.mutateAsync({
+                                id: node.id,
+                                request: {
+                                  clear_quarantine: isQuarantined(node),
+                                  target_status: 'offline',
+                                },
+                              }),
+                            (updatedNode) =>
+                              nodeActionResultFromNode(
+                                'resumed',
+                                updatedNode,
+                                'Node resume command was recorded and quarantine flag is cleared when requested.',
+                              ),
+                          )
                         }
                       >
                         {t('Resume')}
@@ -646,12 +823,23 @@ export function NodesPage() {
                       <button
                         type="button"
                         className="button button--secondary"
-                        disabled={!canQuarantineNode(node) || quarantineNode.isPending}
+                        disabled={hasPendingControl || !canQuarantineNode(node) || quarantineNode.isPending}
                         onClick={() =>
-                          void quarantineNode.mutateAsync({
-                            id: node.id,
-                            request: { reason: 'operator quarantine' },
-                          })
+                          void runNodeAction(
+                            'Quarantine node',
+                            node,
+                            () =>
+                              quarantineNode.mutateAsync({
+                                id: node.id,
+                                request: { reason: 'operator quarantine' },
+                              }),
+                            (updatedNode) =>
+                              nodeActionResultFromNode(
+                                'quarantined',
+                                updatedNode,
+                                'Node quarantine command was recorded and this node should not receive traffic.',
+                              ),
+                          )
                         }
                       >
                         {t('Quarantine')}
@@ -659,8 +847,15 @@ export function NodesPage() {
                       <button
                         type="button"
                         className="button button--secondary"
-                        disabled={restartNode.isPending}
-                        onClick={() => void restartNode.mutateAsync(node.id)}
+                        disabled={hasPendingControl || restartNode.isPending}
+                        onClick={() =>
+                          void runNodeAction(
+                            'Restart node',
+                            node,
+                            () => restartNode.mutateAsync(node.id),
+                            (command) => nodeActionResultFromCommand('restart queued', node, command),
+                          )
+                        }
                       >
                         {t('Restart')}
                       </button>
@@ -668,17 +863,34 @@ export function NodesPage() {
                         type="button"
                         className="button button--secondary"
                         disabled={resetNodeTraffic.isPending}
-                        onClick={() => void resetNodeTraffic.mutateAsync(node.id)}
+                        onClick={() =>
+                          void runNodeAction(
+                            'Reset node traffic',
+                            node,
+                            () => resetNodeTraffic.mutateAsync(node.id),
+                            (command) => nodeActionResultFromCommand('traffic reset queued', node, command),
+                          )
+                        }
                       >
                         {t('Reset traffic')}
                       </button>
                       <button
                         type="button"
                         className="button button--secondary"
-                        disabled={deleteNode.isPending}
+                        disabled={hasPendingControl || deleteNode.isPending}
                         onClick={() => {
                           if (globalThis.confirm(`Delete node ${node.name}? This pauses runtime traffic first.`)) {
-                            void deleteNode.mutateAsync(node.id)
+                            void runNodeAction(
+                              'Delete node',
+                              node,
+                              () => deleteNode.mutateAsync(node.id),
+                              (updatedNode) =>
+                                nodeActionResultFromNode(
+                                  'deleted',
+                                  updatedNode,
+                                  'Node was marked deleted and a pause command was queued before removal from active service.',
+                                ),
+                            )
                           }
                         }}
                       >
@@ -788,12 +1000,22 @@ export function NodesPage() {
                 className="button button--secondary"
                 disabled={reorderNodes.isPending}
                 onClick={() =>
-                  void reorderNodes.mutateAsync({
-                    items: nodes.map((node, index) => ({
-                      id: node.id,
-                      sort_order: nodes.length - index,
-                    })),
-                  })
+                  void runGlobalNodeAction(
+                    'Reverse node order',
+                    () =>
+                      reorderNodes.mutateAsync({
+                        items: nodes.map((node, index) => ({
+                          id: node.id,
+                          sort_order: nodes.length - index,
+                        })),
+                      }),
+                    (response) => ({
+                      detail: `${response.items.length} nodes reordered and refreshed from the backend.`,
+                      label: 'order saved',
+                      nodeName: 'Node inventory',
+                      tone: 'good',
+                    }),
+                  )
                 }
               >
                 {t('Reverse order')}
@@ -803,11 +1025,21 @@ export function NodesPage() {
                 className="button button--secondary"
                 disabled={bulkNodes.isPending}
                 onClick={() =>
-                  void bulkNodes.mutateAsync({
-                    action: 'reset_traffic',
-                    ids: nodes.map((node) => node.id),
-                    reason: 'operator bulk reset traffic',
-                  })
+                  void runGlobalNodeAction(
+                    'Reset all node traffic',
+                    () =>
+                      bulkNodes.mutateAsync({
+                        action: 'reset_traffic',
+                        ids: nodes.map((node) => node.id),
+                        reason: 'operator bulk reset traffic',
+                      }),
+                    (response) => ({
+                      detail: `${response.items.length} nodes accepted the traffic reset request.`,
+                      label: 'bulk reset queued',
+                      nodeName: 'All nodes',
+                      tone: 'info',
+                    }),
+                  )
                 }
               >
                 {t('Reset all traffic')}
@@ -817,11 +1049,21 @@ export function NodesPage() {
                 className="button button--secondary"
                 disabled={bulkNodes.isPending}
                 onClick={() =>
-                  void bulkNodes.mutateAsync({
-                    action: 'pause',
-                    ids: nodes.map((node) => node.id),
-                    reason: 'operator bulk pause',
-                  })
+                  void runGlobalNodeAction(
+                    'Pause all nodes',
+                    () =>
+                      bulkNodes.mutateAsync({
+                        action: 'pause',
+                        ids: nodes.map((node) => node.id),
+                        reason: 'operator bulk pause',
+                      }),
+                    (response) => ({
+                      detail: `${response.items.length} nodes accepted the pause request.`,
+                      label: 'bulk pause queued',
+                      nodeName: 'All nodes',
+                      tone: 'watch',
+                    }),
+                  )
                 }
               >
                 {t('Pause all')}
