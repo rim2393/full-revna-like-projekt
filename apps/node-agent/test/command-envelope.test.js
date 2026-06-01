@@ -164,3 +164,52 @@ test("quarantine command requires a reason and rejects inline secret payloads", 
     /Inline secret-like fields/
   );
 });
+
+test("outbound apply permits resolved runtime credentials but still rejects stray secrets", () => {
+  const envelope = createCommandEnvelope({
+    id: "cmd-xray-ss-1",
+    nodeId: "ams-1",
+    command: COMMAND_TYPES.OUTBOUND_APPLY,
+    idempotencyKey: "cmd-xray-ss-1:ams-1",
+    issuedAt: "2026-05-27T00:04:00.000Z",
+    payload: {
+      adapter: "shadowsocks-native",
+      xrayConfig: {
+        inbounds: [
+          {
+            port: 18446,
+            protocol: "shadowsocks",
+            settings: {
+              method: "aes-256-gcm",
+              password: "resolved-runtime-password"
+            }
+          }
+        ]
+      }
+    }
+  });
+
+  assert.equal(validateCommandEnvelope(envelope).ok, true);
+
+  assert.throws(
+    () => createCommandEnvelope({
+      id: "cmd-xray-token-bad",
+      nodeId: "ams-1",
+      command: COMMAND_TYPES.OUTBOUND_APPLY,
+      idempotencyKey: "cmd-xray-token-bad:ams-1",
+      issuedAt: "2026-05-27T00:04:00.000Z",
+      payload: {
+        xrayConfig: {
+          inbounds: [
+            {
+              port: 18446,
+              protocol: "shadowsocks",
+              settings: { token: "not-a-runtime-credential" }
+            }
+          ]
+        }
+      }
+    }),
+    /Inline secret-like fields/
+  );
+});

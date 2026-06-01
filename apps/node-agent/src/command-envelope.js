@@ -65,6 +65,12 @@ function immutablePayload(payload) {
   return Object.freeze({ ...(payload ?? {}) });
 }
 
+function inlineSecretOptions(command) {
+  return Object.freeze({
+    allowRuntimeCredentialPayloads: command === COMMAND_TYPES.OUTBOUND_APPLY
+  });
+}
+
 export function validateCommandEnvelope(envelope) {
   const errors = [];
 
@@ -97,7 +103,7 @@ export function validateCommandEnvelope(envelope) {
   }
 
   try {
-    assertNoInlineSecrets(envelope);
+    assertNoInlineSecrets(envelope, inlineSecretOptions(envelope.command));
   } catch (error) {
     errors.push(error.message);
   }
@@ -106,7 +112,7 @@ export function validateCommandEnvelope(envelope) {
 }
 
 export function createCommandEnvelope(input = {}) {
-  assertNoInlineSecrets(input);
+  assertNoInlineSecrets(input, inlineSecretOptions(input.command));
 
   const envelope = Object.freeze({
     modelVersion: COMMAND_ENVELOPE_VERSION,

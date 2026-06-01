@@ -16,6 +16,20 @@ const FORBIDDEN_INLINE_SECRET_KEYS = new Set([
   "generated_config"
 ]);
 
+const RUNTIME_CREDENTIAL_PAYLOAD_ROOTS = Object.freeze([
+  "$.payload.xrayConfig",
+  "$.payload.hysteria2Config",
+  "$.payload.tuicConfig",
+  "$.payload.wireguardConfig"
+]);
+
+const RUNTIME_CREDENTIAL_KEYS = new Set([
+  "password",
+  "passwd",
+  "privateKey",
+  "private_key"
+]);
+
 function isPlainObject(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
@@ -24,9 +38,27 @@ function normalizeKey(key) {
   return key.replace(/[-_]/g, "").toLowerCase();
 }
 
-function findForbiddenKeys(value, path = "$", violations = []) {
+function isAllowedRuntimeCredentialKey(path, key, options) {
+  if (!options.allowRuntimeCredentialPayloads) {
+    return false;
+  }
+  const normalized = normalizeKey(key);
+  const isRuntimeCredentialKey = [...RUNTIME_CREDENTIAL_KEYS].some(
+    (allowedKey) => normalized === normalizeKey(allowedKey)
+  );
+  if (!isRuntimeCredentialKey) {
+    return false;
+  }
+  return RUNTIME_CREDENTIAL_PAYLOAD_ROOTS.some(
+    (root) => path === root || path.startsWith(`${root}.`) || path.startsWith(`${root}[`)
+  );
+}
+
+function findForbiddenKeys(value, path = "$", violations = [], options = {}) {
   if (Array.isArray(value)) {
-    value.forEach((item, index) => findForbiddenKeys(item, `${path}[${index}]`, violations));
+    value.forEach((item, index) =>
+      findForbiddenKeys(item, `${path}[${index}]`, violations, options)
+    );
     return violations;
   }
 
@@ -37,11 +69,14 @@ function findForbiddenKeys(value, path = "$", violations = []) {
   for (const [key, child] of Object.entries(value)) {
     const normalized = normalizeKey(key);
     for (const forbiddenKey of FORBIDDEN_INLINE_SECRET_KEYS) {
-      if (normalized === normalizeKey(forbiddenKey)) {
+      if (
+        normalized === normalizeKey(forbiddenKey) &&
+        !isAllowedRuntimeCredentialKey(path, key, options)
+      ) {
         violations.push(`${path}.${key}`);
       }
     }
-    findForbiddenKeys(child, `${path}.${key}`, violations);
+    findForbiddenKeys(child, `${path}.${key}`, violations, options);
   }
 
   return violations;
@@ -63,8 +98,8 @@ function assertPort(value, path, errors) {
   }
 }
 
-export function assertNoInlineSecrets(value) {
-  const violations = findForbiddenKeys(value);
+export function assertNoInlineSecrets(value, options = {}) {
+  const violations = findForbiddenKeys(value, "$", [], options);
   if (violations.length > 0) {
     throw new Error(`Inline secret-like fields are not allowed: ${violations.join(", ")}`);
   }
