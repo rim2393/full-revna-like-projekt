@@ -790,6 +790,62 @@ async def test_public_subscription_manifest_rejects_expired_license(
     assert public_manifest_response.json()["error"]["code"] == "subscription_license_expired"
 
 
+async def test_public_subscription_enforces_user_device_limit_and_registers_hwid(
+    route_app: RouteTestApp,
+) -> None:
+    user, license_record, node = await seed_subscription_dependencies(route_app)
+    user.device_limit = 1
+    async with route_app.sessionmaker() as session:
+        await session.merge(user)
+        await session.commit()
+
+    create_response = await route_app.client.post(
+        "/api/v1/subscriptions",
+        json={
+            "user_id": str(user.id),
+            "license_id": str(license_record.id),
+            "node_id": str(node.id),
+            "delivery_profile": {"protocol": "vless"},
+            "config_hash": "sha256:vless-device",
+        },
+    )
+    assert create_response.status_code == 201
+    public_id = create_response.json()["public_id"]
+
+    missing_device_response = await route_app.client.get(
+        f"/api/v1/subscriptions/public/{public_id}/manifest",
+    )
+    assert missing_device_response.status_code == 428
+    assert missing_device_response.json()["error"]["code"] == "subscription_device_id_required"
+
+    first_device_response = await route_app.client.get(
+        f"/api/v1/subscriptions/public/{public_id}/manifest?device_id=device-1",
+        headers={"User-Agent": "Lumen QA Device"},
+    )
+    assert first_device_response.status_code == 200
+
+    repeated_device_response = await route_app.client.get(
+        f"/api/v1/subscriptions/public/{public_id}/render?target=sing-box",
+        headers={"X-Lumen-HWID": "device-1"},
+    )
+    assert repeated_device_response.status_code == 200
+
+    over_limit_response = await route_app.client.get(
+        f"/api/v1/subscriptions/public/{public_id}/manifest?device_id=device-2",
+    )
+    assert over_limit_response.status_code == 403
+    assert over_limit_response.json()["error"]["code"] == "subscription_device_limit_exceeded"
+
+    async with route_app.sessionmaker() as session:
+        persisted_user = await session.get(User, user.id)
+        devices = persisted_user.metadata_json["devices"]
+    assert len(devices) == 1
+    assert devices[0]["id"] == "device-1"
+    assert devices[0]["hwid"] == "device-1"
+    assert devices[0]["status"] == "active"
+    assert devices[0]["last_seen_at"]
+
+
 async def test_subscription_route_rejects_inline_secret_delivery_field(
     route_app: RouteTestApp,
 ) -> None:

@@ -954,6 +954,7 @@ async def test_user_detail_returns_subscriptions_devices_nodes_and_history(
 
     public_render_response = await foundation_app.client.get(
         f"/api/v1/subscriptions/public/{subscription['public_id']}/render?target=happ",
+        headers={"X-Lumen-HWID": "AABBCC"},
     )
     assert public_render_response.status_code == 200
     assert public_render_response.headers["x-lumen-render-target"] == "happ"
@@ -976,6 +977,8 @@ async def test_user_detail_returns_subscriptions_devices_nodes_and_history(
         "public_id": subscription["public_id"],
         "subscription_id": subscription["id"],
         "target": "happ",
+        "device_id": "AABBCC",
+        "device_status": "known",
     }
 
     delete_device_response = await foundation_app.client.delete(

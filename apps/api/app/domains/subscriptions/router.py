@@ -1,7 +1,7 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, Response, status
+from fastapi import APIRouter, Depends, Header, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings, get_settings
@@ -25,6 +25,7 @@ from app.domains.subscriptions.schemas import (
 from app.domains.subscriptions.service import (
     build_public_subscription_manifest,
     build_subscription_manifest,
+    enforce_public_subscription_device,
     get_subscription_by_public_id,
     revoke_subscription,
     subscription_to_response,
@@ -120,12 +121,19 @@ async def revoke_subscription_route(
 async def get_public_subscription_manifest(
     public_id: str,
     session: DatabaseSession,
+    device_id: str | None = Query(default=None),
+    hwid: str | None = Query(default=None),
+    x_lumen_hwid: str | None = Header(default=None, alias="X-Lumen-HWID"),
+    x_device_id: str | None = Header(default=None, alias="X-Device-Id"),
+    user_agent: str | None = Header(default=None, alias="User-Agent"),
 ):
     try:
         manifest = await build_and_record_public_subscription_request(
             session,
             public_id=public_id,
             target="manifest",
+            device_id=device_id or hwid or x_lumen_hwid or x_device_id,
+            device_label=user_agent,
         )
         await session.commit()
         return manifest
@@ -152,6 +160,11 @@ async def render_public_subscription(
         alias="format",
         description="Compatibility alias for target.",
     ),
+    device_id: str | None = Query(default=None),
+    hwid: str | None = Query(default=None),
+    x_lumen_hwid: str | None = Header(default=None, alias="X-Lumen-HWID"),
+    x_device_id: str | None = Header(default=None, alias="X-Device-Id"),
+    user_agent: str | None = Header(default=None, alias="User-Agent"),
 ) -> Response:
     try:
         render_target = normalize_render_target(target or render_format)
@@ -159,6 +172,8 @@ async def render_public_subscription(
             session,
             public_id=public_id,
             target=render_target,
+            device_id=device_id or hwid or x_lumen_hwid or x_device_id,
+            device_label=user_agent,
         )
         await session.commit()
     except APIError as error:
@@ -223,8 +238,16 @@ async def build_and_record_public_subscription_request(
     *,
     public_id: str,
     target: str,
+    device_id: str | None = None,
+    device_label: str | None = None,
 ) -> dict[str, object]:
     subscription = await get_subscription_by_public_id(session, public_id=public_id)
+    device_result = await enforce_public_subscription_device(
+        session,
+        subscription=subscription,
+        device_id=device_id,
+        device_label=device_label,
+    )
     manifest = await build_public_subscription_manifest(session, public_id=public_id)
     await create_audit_event(
         session,
@@ -238,6 +261,14 @@ async def build_and_record_public_subscription_request(
                 "public_id": subscription.public_id,
                 "subscription_id": str(subscription.id),
                 "target": target,
+                **(
+                    {
+                        "device_id": str(device_result["device_id"]),
+                        "device_status": str(device_result["device_status"]),
+                    }
+                    if device_result is not None
+                    else {}
+                ),
             },
         ),
     )

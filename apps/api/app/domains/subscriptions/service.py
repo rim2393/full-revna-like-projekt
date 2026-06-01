@@ -317,6 +317,99 @@ async def build_public_subscription_manifest(
     return await build_subscription_manifest(session, subscription_id=subscription.id)
 
 
+async def enforce_public_subscription_device(
+    session: AsyncSession,
+    *,
+    subscription: Subscription,
+    device_id: str | None,
+    device_label: str | None = None,
+    platform: str | None = None,
+) -> dict[str, object] | None:
+    user = await session.get(User, subscription.user_id)
+    if user is None:
+        raise APIError(
+            code="subscription_user_not_found",
+            message="Subscription user was not found.",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+    if user.device_limit is None:
+        return None
+
+    normalized_device_id = _normalize_device_id(device_id)
+    if normalized_device_id is None:
+        raise APIError(
+            code="subscription_device_id_required",
+            message="This subscription requires a device id or HWID.",
+            status_code=status.HTTP_428_PRECONDITION_REQUIRED,
+        )
+
+    metadata = dict(user.metadata_json)
+    raw_devices = metadata.get("devices")
+    devices = list(raw_devices) if isinstance(raw_devices, list) else []
+    now = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+    active_count = 0
+    matching_index: int | None = None
+    normalized_devices: list[object] = []
+    for raw_device in devices:
+        if not isinstance(raw_device, dict):
+            continue
+        device = dict(raw_device)
+        if str(device.get("status") or "active") == "active":
+            active_count += 1
+        if _device_id_matches(device, normalized_device_id):
+            matching_index = len(normalized_devices)
+        normalized_devices.append(device)
+
+    if matching_index is None:
+        if user.device_limit <= 0 or active_count >= user.device_limit:
+            raise APIError(
+                code="subscription_device_limit_exceeded",
+                message="Subscription device limit has been reached.",
+                status_code=status.HTTP_403_FORBIDDEN,
+                details=[f"device_limit={user.device_limit}", f"device_count={active_count}"],
+            )
+        normalized_devices.append(
+            {
+                "id": normalized_device_id,
+                "hwid": normalized_device_id,
+                "label": _normalize_device_label(device_label) or normalized_device_id,
+                "platform": _normalize_device_label(platform),
+                "status": "active",
+                "first_seen_at": now,
+                "last_seen_at": now,
+                "subscription_id": str(subscription.id),
+            }
+        )
+        device_status = "registered"
+    else:
+        device = dict(normalized_devices[matching_index])
+        device["last_seen_at"] = now
+        device.setdefault("first_seen_at", now)
+        device["status"] = "active"
+        if device_label:
+            device["label"] = _normalize_device_label(device_label) or device.get("label")
+        if platform:
+            device["platform"] = _normalize_device_label(platform)
+        normalized_devices[matching_index] = device
+        device_status = "known"
+
+    metadata["devices"] = normalized_devices
+    user.metadata_json = metadata
+    await session.flush()
+    return {
+        "device_id": normalized_device_id,
+        "device_status": device_status,
+        "device_limit": user.device_limit,
+        "device_count": len(
+            [
+                item
+                for item in normalized_devices
+                if isinstance(item, dict) and str(item.get("status") or "active") == "active"
+            ]
+        ),
+    }
+
+
 async def create_subscription(
     session: AsyncSession,
     *,
@@ -763,6 +856,36 @@ def _ensure_license_can_be_served(license_record: License | None) -> None:
             message="Subscription license has expired.",
             status_code=status.HTTP_410_GONE,
         )
+
+
+def _normalize_device_id(device_id: str | None) -> str | None:
+    if device_id is None:
+        return None
+    normalized = str(device_id).strip()
+    if not normalized:
+        return None
+    if len(normalized) > 128:
+        raise APIError(
+            code="subscription_device_id_invalid",
+            message="Device id is too long.",
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            details=["device_id"],
+        )
+    return normalized
+
+
+def _normalize_device_label(value: str | None) -> str | None:
+    if value is None:
+        return None
+    normalized = str(value).strip()
+    if not normalized:
+        return None
+    return normalized[:160]
+
+
+def _device_id_matches(device: dict[object, object], device_id: str) -> bool:
+    candidates = [device.get("id"), device.get("hwid")]
+    return any(str(candidate) == device_id for candidate in candidates if candidate is not None)
 
 
 def _ensure_aware(value: datetime) -> datetime:
