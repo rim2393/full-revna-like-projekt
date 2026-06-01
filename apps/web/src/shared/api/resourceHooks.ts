@@ -388,6 +388,7 @@ export function useUpdateProfile() {
       apiClient.updateProfile(id, request),
     onSuccess: (_response, variables) => {
       void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.profiles })
+      void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.squads })
       void queryClient.invalidateQueries({
         queryKey: resourceQueryKeys.profileComputedConfig(variables.id),
       })
@@ -442,6 +443,7 @@ export function useCreateHost() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.hosts })
       void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.profiles })
+      void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.squads })
       void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.profileGlobalInbounds })
     },
   })

@@ -213,6 +213,10 @@ const ru: Record<string, string> = {
   'Squad membership': 'Состав сквада',
   '{count} users': '{count} пользователей',
   'Squad nodes': 'Ноды сквада',
+  'Binding matrix': 'Матрица привязок',
+  'Profiles and hosts': 'Профили и хосты',
+  'Select profile': 'Выберите профиль',
+  'Attach host': 'Привязать хост',
   'No accessible nodes': 'Доступных нод нет',
   'Attach profiles or hosts to expose node access for this squad.':
     'Привяжите профили или хосты, чтобы этот сквад получил доступ к нодам.',

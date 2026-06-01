@@ -4,10 +4,14 @@ import {
   useAddSquadUsers,
   useCreateSquad,
   useDeleteSquad,
+  useHostsPageData,
+  useProfilesPageData,
   useReorderSquads,
   useRemoveSquadUsers,
   useSquadDetailData,
   useSquadsPageData,
+  useUpdateHost,
+  useUpdateProfile,
   useUpdateSquad,
   useUsersPageData,
 } from '../shared/api/resourceHooks'
@@ -27,8 +31,12 @@ export function SquadsPage() {
   const { t } = useI18n()
   const query = useSquadsPageData()
   const usersQuery = useUsersPageData()
+  const profilesQuery = useProfilesPageData()
+  const hostsQuery = useHostsPageData()
   const createSquad = useCreateSquad()
   const updateSquad = useUpdateSquad()
+  const updateProfile = useUpdateProfile()
+  const updateHost = useUpdateHost()
   const deleteSquad = useDeleteSquad()
   const reorderSquads = useReorderSquads()
   const addUsers = useAddSquadUsers()
@@ -39,8 +47,12 @@ export function SquadsPage() {
   const [formError, setFormError] = useState<string | null>(null)
   const [selectedSquadId, setSelectedSquadId] = useState('')
   const [memberUserId, setMemberUserId] = useState('')
+  const [matrixProfileId, setMatrixProfileId] = useState('')
+  const [matrixHostId, setMatrixHostId] = useState('')
   const squads = query.data?.items ?? []
   const users = usersQuery.data?.items ?? []
+  const profiles = profilesQuery.data?.items ?? []
+  const hosts = hostsQuery.data?.items ?? []
   const selectedSquad = useMemo(
     () => squads.find((squad) => squad.id === selectedSquadId) ?? squads[0],
     [selectedSquadId, squads],
@@ -71,6 +83,46 @@ export function SquadsPage() {
       id: selectedSquad.id,
       request: { user_ids: [memberUserId] },
     })
+  }
+
+  async function handleBindProfile() {
+    if (!selectedSquad || !matrixProfileId) {
+      return
+    }
+    await updateProfile.mutateAsync({
+      id: matrixProfileId,
+      request: { squad_id: selectedSquad.id },
+    })
+    setMatrixProfileId('')
+    await detailQuery.refetch()
+  }
+
+  async function handleUnbindProfile(profileId: string) {
+    await updateProfile.mutateAsync({
+      id: profileId,
+      request: { squad_id: null },
+    })
+    await detailQuery.refetch()
+  }
+
+  async function handleBindHost() {
+    if (!selectedSquad || !matrixHostId) {
+      return
+    }
+    await updateHost.mutateAsync({
+      id: matrixHostId,
+      request: { squad_id: selectedSquad.id },
+    })
+    setMatrixHostId('')
+    await detailQuery.refetch()
+  }
+
+  async function handleUnbindHost(hostId: string) {
+    await updateHost.mutateAsync({
+      id: hostId,
+      request: { squad_id: null },
+    })
+    await detailQuery.refetch()
   }
 
   return (
@@ -237,6 +289,64 @@ export function SquadsPage() {
           <article className="panel">
             <div className="panel__header">
               <div>
+                <p className="eyebrow">{t('Binding matrix')}</p>
+                <h2>{t('Profiles and hosts')}</h2>
+              </div>
+            </div>
+            <label htmlFor="squad-matrix-profile">
+              {t('Attach profile')}
+              <select
+                id="squad-matrix-profile"
+                value={matrixProfileId}
+                onChange={(event) => setMatrixProfileId(event.target.value)}
+              >
+                <option value="">{t('Select profile')}</option>
+                {profiles
+                  .filter((profile) => profile.squad_id !== selectedSquad?.id)
+                  .map((profile) => (
+                    <option key={profile.id} value={profile.id}>
+                      {profile.name} | {profile.adapter}
+                    </option>
+                  ))}
+              </select>
+            </label>
+            <button
+              type="button"
+              className="button button--secondary"
+              disabled={!selectedSquad || !matrixProfileId || updateProfile.isPending}
+              onClick={() => void handleBindProfile()}
+            >
+              {t('Attach profile')}
+            </button>
+            <label htmlFor="squad-matrix-host">
+              {t('Attach host')}
+              <select
+                id="squad-matrix-host"
+                value={matrixHostId}
+                onChange={(event) => setMatrixHostId(event.target.value)}
+              >
+                <option value="">{t('Select host')}</option>
+                {hosts
+                  .filter((host) => host.squad_id !== selectedSquad?.id)
+                  .map((host) => (
+                    <option key={host.id} value={host.id}>
+                      {host.hostname} | {host.name}
+                    </option>
+                  ))}
+              </select>
+            </label>
+            <button
+              type="button"
+              className="button button--secondary"
+              disabled={!selectedSquad || !matrixHostId || updateHost.isPending}
+              onClick={() => void handleBindHost()}
+            >
+              {t('Attach host')}
+            </button>
+          </article>
+          <article className="panel">
+            <div className="panel__header">
+              <div>
                 <p className="eyebrow">{t('Squad nodes')}</p>
                 <h2>{t('{count} nodes', { count: detailQuery.data?.nodes.length ?? 0 })}</h2>
               </div>
@@ -269,6 +379,15 @@ export function SquadsPage() {
               {(detailQuery.data?.profiles ?? []).map((profile) => (
                 <div key={profile.id} className="resource-list__item">
                   <span>{profile.name}</span>
+                  <button
+                    type="button"
+                    className="icon-button"
+                    aria-label={`Detach profile ${profile.name}`}
+                    disabled={updateProfile.isPending}
+                    onClick={() => void handleUnbindProfile(profile.id)}
+                  >
+                    <UserMinus size={16} aria-hidden="true" />
+                  </button>
                   <small>
                     {profile.adapter} | {profile.status} |{' '}
                     {profile.inbounds.length > 0 ? formatTags(profile.inbounds) : t('No inbounds')}
@@ -294,6 +413,15 @@ export function SquadsPage() {
               {(detailQuery.data?.hosts ?? []).map((host) => (
                 <div key={host.id} className="resource-list__item">
                   <span>{host.hostname}</span>
+                  <button
+                    type="button"
+                    className="icon-button"
+                    aria-label={`Detach host ${host.hostname}`}
+                    disabled={updateHost.isPending}
+                    onClick={() => void handleUnbindHost(host.id)}
+                  >
+                    <UserMinus size={16} aria-hidden="true" />
+                  </button>
                   <small>
                     {host.name} | {host.inbound_tag ?? t('No inbound')} | {host.port ?? t('Automatic port')} |{' '}
                     {host.status}

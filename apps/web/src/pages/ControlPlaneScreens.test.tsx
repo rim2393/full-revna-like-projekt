@@ -782,6 +782,134 @@ describe('Control plane resource screens', () => {
     expect(screen.getByText(/vless\/tcp\/reality/i)).toBeInTheDocument()
   })
 
+  it('wires squad binding matrix controls to profile and host update requests', async () => {
+    const user = userEvent.setup()
+    const detail: SquadDetailResponse = {
+      hosts: [
+        {
+          hostname: 'assigned.example.test',
+          id: 'host_assigned',
+          inbound_tag: 'ASSIGNED_INBOUND',
+          name: 'Assigned host',
+          node_id: 'node_detail',
+          port: 443,
+          protocol_profile_id: 'profile_assigned',
+          status: 'active',
+        },
+      ],
+      inbound_matrix: [],
+      nodes: [],
+      profiles: [
+        {
+          adapter: 'xray-core',
+          id: 'profile_assigned',
+          inbounds: [],
+          name: 'assigned-profile',
+          node_id: 'node_detail',
+          status: 'active',
+        },
+      ],
+      squad: {
+        id: 'squad_detail',
+        kind: 'internal',
+        metadata_json: {},
+        name: 'Detail squad',
+        status: 'active',
+      },
+      users: [],
+    }
+    const profileAssigned = {
+      adapter: 'xray-core',
+      config_json: {},
+      credentials_ref: null,
+      id: 'profile_assigned',
+      metadata_json: {},
+      name: 'assigned-profile',
+      node_id: 'node_detail',
+      port_reservations: [],
+      squad_id: 'squad_detail',
+      status: 'active',
+    }
+    const profileAvailable = {
+      ...profileAssigned,
+      id: 'profile_available',
+      name: 'available-profile',
+      squad_id: null,
+    }
+    const hostAssigned = {
+      address: null,
+      excluded_internal_squad_ids: [],
+      final_mask: null,
+      hidden: false,
+      hostname: 'assigned.example.test',
+      id: 'host_assigned',
+      inbound_tag: 'ASSIGNED_INBOUND',
+      metadata_json: {},
+      mihomo_x25519_public_key: null,
+      mux_json: {},
+      name: 'Assigned host',
+      node_id: 'node_detail',
+      path: null,
+      port: 443,
+      protocol_profile_id: 'profile_assigned',
+      remark: null,
+      security: null,
+      shuffle_host: false,
+      sni: null,
+      sockopt_json: {},
+      squad_id: 'squad_detail',
+      status: 'active',
+      subscription_excluded: false,
+      tags: [],
+      xhttp_json: {},
+      xray_template_json: {},
+    }
+    const hostAvailable = {
+      ...hostAssigned,
+      hostname: 'available.example.test',
+      id: 'host_available',
+      name: 'Available host',
+      squad_id: null,
+    }
+    const updateProfile = vi.fn(async (_profileId: string, request) => ({
+      ...profileAvailable,
+      squad_id: request.squad_id ?? null,
+    }))
+    const updateHost = vi.fn(async (_hostId: string, request) => ({
+      ...hostAvailable,
+      squad_id: request.squad_id ?? null,
+    }))
+    const apiClient: LumenApiClient = {
+      ...createDevelopmentLumenApiClient(),
+      getSquadDetail: async () => detail,
+      listHosts: async () => ({ items: [hostAssigned, hostAvailable] }),
+      listProfiles: async () => ({ items: [profileAssigned, profileAvailable] }),
+      listSquads: async () => ({ items: [detail.squad] }),
+      listUsers: async () => ({ items: [] }),
+      updateHost,
+      updateProfile,
+    }
+
+    renderWithRouter('/squads', { apiClient, initialSession: developmentSession })
+
+    expect(await screen.findByText('available-profile | xray-core')).toBeInTheDocument()
+    await user.selectOptions(screen.getByLabelText(/attach profile/i), 'profile_available')
+    await user.click(screen.getByRole('button', { name: /^attach profile$/i }))
+    await user.selectOptions(screen.getByLabelText(/attach host/i), 'host_available')
+    await user.click(screen.getByRole('button', { name: /^attach host$/i }))
+    await user.click(screen.getByRole('button', { name: /detach profile assigned-profile/i }))
+    await user.click(screen.getByRole('button', { name: /detach host assigned.example.test/i }))
+
+    await waitFor(() =>
+      expect(updateProfile).toHaveBeenCalledWith('profile_available', { squad_id: 'squad_detail' }),
+    )
+    await waitFor(() =>
+      expect(updateHost).toHaveBeenCalledWith('host_available', { squad_id: 'squad_detail' }),
+    )
+    expect(updateProfile).toHaveBeenCalledWith('profile_assigned', { squad_id: null })
+    expect(updateHost).toHaveBeenCalledWith('host_assigned', { squad_id: null })
+  })
+
   it('updates settings without accepting secret-like keys', async () => {
     const user = userEvent.setup()
     const updateSetting = vi.fn(async (key: string, request: SettingUpdateRequest) => ({
