@@ -588,6 +588,8 @@ def sing_box_outbound(entry: dict[str, Any], *, settings: Settings) -> dict[str,
         "server": protocol["endpoint"]["host"],
         "server_port": protocol["endpoint"]["port"],
     }
+    if protocol_type in {"vless", "vmess", "trojan"} and network_type(protocol) == "xhttp":
+        return None
 
     if protocol_type == "vless":
         base.update(

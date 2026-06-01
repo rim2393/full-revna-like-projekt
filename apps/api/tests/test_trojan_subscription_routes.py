@@ -253,6 +253,49 @@ async def test_vmess_subscription_renders_all_client_formats(route_app: RouteTes
     assert 'type: "vmess"' in mihomo.text
 
 
+async def test_xhttp_subscription_does_not_emit_fake_sing_box_transport(
+    route_app: RouteTestApp,
+) -> None:
+    user, license_record, node = await _seed(route_app)
+    create = await route_app.client.post(
+        "/api/v1/subscriptions",
+        json={
+            "user_id": str(user.id),
+            "license_id": str(license_record.id),
+            "node_id": str(node.id),
+            "delivery_profile": {
+                "protocol": "vless-xhttp-tls",
+                "adapter": "vless-xhttp-tls",
+                "profile_title": "Lumen XHTTP",
+                "server_name": "xhttp.example.test",
+                "path": "/xhttp",
+                "mode": "auto",
+                "port": "443",
+            },
+            "config_hash": "sha256:xhttp",
+        },
+    )
+    assert create.status_code == 201, create.text
+    public_id = create.json()["public_id"]
+
+    sing_box = await route_app.client.get(
+        f"/api/v1/subscriptions/public/{public_id}/render?target=sing-box",
+    )
+    assert sing_box.status_code == 200
+    assert all(
+        outbound.get("type") != "vless"
+        for outbound in sing_box.json()["outbounds"]
+    )
+
+    xray = await route_app.client.get(
+        f"/api/v1/subscriptions/public/{public_id}/render?target=xray-json",
+    )
+    assert xray.status_code == 200
+    stream = xray.json()["outbounds"][0]["streamSettings"]
+    assert stream["network"] == "xhttp"
+    assert stream["xhttpSettings"] == {"path": "/xhttp", "mode": "auto"}
+
+
 async def test_tuic_subscription_renders_client_formats(route_app: RouteTestApp) -> None:
     user, license_record, node = await _seed(route_app)
     create = await route_app.client.post(
