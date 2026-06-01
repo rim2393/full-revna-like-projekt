@@ -105,7 +105,7 @@ test("renders VLESS TCP TLS fields with real derived credentials", () => {
   assert.doesNotMatch(mihomo, /skeleton|placeholder|credentialsRef|privateKey|accessToken/i);
 });
 
-test("rejects catalog-only protocols from client renderers", () => {
+test("renders Hysteria2, Trojan and Shadowsocks with real derived credentials", () => {
   const manifest = createSubscriptionManifest({
     generatedAt: "2026-05-26T00:00:00.000Z",
     provider: { id: "lumen", name: "Lumen VPN" },
@@ -121,6 +121,53 @@ test("rejects catalog-only protocols from client renderers", () => {
             endpoint: { host: "ams-1.example.net", port: 443 },
             security: { serverName: "ams-1.example.net" },
             credentialsRef: "vault://subscriptions/sub_123/trojan"
+          },
+          {
+            type: "shadowsocks",
+            endpoint: { host: "ams-1.example.net", port: 8388 },
+            rendererHints: { method: "aes-256-gcm" },
+            credentialsRef: "vault://subscriptions/sub_123/shadowsocks"
+          },
+          {
+            type: "hysteria2",
+            endpoint: { host: "ams-1.example.net", port: 443, transport: "udp" },
+            security: { serverName: "hy2.example.net" },
+            credentialsRef: "vault://subscriptions/sub_123/hysteria2"
+          }
+        ]
+      }
+    ]
+  });
+
+  const singBox = renderSingBoxConfig(manifest, { credentialSeed: CREDENTIAL_SEED });
+  const mihomo = renderMihomoYaml(manifest, { credentialSeed: CREDENTIAL_SEED });
+
+  assert.equal(singBox.outbounds[0].type, "trojan");
+  assert.equal(singBox.outbounds[1].type, "ss");
+  assert.equal(singBox.outbounds[1].method, "aes-256-gcm");
+  assert.equal(singBox.outbounds[2].type, "hysteria2");
+  assert.match(mihomo, /type: "trojan"/);
+  assert.match(mihomo, /type: "ss"/);
+  assert.match(mihomo, /type: "hysteria2"/);
+  assert.doesNotMatch(JSON.stringify(singBox), /skeleton|placeholder|credentialsRef|privateKey|accessToken/i);
+  assert.doesNotMatch(mihomo, /skeleton|placeholder|credentialsRef|privateKey|accessToken/i);
+});
+
+test("rejects WireGuard from client renderers until real key material is available", () => {
+  const manifest = createSubscriptionManifest({
+    generatedAt: "2026-05-26T00:00:00.000Z",
+    provider: { id: "lumen", name: "Lumen VPN" },
+    subscription: { id: "sub_123", audience: "android" },
+    nodes: [
+      {
+        id: "ams-1",
+        displayName: "Amsterdam 1",
+        region: "nl-ams",
+        protocols: [
+          {
+            type: "wireguard",
+            endpoint: { host: "ams-1.example.net", port: 51820, transport: "udp" },
+            credentialsRef: "vault://subscriptions/sub_123/wireguard"
           }
         ]
       }

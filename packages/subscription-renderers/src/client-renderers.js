@@ -8,7 +8,13 @@ export const SUPPORTED_RENDER_FORMATS = Object.freeze([
   "clash-meta",
   "mihomo"
 ]);
-const LIVE_CLIENT_PROTOCOLS = new Set(["vless-reality", "vless-tcp-tls"]);
+const LIVE_CLIENT_PROTOCOLS = new Set([
+  "vless-reality",
+  "vless-tcp-tls",
+  "trojan",
+  "shadowsocks",
+  "hysteria2"
+]);
 
 function flattenProtocolEntries(manifest) {
   return manifest.nodes.flatMap((node) =>

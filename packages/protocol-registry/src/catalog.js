@@ -1,4 +1,5 @@
 import { createProtocolRegistry, defineProtocolAdapter } from "./adapter-interface.js";
+import { runtimeProtocolAdapters } from "./generic-live.js";
 import { vlessProtocolAdapters } from "./vless.js";
 
 export const protocolCatalogEntries = Object.freeze([
@@ -50,5 +51,6 @@ export const protocolCatalogAdapters = Object.freeze(
 );
 
 export const defaultProtocolRegistry = createProtocolRegistry([
-  ...vlessProtocolAdapters
+  ...vlessProtocolAdapters,
+  ...runtimeProtocolAdapters
 ]);

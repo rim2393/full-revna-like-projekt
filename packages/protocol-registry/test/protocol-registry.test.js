@@ -26,12 +26,13 @@ function realityRequest(overrides = {}) {
   };
 }
 
-test("default registry exposes only production-plan adapters while catalog entries stay separate", () => {
+test("default registry exposes all production-plan adapters while catalog entries stay separate", () => {
   const protocols = defaultProtocolRegistry.list().map((adapter) => adapter.protocol);
-  assert.deepEqual(protocols, ["vless-reality", "vless-tcp-tls"]);
+  assert.deepEqual(protocols, ["vless-reality", "vless-tcp-tls", "trojan", "shadowsocks", "wireguard", "hysteria2"]);
   assert.deepEqual(protocolCatalogEntries.map((adapter) => adapter.protocol), ["vless", "trojan", "shadowsocks", "wireguard", "hysteria2"]);
   assert.equal(defaultProtocolRegistry.require("vless-reality").status, "experimental");
   assert.equal(defaultProtocolRegistry.require("vless-tcp-tls").status, "experimental");
+  assert.equal(defaultProtocolRegistry.require("hysteria2").status, "experimental");
   assert.equal(defaultProtocolRegistry.get("vless"), null);
 });
 
@@ -114,4 +115,31 @@ test("detects overlapping exclusive bind ports from adapter plans", () => {
   assert.equal(conflicts.length, 1);
   assert.equal(conflicts[0].type, "exclusive_bind_port");
   assert.deepEqual(conflicts[0].ownerIds, ["left", "right"]);
+});
+
+test("runtime protocol adapters produce non-catalog outbound plans without inline secrets", () => {
+  const plan = defaultProtocolRegistry.require("hysteria2").planOutbound({
+    nodeId: "ams-1",
+    outboundId: "hy2-1",
+    endpoint: { host: "ams-1.example.net", port: 443, transport: "udp" },
+    bind: { address: "0.0.0.0", port: 443, protocol: "udp" },
+    credentialsRef: "vault://nodes/ams-1/hysteria2",
+    security: { serverName: "ams-1.example.net" }
+  });
+
+  assert.equal(plan.kind, "lumen.protocol-outbound.runtime-plan.v1");
+  assert.equal(plan.protocol, "hysteria2");
+  assert.equal(plan.runtime, "hysteria2");
+  assert.equal(plan.implementationStatus, "config-plan");
+  assert.deepEqual(plan.requiredCapabilities, ["runtime.hysteria2"]);
+  assert.equal(plan.portReservations[0].protocol, "udp");
+  assert.doesNotMatch(JSON.stringify(plan), /password|privateKey|accessToken|uuid/i);
+
+  assert.equal(defaultProtocolRegistry.require("trojan").validateConfig({
+    nodeId: "ams-1",
+    outboundId: "trojan-1",
+    endpoint: { host: "ams-1.example.net", port: 443 },
+    credentialsRef: "vault://nodes/ams-1/trojan",
+    password: "must-not-inline"
+  }).ok, false);
 });
