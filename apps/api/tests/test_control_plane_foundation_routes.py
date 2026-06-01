@@ -244,6 +244,9 @@ async def test_auth_provider_settings_are_typed_and_audited(
     assert telegram_provider["status"] == "needs_configuration"
     assert telegram_provider["scopes"] == ["admin:login"]
     assert "telegram_bot_token" in telegram_provider["metadata_json"]["missing"]
+    generic_provider = next(item for item in providers if item["provider"] == "generic_oauth2")
+    assert generic_provider["status"] == "needs_configuration"
+    assert "issuer_or_endpoints" in generic_provider["metadata_json"]["missing"]
 
     patch_response = await foundation_app.client.patch(
         "/api/v1/settings/auth/providers/google",
@@ -261,7 +264,7 @@ async def test_auth_provider_settings_are_typed_and_audited(
         json={"enabled": True},
     )
     assert generic_patch_response.status_code == 422
-    assert generic_patch_response.json()["error"]["code"] == "auth_provider_not_live"
+    assert generic_patch_response.json()["error"]["code"] == "auth_provider_not_configured"
 
     password_patch_response = await foundation_app.client.patch(
         "/api/v1/settings/auth/providers/password",

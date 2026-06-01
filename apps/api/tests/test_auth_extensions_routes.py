@@ -32,6 +32,14 @@ def app_client(tmp_path) -> Iterator[TestClient]:
         google_oauth_enabled=True,
         google_oauth_client_id="google-client-id",
         google_oauth_client_secret=SecretStr("google-client-secret"),
+        generic_oauth2_enabled=True,
+        generic_oauth2_display_name="Corporate SSO",
+        generic_oauth2_authorization_endpoint="https://sso.example.test/oauth/authorize",
+        generic_oauth2_token_endpoint="https://sso.example.test/oauth/token",  # noqa: S106 - public test URL.
+        generic_oauth2_userinfo_endpoint="https://sso.example.test/oauth/userinfo",
+        generic_oauth2_client_id="generic-client-id",
+        generic_oauth2_client_secret=SecretStr("generic-client-secret"),
+        generic_oauth2_scope="openid email profile groups",
         telegram_login_enabled=True,
         telegram_bot_token=SecretStr("telegram-bot-token"),
         telegram_bot_username="lumen_test_bot",
@@ -78,6 +86,8 @@ def test_provider_list_reflects_enabled_flags(tmp_path) -> None:
         assert response.status_code == 200
         providers = {item["provider"]: item for item in response.json()["items"]}
         assert providers["google"]["enabled"] is True
+        assert providers["generic_oauth2"]["enabled"] is True
+        assert providers["generic_oauth2"]["display_name"] == "Corporate SSO"
         assert providers["github"]["enabled"] is False
         assert providers["telegram"]["enabled"] is True
 
@@ -92,6 +102,24 @@ def test_oauth_start_persists_state_and_builds_url(tmp_path) -> None:
         assert "client_id=google-client-id" in body["authorization_url"]
         assert "code_challenge=" in body["authorization_url"]
         assert f"state={body['state']}" in body["authorization_url"]
+
+
+def test_generic_oauth2_start_uses_configured_provider_endpoints(tmp_path) -> None:
+    with app_client(tmp_path) as client:
+        response = client.get(
+            "/api/v1/auth/oauth/generic_oauth2/start",
+            params={"redirect": "/settings"},
+        )
+        assert response.status_code == 200
+        body = response.json()
+        assert body["provider"] == "generic_oauth2"
+        assert body["state"].startswith("lumen_os_")
+        assert body["authorization_url"].startswith(
+            "https://sso.example.test/oauth/authorize?"
+        )
+        assert "client_id=generic-client-id" in body["authorization_url"]
+        assert "scope=openid+email+profile+groups" in body["authorization_url"]
+        assert "code_challenge=" in body["authorization_url"]
 
 
 def test_oauth_callback_links_existing_user_by_verified_email(tmp_path, monkeypatch) -> None:

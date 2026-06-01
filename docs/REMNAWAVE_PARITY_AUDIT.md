@@ -16,7 +16,7 @@ counts, placeholder actions and DB-only buttons do not count.
 | Hosts | Host model is narrower than required Remnawave parity fields: path, SNI, security, mux, sockopt, xHTTP, exclusions, final mask and Mihomo X25519. | Open |
 | Subscriptions | Admin API lacks delete/clone/raw/connection keys/subpage config and lookup by username or short UUID. | Closed locally for delete/clone/raw preview/connection-key read/lookup in the subscription admin slice; live closure pending `v0.1.63` deploy evidence. Subpage config remains split into the dedicated Subscription Page settings surface. |
 | Subscriptions | Create UI covers only a narrow part of the backend subscription contract and still has a static `server_name` default. | Partially closed: static `server_name` removed, `expires_at` and `config_hash` added; richer subscription setting UX remains a follow-up. |
-| Settings | Auth providers with `unimplemented` status are deliberately read-only; this is not Remnawave-level parity until the real callback/config flow exists. | Open |
+| Settings | Auth providers with `unimplemented` status are deliberately read-only; this is not Remnawave-level parity until the real callback/config flow exists. | Closed locally for `generic_oauth2`: it now uses real env/file-backed OAuth2/OIDC config, login discovery/start/callback flow, and settings validation. Live closure pending release/deploy after VPS reachability returns. |
 | Tools | Several tools are inspector-only; drop connections, top users, node user IPs and full HApp routing encryption remain incomplete. | Open |
 | Settings | Settings are generic key/value; typed Remnawave/Lumen groups with validation are incomplete. | Open |
 | OpenAPI | Checked-in OpenAPI seed is stale and does not include the current admin/node/tools surfaces. | Open |
@@ -88,3 +88,17 @@ Closure evidence:
   (`17 passed`), scoped API ruff passed, web TypeScript passed,
   `httpClient.test.ts` plus `productionReality.test.ts` passed (`11 tests`),
   and web production build passed.
+
+## Auth Provider Follow-Up Findings
+
+- `generic_oauth2` is no longer catalog-only. It is part of the implemented
+  provider set and is blocked as `needs_configuration` until real environment
+  or secret-file configuration exists.
+- The real login flow supports either OIDC discovery through
+  `generic_oauth2_issuer` or explicit authorization/token/userinfo endpoints.
+  Client secrets remain env/file-backed and are not accepted in panel metadata.
+- The provider can use custom userinfo field names for subject, email,
+  verification, and display name while keeping existing Google/GitHub/Keycloak
+  and PocketID behavior intact.
+- Local gates for this slice: scoped API ruff passed; auth/settings route tests
+  passed (`34 passed, 2 skipped`); web TypeScript passed.

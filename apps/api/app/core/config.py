@@ -120,6 +120,22 @@ class Settings(BaseSettings):
     pocketid_oauth_client_secret: SecretStr | None = None
     pocketid_oauth_client_secret_file: str | None = None
 
+    generic_oauth2_enabled: bool = False
+    generic_oauth2_display_name: str = "Generic OAuth2"
+    generic_oauth2_issuer: str | None = None
+    generic_oauth2_authorization_endpoint: str | None = None
+    generic_oauth2_token_endpoint: str | None = None
+    generic_oauth2_userinfo_endpoint: str | None = None
+    generic_oauth2_client_id: str | None = None
+    generic_oauth2_client_secret: SecretStr | None = None
+    generic_oauth2_client_secret_file: str | None = None
+    generic_oauth2_scope: str = "openid email profile"
+    generic_oauth2_use_pkce: bool = True
+    generic_oauth2_subject_field: str = "sub"
+    generic_oauth2_email_field: str = "email"
+    generic_oauth2_email_verified_field: str = "email_verified"
+    generic_oauth2_display_name_field: str = "name"
+
     telegram_login_enabled: bool = Field(
         default=False,
         validation_alias=AliasChoices("TELEGRAM_ENABLED", "LUMEN_TELEGRAM_LOGIN_ENABLED"),
@@ -155,6 +171,7 @@ class Settings(BaseSettings):
             ("github_oauth_client_secret", "github_oauth_client_secret_file"),
             ("keycloak_oauth_client_secret", "keycloak_oauth_client_secret_file"),
             ("pocketid_oauth_client_secret", "pocketid_oauth_client_secret_file"),
+            ("generic_oauth2_client_secret", "generic_oauth2_client_secret_file"),
             ("telegram_bot_token", "telegram_bot_token_file"),
         )
         for secret_attr, file_attr in file_backed:

@@ -1,12 +1,12 @@
 # Continuation Checkpoint
 
-Last audited: 2026-06-01 21:18 Europe/Moscow.
+Last audited: 2026-06-01 21:28 Europe/Moscow.
 
 ## Current Working Copy
 
 - Repo: `D:\android-app-new\_work\full-revna-like-projekt`
-- Main branch state: clean after committing and pushing subscription admin
-  parity changes.
+- Main branch state: dirty with local `generic_oauth2` auth-provider parity
+  changes ready to commit.
 - Current signed public production manifest: `v0.1.63`.
 - `v0.1.63` closed-image release succeeded, and `lumen_vpn` commit `5df4327`
   promoted `release/prod.json` to `v0.1.63`.
@@ -102,6 +102,17 @@ Last audited: 2026-06-01 21:18 Europe/Moscow.
     Clone, Delete, Devices, and Raw preview.
   - RU translation coverage was extended for the new production UI strings; the
     production reality test remains the guard against partial translation.
+- 2026-06-01 Auth provider parity follow-up:
+  - `generic_oauth2` is no longer catalog-only/read-only locally. It is in the
+    implemented provider set and becomes `active` only when real env/file-backed
+    OAuth2/OIDC configuration exists.
+  - The OAuth runtime supports either OIDC discovery through
+    `generic_oauth2_issuer` or explicit authorization/token/userinfo endpoints.
+  - Client secrets remain env/file-backed through
+    `generic_oauth2_client_secret` or `generic_oauth2_client_secret_file`; panel
+    metadata still rejects inline secret-like fields.
+  - Custom userinfo fields are supported for subject, email, verified flag, and
+    display name.
 
 ## Verification Done
 
@@ -140,6 +151,9 @@ Last audited: 2026-06-01 21:18 Europe/Moscow.
   `test_license_subscription_routes.py` passed with 17 tests; web TypeScript
   passed; web `httpClient.test.ts` plus `productionReality.test.ts` passed with
   11 tests; web production build passed.
+- Auth provider parity local gates: scoped API ruff passed; API
+  `test_auth_extensions_routes.py` plus `test_control_plane_foundation_routes.py`
+  passed with 34 tests and 2 skips; web TypeScript passed.
 - Live prod evidence after `v0.1.40`: panel `LUMEN_VERSION=v0.1.40`, node-agent image pinned to `v0.1.40`, HTTP-proxy profile apply succeeded with `dryRun=false`, Xray config contains `blackhole`, `protocol=["bittorrent"]`, sniffing on all active inbounds, and `xray -test` passed.
 - Live prod evidence after `v0.1.41`: panel `LUMEN_VERSION=v0.1.41`, node-agent image pinned to `v0.1.41`, `shadowsocks-2022` profile apply succeeded with `dryRun=false`, node policy applied, generated sing-box Shadowsocks config contains the policy block route, `sing-box check -c` passed against the live config, and TCP `24081` listened on the node.
 - Live prod evidence after `v0.1.49`: panel `LUMEN_VERSION=v0.1.49`, node-agent image pinned to `v0.1.49`, public installer persisted host IP forwarding, direct OpenVPN UDP profile apply succeeded with `dryRun=false`, node listened on UDP `24103`, OpenVPN auth files were readable/executable by the dropped `nobody` user without exposing raw credentials, NAT had exactly one `10.90.3.0/24` MASQUERADE rule after repeated apply, and a disposable OpenVPN client connected from the panel VPS using the rendered subscription.
@@ -186,8 +200,8 @@ Last audited: 2026-06-01 21:18 Europe/Moscow.
 1. Restore production VPS/provider firewall reachability, then rerun the
    official deploy/upgrade flow for already-published `v0.1.63` and live-smoke
    subscription lookup, clone, delete, devices, and raw preview.
-2. Implement real `generic_oauth2`/auth-provider parity; currently the
-   provider is catalog-only/read-only and blocked as `unimplemented`.
+2. Commit and release the local `generic_oauth2` auth-provider parity slice
+   after final diff review.
 3. Continue the remaining real-runtime protocol gaps: Android IKEv2/IPsec.
 4. Do not mark WireGuard/AWG torrent blocking complete through a fake policy artifact. Native WireGuard needs a real enforceable design such as nftables marks/routing or an explicit unsupported/enforced-by-edge status; ordinary `wg-quick` cannot do BitTorrent protocol detection by itself.
 5. Continue Remnawave parity UI pages only against live API state; no fake counters or static placeholder rows.

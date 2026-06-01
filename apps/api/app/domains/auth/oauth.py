@@ -36,6 +36,10 @@ class ResolvedProvider:
     scope: str
     use_pkce: bool
     emails_endpoint: str | None = None
+    subject_field: str = "sub"
+    email_field: str = "email"
+    email_verified_field: str = "email_verified"
+    display_name_field: str = "name"
 
 
 @dataclass(frozen=True)
@@ -80,6 +84,12 @@ def provider_infos(settings: Settings) -> list[OAuthProviderInfo]:
             display_name="PocketID",
             kind="oidc",
             enabled=settings.pocketid_oauth_enabled,
+        ),
+        OAuthProviderInfo(
+            provider="generic_oauth2",
+            display_name=settings.generic_oauth2_display_name,
+            kind="oauth2",
+            enabled=settings.generic_oauth2_enabled,
         ),
         OAuthProviderInfo(
             provider="telegram",
@@ -144,6 +154,8 @@ async def resolve_provider(provider: str, settings: Settings) -> ResolvedProvide
         )
     if provider in {"keycloak", "pocketid"}:
         return await _resolve_oidc_provider(provider, settings)
+    if provider == "generic_oauth2":
+        return await _resolve_generic_oauth2_provider(settings)
     raise APIError(
         code="oauth_provider_unknown",
         message="OAuth provider is not supported.",
@@ -271,6 +283,53 @@ async def _resolve_oidc_provider(provider: str, settings: Settings) -> ResolvedP
     )
 
 
+async def _resolve_generic_oauth2_provider(settings: Settings) -> ResolvedProvider:
+    _require_enabled(settings.generic_oauth2_enabled, "generic_oauth2")
+    client_id = _require_value(
+        settings.generic_oauth2_client_id, "generic_oauth2", "client_id"
+    )
+    client_secret = require_secret(
+        settings.generic_oauth2_client_secret, name="generic_oauth2_client_secret"
+    )
+    if settings.generic_oauth2_issuer:
+        discovery = await _discover_oidc(settings.generic_oauth2_issuer)
+        authorization_endpoint = discovery["authorization_endpoint"]
+        token_endpoint = discovery["token_endpoint"]
+        userinfo_endpoint = discovery.get("userinfo_endpoint")
+    else:
+        authorization_endpoint = _require_value(
+            settings.generic_oauth2_authorization_endpoint,
+            "generic_oauth2",
+            "authorization_endpoint",
+        )
+        token_endpoint = _require_value(
+            settings.generic_oauth2_token_endpoint,
+            "generic_oauth2",
+            "token_endpoint",
+        )
+        userinfo_endpoint = _require_value(
+            settings.generic_oauth2_userinfo_endpoint,
+            "generic_oauth2",
+            "userinfo_endpoint",
+        )
+    return ResolvedProvider(
+        name="generic_oauth2",
+        display_name=settings.generic_oauth2_display_name,
+        kind="oidc" if settings.generic_oauth2_issuer else "oauth2",
+        client_id=client_id,
+        client_secret=client_secret,
+        authorization_endpoint=authorization_endpoint,
+        token_endpoint=token_endpoint,
+        userinfo_endpoint=userinfo_endpoint,
+        scope=settings.generic_oauth2_scope,
+        use_pkce=settings.generic_oauth2_use_pkce,
+        subject_field=settings.generic_oauth2_subject_field,
+        email_field=settings.generic_oauth2_email_field,
+        email_verified_field=settings.generic_oauth2_email_verified_field,
+        display_name_field=settings.generic_oauth2_display_name_field,
+    )
+
+
 async def _discover_oidc(issuer: str) -> dict[str, str]:
     normalized = issuer.rstrip("/")
     if normalized in _DISCOVERY_CACHE:
@@ -356,8 +415,8 @@ async def _fetch_profile(resolved: ResolvedProvider, *, access_token: str) -> OA
                     http_client, headers=headers, resolved=resolved, userinfo=userinfo
                 )
             else:
-                email = userinfo.get("email")
-                email_verified = bool(userinfo.get("email_verified", False))
+                email = userinfo.get(resolved.email_field)
+                email_verified = bool(userinfo.get(resolved.email_verified_field, False))
     except (httpx.HTTPError, ValueError) as exc:
         raise APIError(
             code="oauth_userinfo_failed",
@@ -367,7 +426,8 @@ async def _fetch_profile(resolved: ResolvedProvider, *, access_token: str) -> OA
 
     subject = _subject_from_userinfo(resolved, userinfo)
     display_name = (
-        userinfo.get("name")
+        userinfo.get(resolved.display_name_field)
+        or userinfo.get("name")
         or userinfo.get("preferred_username")
         or userinfo.get("login")
     )
@@ -403,7 +463,7 @@ async def _github_primary_email(
 
 
 def _subject_from_userinfo(resolved: ResolvedProvider, userinfo: dict[str, object]) -> str:
-    subject = userinfo.get("sub") or userinfo.get("id")
+    subject = userinfo.get(resolved.subject_field) or userinfo.get("sub") or userinfo.get("id")
     if subject is None:
         raise APIError(
             code="oauth_subject_missing",

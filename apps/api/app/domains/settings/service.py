@@ -15,7 +15,16 @@ from app.domains.settings.schemas import (
 
 AUTH_PROVIDERS_KEY = "auth.providers"
 IMPLEMENTED_AUTH_PROVIDERS = frozenset(
-    {"password", "passkey", "telegram", "github", "google", "keycloak", "pocketid"}
+    {
+        "password",
+        "passkey",
+        "telegram",
+        "github",
+        "google",
+        "keycloak",
+        "pocketid",
+        "generic_oauth2",
+    }
 )
 RESERVED_SETTING_KEYS = frozenset({AUTH_PROVIDERS_KEY})
 DEFAULT_AUTH_PROVIDERS: tuple[dict[str, object], ...] = (
@@ -79,7 +88,7 @@ DEFAULT_AUTH_PROVIDERS: tuple[dict[str, object], ...] = (
         "provider": "generic_oauth2",
         "display_name": "Generic OAuth2",
         "enabled": False,
-        "status": "unimplemented",
+        "status": "needs_configuration",
         "scopes": ["openid", "email", "profile"],
         "metadata_json": {},
     },
@@ -331,6 +340,28 @@ def _auth_provider_runtime(provider: str, settings: Settings) -> dict[str, objec
             secret_file=settings.pocketid_oauth_client_secret_file,
             issuer=settings.pocketid_oauth_issuer,
         )
+    if provider == "generic_oauth2":
+        missing_endpoint = not (
+            settings.generic_oauth2_issuer
+            or (
+                settings.generic_oauth2_authorization_endpoint
+                and settings.generic_oauth2_token_endpoint
+                and settings.generic_oauth2_userinfo_endpoint
+            )
+        )
+        runtime = _oauth_runtime(
+            enabled=settings.generic_oauth2_enabled,
+            client_id=settings.generic_oauth2_client_id,
+            secret=settings.generic_oauth2_client_secret,
+            secret_file=settings.generic_oauth2_client_secret_file,
+            issuer=not missing_endpoint,
+        )
+        if missing_endpoint and "issuer" in runtime["missing"]:
+            runtime["missing"] = [
+                value if value != "issuer" else "issuer_or_endpoints"
+                for value in runtime["missing"]
+            ]
+        return runtime
     return {
         "implemented": False,
         "configured": False,
