@@ -45,9 +45,10 @@ async function proxySubscriptionManifest(request, response, input) {
     return true;
   }
 
-  const upstreamUrl = `${apiInternalUrl}/api/v1/subscriptions/public/${encodeURIComponent(publicId)}/manifest`;
+  const upstreamQuery = buildUpstreamQuery(url.searchParams);
+  const upstreamUrl = `${apiInternalUrl}/api/v1/subscriptions/public/${encodeURIComponent(publicId)}/manifest${formatQuery(upstreamQuery)}`;
   const upstream = await input.fetchImpl(upstreamUrl, {
-    headers: { accept: "application/json" }
+    headers: buildSubscriptionProxyHeaders(request, "application/json")
   });
   const body = await upstream.text();
   response.writeHead(upstream.status, {
@@ -87,9 +88,10 @@ async function proxySubscriptionRender(request, response, input) {
 
   const target = match.target || url.searchParams.get("target") || url.searchParams.get("format") || inferTargetFromUserAgent(request.headers["user-agent"]);
   if (!match.target && wantsHtmlSubscriptionPage(request)) {
-    const manifestUrl = `${apiInternalUrl}/api/v1/subscriptions/public/${encodeURIComponent(match.publicId)}/manifest`;
+    const manifestQuery = buildUpstreamQuery(url.searchParams);
+    const manifestUrl = `${apiInternalUrl}/api/v1/subscriptions/public/${encodeURIComponent(match.publicId)}/manifest${formatQuery(manifestQuery)}`;
     const manifestResponse = await input.fetchImpl(manifestUrl, {
-      headers: { accept: "application/json" }
+      headers: buildSubscriptionProxyHeaders(request, "application/json")
     });
     const manifestText = await manifestResponse.text();
     if (!manifestResponse.ok) {
@@ -111,9 +113,11 @@ async function proxySubscriptionRender(request, response, input) {
     }));
     return true;
   }
-  const upstreamUrl = `${apiInternalUrl}/api/v1/subscriptions/public/${encodeURIComponent(match.publicId)}/render?target=${encodeURIComponent(target)}`;
+  const upstreamQuery = buildUpstreamQuery(url.searchParams);
+  upstreamQuery.set("target", target);
+  const upstreamUrl = `${apiInternalUrl}/api/v1/subscriptions/public/${encodeURIComponent(match.publicId)}/render${formatQuery(upstreamQuery)}`;
   const upstream = await input.fetchImpl(upstreamUrl, {
-    headers: { accept: request.headers.accept ?? "*/*" }
+    headers: buildSubscriptionProxyHeaders(request, request.headers.accept ?? "*/*")
   });
   const body = await upstream.text();
   const headers = {
@@ -135,6 +139,31 @@ async function proxySubscriptionRender(request, response, input) {
   response.writeHead(upstream.status, headers);
   response.end(body);
   return true;
+}
+
+function buildUpstreamQuery(searchParams) {
+  const upstreamQuery = new URLSearchParams(searchParams);
+  upstreamQuery.delete("format");
+  return upstreamQuery;
+}
+
+function formatQuery(searchParams) {
+  const query = searchParams.toString();
+  return query ? `?${query}` : "";
+}
+
+function buildSubscriptionProxyHeaders(request, accept) {
+  const headers = { accept };
+  for (const [incomingName, upstreamName] of [
+    ["x-lumen-hwid", "X-Lumen-HWID"],
+    ["x-device-id", "X-Device-Id"]
+  ]) {
+    const value = firstHeaderValue(request.headers[incomingName]);
+    if (value) {
+      headers[upstreamName] = value;
+    }
+  }
+  return headers;
 }
 
 function inferTargetFromUserAgent(userAgent = "") {

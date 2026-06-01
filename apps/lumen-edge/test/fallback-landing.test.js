@@ -92,12 +92,12 @@ test("proxies public subscription manifest without exposing API credentials", as
   });
   const port = await listen(server);
   try {
-    const response = await fetch(`http://127.0.0.1:${port}/sub/lumen_sub_abc1234567890xyz/manifest`);
+    const response = await fetch(`http://127.0.0.1:${port}/sub/lumen_sub_abc1234567890xyz/manifest?device_id=device-1&device_label=Pixel`);
     const body = await response.json();
 
     assert.equal(response.status, 200);
     assert.equal(body.schemaVersion, "lumen.subscription-manifest.v1");
-    assert.equal(upstreamCalls[0].url, "http://api.internal:8000/api/v1/subscriptions/public/lumen_sub_abc1234567890xyz/manifest");
+    assert.equal(upstreamCalls[0].url, "http://api.internal:8000/api/v1/subscriptions/public/lumen_sub_abc1234567890xyz/manifest?device_id=device-1&device_label=Pixel");
     assert.equal(upstreamCalls[0].options.headers.accept, "application/json");
     assert.equal(upstreamCalls[0].options.headers.authorization, undefined);
   } finally {
@@ -125,14 +125,17 @@ test("proxies public rendered subscription with target negotiation", async () =>
   });
   const port = await listen(server);
   try {
-    const response = await fetch(`http://127.0.0.1:${port}/sub/lumen_sub_abc1234567890xyz/hiddify`);
+    const response = await fetch(`http://127.0.0.1:${port}/sub/lumen_sub_abc1234567890xyz/hiddify?device_id=device-1&hwid=HWID-1`, {
+      headers: { "x-device-id": "HEADER-DEVICE" }
+    });
     const body = await response.text();
 
     assert.equal(response.status, 200);
     assert.equal(body, "vless://example\n");
     assert.equal(response.headers.get("x-lumen-render-target"), "hiddify");
-    assert.equal(upstreamCalls[0].url, "http://api.internal:8000/api/v1/subscriptions/public/lumen_sub_abc1234567890xyz/render?target=hiddify");
+    assert.equal(upstreamCalls[0].url, "http://api.internal:8000/api/v1/subscriptions/public/lumen_sub_abc1234567890xyz/render?device_id=device-1&hwid=HWID-1&target=hiddify");
     assert.equal(upstreamCalls[0].options.headers.authorization, undefined);
+    assert.equal(upstreamCalls[0].options.headers["X-Device-Id"], "HEADER-DEVICE");
   } finally {
     await close(server);
   }
