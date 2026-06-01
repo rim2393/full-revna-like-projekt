@@ -85,7 +85,20 @@ function pluginValidationArgs(plugin) {
   if (plugin === "v2ray-plugin") {
     return ["--version"];
   }
-  return ["--help"];
+  return ["-h"];
+}
+
+async function validatePluginBinary(execFileImpl, plugin) {
+  try {
+    await runExecFile(execFileImpl, plugin, pluginValidationArgs(plugin));
+    return;
+  } catch (error) {
+    const output = `${error?.stdout ?? ""}\n${error?.stderr ?? ""}`;
+    if (plugin === "obfs-server" && output.includes("simple-obfs")) {
+      return;
+    }
+    throw error;
+  }
 }
 
 export function createShadowsocksPluginApplyPlan(input = {}) {
@@ -172,11 +185,7 @@ export async function ensureManagedShadowsocksPluginProcess(input = {}) {
   const logPath = env.LUMEN_SHADOWSOCKS_PLUGIN_LOG_FILE ?? DEFAULT_SHADOWSOCKS_PLUGIN_LOG_FILE;
   const pidFile = env.LUMEN_SHADOWSOCKS_PLUGIN_PID_FILE ?? DEFAULT_SHADOWSOCKS_PLUGIN_PID_FILE;
   await runExecFile(input.execFileImpl, binary, ["--version"]);
-  await runExecFile(
-    input.execFileImpl,
-    runtimeConfig.plugin,
-    pluginValidationArgs(runtimeConfig.plugin)
-  );
+  await validatePluginBinary(input.execFileImpl, runtimeConfig.plugin);
   const pid = readPid(pidFile);
   if (isPidRunning(pid)) {
     return Object.freeze({
@@ -212,11 +221,7 @@ export async function applyShadowsocksPluginConfig(plan, input = {}) {
   mkdirSync(dirname(configPath), { recursive: true, mode: 0o700 });
   writeFileSync(configPath, `${JSON.stringify(runtimeConfig, null, 2)}\n`, { mode: 0o600 });
   await runExecFile(input.execFileImpl, binary, ["--version"]);
-  await runExecFile(
-    input.execFileImpl,
-    runtimeConfig.plugin,
-    pluginValidationArgs(runtimeConfig.plugin)
-  );
+  await validatePluginBinary(input.execFileImpl, runtimeConfig.plugin);
   const logPath = env.LUMEN_SHADOWSOCKS_PLUGIN_LOG_FILE ?? DEFAULT_SHADOWSOCKS_PLUGIN_LOG_FILE;
   const pidFile = env.LUMEN_SHADOWSOCKS_PLUGIN_PID_FILE ?? DEFAULT_SHADOWSOCKS_PLUGIN_PID_FILE;
   stopPid(pidFile);

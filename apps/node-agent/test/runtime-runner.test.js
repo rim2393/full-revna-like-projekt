@@ -463,6 +463,12 @@ test("run once applies managed sing-box Shadowsocks config from outbound apply",
       },
       execFileImpl: async (command, args) => {
         execCalls.push([command, args]);
+        if (command === "obfs-server") {
+          const error = new Error("obfs-server help exits with status 1");
+          error.stdout = "\nsimple-obfs 0.0.5\n";
+          error.stderr = "";
+          throw error;
+        }
         return { stdout: "", stderr: "" };
       },
       spawnImpl: (command, args) => {
@@ -731,7 +737,7 @@ test("run once applies managed Shadowsocks simple-obfs config from outbound appl
     assert.equal(result.command.status, "succeeded");
     assert.deepEqual(execCalls, [
       ["ssserver", ["--version"]],
-      ["obfs-server", ["--help"]]
+      ["obfs-server", ["-h"]]
     ]);
     assert.deepEqual(spawned[0], ["ssserver", ["-c", configPath]]);
     const config = JSON.parse(readFileSync(configPath, "utf8"));
