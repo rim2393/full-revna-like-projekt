@@ -57,6 +57,7 @@ type ProfileFormState = {
   credentialsRef: string
   configJson: string
   flow: string
+  metadataJson: string
   name: string
   nodeId: string
   port: string
@@ -74,6 +75,7 @@ const defaultForm: ProfileFormState = {
   credentialsRef: '',
   configJson: JSON.stringify({}, null, 2),
   flow: '',
+  metadataJson: JSON.stringify({}, null, 2),
   name: '',
   nodeId: '',
   port: '443',
@@ -1812,6 +1814,15 @@ function ProfileEditor({
             onChange={(event) => patch({ configJson: event.target.value })}
           />
         </label>
+        <label htmlFor="profile-metadata-json" className="profile-form-grid__wide">
+          {t('Profile metadata JSON')}
+          <textarea
+            id="profile-metadata-json"
+            spellCheck={false}
+            value={form.metadataJson}
+            onChange={(event) => patch({ metadataJson: event.target.value })}
+          />
+        </label>
         <label className="toggle-row profile-form-grid__wide" htmlFor="profile-allow-conflicts">
           <input
             id="profile-allow-conflicts"
@@ -1867,6 +1878,7 @@ function profileToForm(profile: ProtocolProfileRecord): ProfileFormState {
     configJson: JSON.stringify(profile.config_json, null, 2),
     credentialsRef: profile.credentials_ref ?? '',
     flow: String(profile.config_json.flow ?? ''),
+    metadataJson: JSON.stringify(profile.metadata_json, null, 2),
     name: profile.name,
     nodeId: profile.node_id,
     port: String(reservation.port ?? ''),
@@ -1935,6 +1947,7 @@ function formToRequest(
     throw new Error(t('Name is required.'))
   }
   const config_json = parseProfileConfigJson(form.configJson, t)
+  const metadata_json = parseProfileMetadataJson(form.metadataJson, t)
   config_json.security = form.security
   config_json.transport = form.transport
   if (adapterCapabilities.includes('reality') && form.flow.trim()) {
@@ -1952,6 +1965,7 @@ function formToRequest(
     allow_port_conflicts: form.allowPortConflicts,
     config_json,
     credentials_ref: form.credentialsRef.trim() || null,
+    metadata_json,
     name: form.name.trim(),
     node_id: form.nodeId,
     port_reservations: [{ address: '0.0.0.0', exclusive: true, port, protocol: form.portProtocol }],
@@ -1969,6 +1983,19 @@ function parseProfileConfigJson(value: string, t: (value: string) => string): Re
   }
   if (!parsed || Array.isArray(parsed) || typeof parsed !== 'object') {
     throw new Error(t('Profile config JSON must be an object.'))
+  }
+  return { ...(parsed as Record<string, unknown>) }
+}
+
+function parseProfileMetadataJson(value: string, t: (value: string) => string): Record<string, unknown> {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(value || '{}')
+  } catch {
+    throw new Error(t('Profile metadata JSON must be valid JSON.'))
+  }
+  if (!parsed || Array.isArray(parsed) || typeof parsed !== 'object') {
+    throw new Error(t('Profile metadata JSON must be an object.'))
   }
   return { ...(parsed as Record<string, unknown>) }
 }

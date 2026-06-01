@@ -103,7 +103,7 @@ describe('Control plane resource screens', () => {
     expect(screen.getByText(/users limited or in grace/i)).toBeInTheDocument()
   })
 
-  it('saves profile config JSON through the real profile update contract', async () => {
+  it('saves profile config and metadata JSON through the real profile update contract', async () => {
     const user = userEvent.setup()
     const developmentClient = createDevelopmentLumenApiClient()
     const checkPortConflicts = vi.fn(async () => ({ allowed: true, conflicts: [] }))
@@ -128,6 +128,14 @@ describe('Control plane resource screens', () => {
     expect(updateProfile).not.toHaveBeenCalled()
 
     fireEvent.change(screen.getByLabelText(/profile config json/i), {
+      target: { value: JSON.stringify({ security: 'reality', transport: 'tcp' }, null, 2) },
+    })
+    fireEvent.change(screen.getByLabelText(/profile metadata json/i), { target: { value: '[]' } })
+    fireEvent.submit(form as HTMLFormElement)
+    expect(await screen.findByText(/profile metadata json must be an object/i)).toBeInTheDocument()
+    expect(updateProfile).not.toHaveBeenCalled()
+
+    fireEvent.change(screen.getByLabelText(/profile config json/i), {
       target: {
         value: JSON.stringify(
           {
@@ -140,11 +148,20 @@ describe('Control plane resource screens', () => {
         ),
       },
     })
+    fireEvent.change(screen.getByLabelText(/profile metadata json/i), {
+      target: {
+        value: JSON.stringify({ order: 7, owner: 'ops' }, null, 2),
+      },
+    })
     fireEvent.submit(form as HTMLFormElement)
 
     await waitFor(() => expect(updateProfile).toHaveBeenCalled())
     expect(updateProfile.mock.calls[0][1].config_json).toMatchObject({
       routing: { domainStrategy: 'AsIs' },
+    })
+    expect(updateProfile.mock.calls[0][1].metadata_json).toMatchObject({
+      order: 7,
+      owner: 'ops',
     })
   })
 
