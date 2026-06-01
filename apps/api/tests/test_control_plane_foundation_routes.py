@@ -490,8 +490,6 @@ async def test_protocol_profile_port_conflict_and_host_flow(
 
 
 async def test_remna_parity_crud_and_bulk_actions(foundation_app: FoundationRouteApp) -> None:
-    node_id = await seeded_node_id(foundation_app)
-
     user_response = await foundation_app.client.post(
         "/api/v1/users",
         json={
@@ -561,6 +559,31 @@ async def test_remna_parity_crud_and_bulk_actions(foundation_app: FoundationRout
     assert bulk_user_response.status_code == 200
     assert bulk_user_response.json()["updated"] == 1
     assert bulk_user_response.json()["items"][0]["traffic_used_gb"] == 0
+
+
+async def test_user_list_returns_existing_local_service_addresses(
+    foundation_app: FoundationRouteApp,
+) -> None:
+    async with foundation_app.sessionmaker() as session:
+        session.add(
+            User(
+                email="openvpn-ss-live-20260601145746@lumen.local",
+                role=Role.USER.value,
+                status="active",
+            )
+        )
+        await session.commit()
+
+    list_response = await foundation_app.client.get("/api/v1/users")
+    assert list_response.status_code == 200
+    emails = {item["email"] for item in list_response.json()["items"]}
+    assert "openvpn-ss-live-20260601145746@lumen.local" in emails
+
+
+async def test_remna_parity_profile_host_subscription_flow(
+    foundation_app: FoundationRouteApp,
+) -> None:
+    node_id = await seeded_node_id(foundation_app)
 
     squad_response = await foundation_app.client.post(
         "/api/v1/squads",

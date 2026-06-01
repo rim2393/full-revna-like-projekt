@@ -56,7 +56,7 @@ class UserBulkActionRequest(BaseModel):
 
 class UserResponse(BaseModel):
     id: UUID
-    email: EmailStr
+    email: str
     role: Role
     status: str = Field(examples=["active"])
     username: str | None
