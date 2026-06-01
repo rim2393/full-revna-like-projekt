@@ -36,7 +36,7 @@ RUN apk add --no-cache ca-certificates curl gcompat iproute2 iptables libev pcre
   && cd /tmp/simple-obfs \
   && git submodule update --init --recursive \
   && ./autogen.sh \
-  && ./configure --prefix=/usr/local \
+  && CFLAGS="-Wno-error=stringop-overread" ./configure --prefix=/usr/local \
   && make -j"$(nproc)" \
   && install -m 0755 src/obfs-server /usr/local/bin/obfs-server \
   && apk del .simple-obfs-build-deps \
