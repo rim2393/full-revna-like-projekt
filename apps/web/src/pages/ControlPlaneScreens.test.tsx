@@ -165,6 +165,25 @@ describe('Control plane resource screens', () => {
     })
   })
 
+  it('wires profile manual reorder controls to the real reorder API contract', async () => {
+    const user = userEvent.setup()
+    const developmentClient = createDevelopmentLumenApiClient()
+    const reorderProfiles = vi.fn(developmentClient.reorderProfiles)
+    const apiClient: LumenApiClient = {
+      ...developmentClient,
+      reorderProfiles,
+    }
+
+    renderWithRouter('/profiles', { apiClient, initialSession: developmentSession })
+
+    expect(await screen.findByRole('heading', { name: /^profiles$/i })).toBeInTheDocument()
+    const moveDown = await screen.findAllByRole('button', { name: /move stealconfig down/i })
+    await user.click(moveDown[0])
+
+    await waitFor(() => expect(reorderProfiles).toHaveBeenCalled())
+    expect(reorderProfiles.mock.calls[0][0]).toEqual(['profile_trojan_xhttp', 'profile_stealconfig'])
+  })
+
   it('wires per-user lifecycle controls to real update requests', async () => {
     const user = userEvent.setup()
     const users: UserRecord[] = [

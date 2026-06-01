@@ -411,6 +411,19 @@ export function useDeleteProfile() {
   })
 }
 
+export function useReorderProfiles() {
+  const apiClient = useApiClient()
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (ids: string[]) => apiClient.reorderProfiles(ids),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.profiles })
+      void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.profileGlobalInbounds })
+    },
+  })
+}
+
 export function useHostsPageData() {
   const apiClient = useApiClient()
 

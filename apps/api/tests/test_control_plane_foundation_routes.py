@@ -852,6 +852,45 @@ async def test_profile_bulk_delete_is_supported(foundation_app: FoundationRouteA
     assert not set(profile_ids).intersection(remaining_ids)
 
 
+async def test_profile_reorder_is_persisted(foundation_app: FoundationRouteApp) -> None:
+    node_id = await seeded_node_id(foundation_app)
+
+    profile_ids: list[str] = []
+    for index in range(2):
+        response = await foundation_app.client.post(
+            "/api/v1/profiles",
+            json={
+                "name": f"Ordered Profile {index}",
+                "node_id": node_id,
+                "adapter": "vless-reality",
+                "credentials_ref": f"vault://protocols/ordered-profile-{index}",
+                "port_reservations": [
+                    {
+                        "address": WILDCARD_BIND_ADDRESS,
+                        "port": 18180 + index,
+                        "protocol": "tcp",
+                    }
+                ],
+            },
+        )
+        assert response.status_code == 201
+        profile_ids.append(response.json()["id"])
+
+    reorder_response = await foundation_app.client.post(
+        "/api/v1/profiles/actions/reorder",
+        json={"ids": [profile_ids[1], profile_ids[0]]},
+    )
+    assert reorder_response.status_code == 200
+    assert reorder_response.json()["updated"] == 2
+
+    list_response = await foundation_app.client.get("/api/v1/profiles")
+    assert list_response.status_code == 200
+    profiles = list_response.json()["items"]
+    assert [profile["id"] for profile in profiles[:2]] == [profile_ids[1], profile_ids[0]]
+    assert profiles[0]["metadata_json"]["order"] == 0
+    assert profiles[1]["metadata_json"]["order"] == 1
+
+
 async def test_squad_detail_membership_and_reorder_are_persisted(
     foundation_app: FoundationRouteApp,
 ) -> None:

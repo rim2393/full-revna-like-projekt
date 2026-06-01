@@ -117,6 +117,12 @@ class ProtocolProfileListResponse(BaseModel):
     items: list[ProtocolProfileResponse]
 
 
+class ProtocolProfileReorderRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    ids: list[UUID] = Field(min_length=1)
+
+
 class ProfileComputedNodeResponse(BaseModel):
     id: UUID
     name: str

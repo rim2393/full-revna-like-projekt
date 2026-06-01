@@ -22,6 +22,7 @@ from app.domains.protocols.schemas import (
     ProtocolAdapterListResponse,
     ProtocolProfileCreateRequest,
     ProtocolProfileListResponse,
+    ProtocolProfileReorderRequest,
     ProtocolProfileResponse,
     ProtocolProfileUpdateRequest,
     ResourceBulkActionRequest,
@@ -62,6 +63,7 @@ from app.domains.protocols.service import (
     profile_response,
     remove_squad_users,
     reorder_hosts,
+    reorder_profiles,
     reorder_squads,
     squad_response,
     update_host,
@@ -257,6 +259,24 @@ async def bulk_profile_delete(
         session,
         principal=principal,
         action="protocol_profile.bulk.delete",
+        resource_type="protocol_profile",
+        metadata_json={"profile_ids": [str(profile_id) for profile_id in request.ids]},
+    )
+    await session.commit()
+    return ResourceBulkActionResponse(updated=updated)
+
+
+@profiles_router.post("/actions/reorder", response_model=ResourceBulkActionResponse)
+async def reorder_profile_route(
+    request: ProtocolProfileReorderRequest,
+    principal: Manager,
+    session: DatabaseSession,
+) -> ResourceBulkActionResponse:
+    updated = await reorder_profiles(session, request=request)
+    await record_audit_event(
+        session,
+        principal=principal,
+        action="protocol_profile.reordered",
         resource_type="protocol_profile",
         metadata_json={"profile_ids": [str(profile_id) for profile_id in request.ids]},
     )

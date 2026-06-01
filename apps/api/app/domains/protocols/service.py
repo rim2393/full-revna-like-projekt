@@ -31,6 +31,7 @@ from app.domains.protocols.schemas import (
     ProfileInboundResponse,
     ProtocolAdapterResponse,
     ProtocolProfileCreateRequest,
+    ProtocolProfileReorderRequest,
     ProtocolProfileResponse,
     ProtocolProfileUpdateRequest,
     SquadCreateRequest,
@@ -359,7 +360,8 @@ async def list_profiles(session: AsyncSession) -> list[ProtocolProfile]:
     result = await session.execute(
         select(ProtocolProfile).order_by(ProtocolProfile.created_at.desc())
     )
-    return list(result.scalars().all())
+    profiles = list(result.scalars().all())
+    return sorted(profiles, key=_profile_sort_key)
 
 
 async def get_profile(session: AsyncSession, *, profile_id: UUID) -> ProtocolProfile:
@@ -612,6 +614,20 @@ async def delete_profiles(session: AsyncSession, *, ids: list[UUID]) -> int:
     profiles = await _get_profiles_by_ids(session, ids)
     for profile in profiles:
         await session.delete(profile)
+    await session.flush()
+    return len(profiles)
+
+
+async def reorder_profiles(
+    session: AsyncSession,
+    *,
+    request: ProtocolProfileReorderRequest,
+) -> int:
+    profiles = await _get_profiles_by_ids(session, request.ids)
+    profiles_by_id = {profile.id: profile for profile in profiles}
+    for order, profile_id in enumerate(request.ids):
+        profile = profiles_by_id[profile_id]
+        profile.metadata_json = {**profile.metadata_json, "order": order}
     await session.flush()
     return len(profiles)
 
@@ -1434,6 +1450,15 @@ def _host_sort_key(host: Host) -> tuple[int, str]:
     if isinstance(order, str) and order.isdigit():
         return (int(order), host.name)
     return (1_000_000, host.name)
+
+
+def _profile_sort_key(profile: ProtocolProfile) -> tuple[int, str]:
+    order = profile.metadata_json.get("order")
+    if isinstance(order, int):
+        return (order, profile.name)
+    if isinstance(order, str) and order.isdigit():
+        return (int(order), profile.name)
+    return (1_000_000, profile.name)
 
 
 def _squad_sort_key(squad: Squad) -> tuple[int, str]:

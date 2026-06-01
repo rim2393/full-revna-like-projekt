@@ -319,6 +319,8 @@ export function createHttpLumenApiClient({
       request(`/api/v1/squads/${squadId}/users/remove`, { body: payload, method: 'POST' }),
     reorderHosts: (ids: string[]) =>
       request('/api/v1/hosts/actions/reorder', { body: { ids }, method: 'POST' }),
+    reorderProfiles: (ids: string[]) =>
+      request('/api/v1/profiles/actions/reorder', { body: { ids }, method: 'POST' }),
     reorderSquads: (ids: string[]) =>
       request('/api/v1/squads/actions/reorder', { body: { ids }, method: 'POST' }),
     reorderSubscriptionTemplates: (ids: string[]) =>

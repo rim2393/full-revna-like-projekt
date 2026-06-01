@@ -1,6 +1,8 @@
 ﻿import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import {
   Ban,
+  ArrowDown,
+  ArrowUp,
   CheckCircle2,
   Code2,
   Copy,
@@ -35,6 +37,7 @@ import {
   useProfileInbounds,
   useProfilesPageData,
   useProtocolAdaptersData,
+  useReorderProfiles,
   useSquadsPageData,
   useBulkProfiles,
   useUpdateProfile,
@@ -99,6 +102,7 @@ export function ProfilesPage() {
   const updateProfile = useUpdateProfile()
   const deleteProfile = useDeleteProfile()
   const bulkProfiles = useBulkProfiles()
+  const reorderProfiles = useReorderProfiles()
   const applyProfileToNode = useApplyProfileToNode()
   const profiles = profilesQuery.data?.items ?? []
   const adapters = adaptersQuery.data?.items ?? []
@@ -113,7 +117,7 @@ export function ProfilesPage() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'disabled'>('all')
   const [adapterFilter, setAdapterFilter] = useState<'all' | string>('all')
   const [nodeFilter, setNodeFilter] = useState<'all' | string>('all')
-  const [sortMode, setSortMode] = useState<'name-asc' | 'name-desc' | 'node' | 'created'>('name-asc')
+  const [sortMode, setSortMode] = useState<'manual' | 'name-asc' | 'name-desc' | 'node' | 'created'>('manual')
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table')
   const [form, setForm] = useState<ProfileFormState>(defaultForm)
   const [formError, setFormError] = useState<string | null>(null)
@@ -126,7 +130,8 @@ export function ProfilesPage() {
     updateProfile.isPending ||
     deleteProfile.isPending ||
     bulkProfiles.isPending ||
-    applyProfileToNode.isPending
+    applyProfileToNode.isPending ||
+    reorderProfiles.isPending
   const selectionBusy = isMutating
   const confirmDanger = (message: string) => window.confirm(message)
   const profileHosts = useMemo(() => groupHostsByProfile(hosts), [hosts])
@@ -156,6 +161,8 @@ export function ProfilesPage() {
     })
 
     switch (sortMode) {
+      case 'manual':
+        return matched
       case 'name-desc':
         return matched.sort((a, b) => b.name.localeCompare(a.name))
       case 'node':
@@ -440,6 +447,30 @@ export function ProfilesPage() {
     }
   }
 
+  async function handleMoveProfile(profile: ProtocolProfileRecord, direction: -1 | 1) {
+    const currentIds = profiles.map((item) => item.id)
+    const currentIndex = currentIds.indexOf(profile.id)
+    const targetIndex = currentIndex + direction
+    if (currentIndex < 0 || targetIndex < 0 || targetIndex >= currentIds.length) {
+      return
+    }
+    const nextIds = [...currentIds]
+    ;[nextIds[currentIndex], nextIds[targetIndex]] = [nextIds[targetIndex], nextIds[currentIndex]]
+    setFormError(null)
+    try {
+      await reorderProfiles.mutateAsync(nextIds)
+      setSortMode('manual')
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : t('Profile reorder failed.'))
+    }
+  }
+
+  function canMoveProfile(profile: ProtocolProfileRecord, direction: -1 | 1) {
+    const currentIndex = profiles.findIndex((item) => item.id === profile.id)
+    const targetIndex = currentIndex + direction
+    return currentIndex >= 0 && targetIndex >= 0 && targetIndex < profiles.length
+  }
+
   function openCreateProfile() {
     setEditingProfileId(null)
     setShowEditor(true)
@@ -711,10 +742,11 @@ export function ProfilesPage() {
                       <select
                         value={sortMode}
                         onChange={(event) =>
-                          setSortMode(event.target.value as 'name-asc' | 'name-desc' | 'node' | 'created')
+                          setSortMode(event.target.value as 'manual' | 'name-asc' | 'name-desc' | 'node' | 'created')
                         }
                         disabled={isMutating}
                       >
+                        <option value="manual">{t('Manual order')}</option>
                         <option value="name-asc">{t('Sort by name (A-Z)')}</option>
                         <option value="name-desc">{t('Sort by name (Z-A)')}</option>
                         <option value="node">{t('Sort by node')}</option>
@@ -752,7 +784,7 @@ export function ProfilesPage() {
                         setStatusFilter('all')
                         setAdapterFilter('all')
                         setNodeFilter('all')
-                        setSortMode('name-asc')
+                        setSortMode('manual')
                       }}
                       disabled={isMutating || !isFiltered}
                     >
@@ -782,11 +814,14 @@ export function ProfilesPage() {
                       hostsByProfile={profileHosts}
                       inboundsByProfile={inboundsByProfile}
                       onFocusInbounds={setProfileForInboundFocus}
+                      canMoveDown={(profile) => canMoveProfile(profile, 1)}
+                      canMoveUp={(profile) => canMoveProfile(profile, -1)}
                       nodeNameFor={(profile) =>
                         nodes.find((node) => node.id === profile.node_id)?.name ?? profile.node_id
                       }
                       onDelete={handleDelete}
                       onEdit={startEdit}
+                      onMove={handleMoveProfile}
                       onDuplicate={startClone}
                       onExport={(profile) => downloadJson(`${profile.name}-profile.json`, profileExport(profile))}
                       onApply={handleApplyProfileToNode}
@@ -825,6 +860,9 @@ export function ProfilesPage() {
                         onDuplicate={startClone}
                         onExport={() => downloadJson(`${profile.name}-profile.json`, profileExport(profile))}
                         onApply={handleApplyProfileToNode}
+                        canMoveDown={canMoveProfile(profile, 1)}
+                        canMoveUp={canMoveProfile(profile, -1)}
+                        onMove={handleMoveProfile}
                         onSelect={setProfileSelected}
                         onSelectRow={toggleSelectedProfile}
                         onFocusInbounds={setProfileForInboundFocus}
@@ -920,8 +958,11 @@ function ProfileInventoryTable({
   hostsByProfile,
   inboundsByProfile,
   nodeNameFor,
+  canMoveDown,
+  canMoveUp,
   onDelete,
   onEdit,
+  onMove,
   onDuplicate,
   onExport,
   onFocusInbounds,
@@ -940,8 +981,11 @@ function ProfileInventoryTable({
   hostsByProfile: Map<string, HostRecord[]>
   inboundsByProfile: Map<string, ProfileInboundRecord[]>
   nodeNameFor: (profile: ProtocolProfileRecord) => string
+  canMoveDown: (profile: ProtocolProfileRecord) => boolean
+  canMoveUp: (profile: ProtocolProfileRecord) => boolean
   onDelete: (profile: ProtocolProfileRecord) => void
   onEdit: (profile: ProtocolProfileRecord) => void
+  onMove: (profile: ProtocolProfileRecord, direction: -1 | 1) => void
   onDuplicate: (profile: ProtocolProfileRecord) => void
   onExport: (profile: ProtocolProfileRecord) => void
   onFocusInbounds: (profileId: string) => void
@@ -1029,6 +1073,26 @@ function ProfileInventoryTable({
             <button
               type="button"
               className="button button--secondary"
+              aria-label={t('Move {name} up', { name: profile.name })}
+              onClick={() => onMove(profile, -1)}
+              disabled={selectionBusy || !canMoveUp(profile)}
+            >
+              <ArrowUp size={16} aria-hidden="true" />
+              {t('Up')}
+            </button>
+            <button
+              type="button"
+              className="button button--secondary"
+              aria-label={t('Move {name} down', { name: profile.name })}
+              onClick={() => onMove(profile, 1)}
+              disabled={selectionBusy || !canMoveDown(profile)}
+            >
+              <ArrowDown size={16} aria-hidden="true" />
+              {t('Down')}
+            </button>
+            <button
+              type="button"
+              className="button button--secondary"
               aria-label={t('Edit {name}', { name: profile.name })}
               onClick={() => onEdit(profile)}
               disabled={selectionBusy}
@@ -1113,11 +1177,14 @@ function ProfileCard({
   hosts,
   inbounds,
   nodeName,
+  canMoveDown,
+  canMoveUp,
   onDelete,
   onEdit,
   onDuplicate,
   onExport,
   onApply,
+  onMove,
   onSelect,
   onSelectRow,
   onToggle,
@@ -1132,10 +1199,13 @@ function ProfileCard({
   hosts: HostRecord[]
   inbounds: number
   nodeName: string
+  canMoveDown: boolean
+  canMoveUp: boolean
   onDelete: (profile: ProtocolProfileRecord) => void
   onEdit: (profile: ProtocolProfileRecord) => void
   onExport: () => void
   onApply: (profile: ProtocolProfileRecord) => void
+  onMove: (profile: ProtocolProfileRecord, direction: -1 | 1) => void
   onDuplicate: (profile: ProtocolProfileRecord) => void
   onSelect: (profileId: string) => void
   onSelectRow: (profileId: string) => void
@@ -1176,6 +1246,26 @@ function ProfileCard({
         </div>
       </div>
       <div className="profile-card__actions">
+        <button
+          type="button"
+          className="button button--secondary"
+          aria-label={t('Move {name} up', { name: profile.name })}
+          onClick={() => onMove(profile, -1)}
+          disabled={selectionBusy || !canMoveUp}
+        >
+          <ArrowUp size={16} aria-hidden="true" />
+          {t('Up')}
+        </button>
+        <button
+          type="button"
+          className="button button--secondary"
+          aria-label={t('Move {name} down', { name: profile.name })}
+          onClick={() => onMove(profile, 1)}
+          disabled={selectionBusy || !canMoveDown}
+        >
+          <ArrowDown size={16} aria-hidden="true" />
+          {t('Down')}
+        </button>
         <button
           type="button"
           className="button button--secondary"

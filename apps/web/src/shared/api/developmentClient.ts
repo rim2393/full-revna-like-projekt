@@ -1093,6 +1093,17 @@ export function createDevelopmentLumenApiClient(): LumenApiClient {
       })
       return { updated: ordered.length }
     },
+    reorderProfiles: async (ids: string[]) => {
+      const ordered = ids
+        .map((id) => profiles.find((profile) => profile.id === id))
+        .filter((profile): profile is ProtocolProfileRecord => Boolean(profile))
+      const remainder = profiles.filter((profile) => !ids.includes(profile.id))
+      profiles.splice(0, profiles.length, ...ordered, ...remainder)
+      ordered.forEach((profile, order) => {
+        profile.metadata_json = { ...profile.metadata_json, order }
+      })
+      return { updated: ordered.length }
+    },
     reorderSquads: async (ids: string[]) => {
       const ordered = ids
         .map((id) => squads.find((squad) => squad.id === id))

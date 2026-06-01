@@ -1163,6 +1163,7 @@ export type LumenApiClient = {
     request: SquadUserMutationRequest,
   ) => Promise<SquadRecord>
   reorderHosts: (ids: string[]) => Promise<ResourceBulkActionResponse>
+  reorderProfiles: (ids: string[]) => Promise<ResourceBulkActionResponse>
   reorderSquads: (ids: string[]) => Promise<ResourceBulkActionResponse>
   reorderSubscriptionTemplates: (ids: string[]) => Promise<ResourceBulkActionResponse>
   reorderResponseRules: (ids: string[]) => Promise<ResourceBulkActionResponse>
