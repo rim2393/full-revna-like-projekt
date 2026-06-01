@@ -10,7 +10,10 @@ import type {
   LoginMethodsResponse,
   MfaChallengeVerifyRequest,
   LumenApiClient,
+  NodePluginApplyRequest,
+  NodePluginCloneRequest,
   NodePluginCreateRequest,
+  NodePluginReorderRequest,
   NodePluginUpdateRequest,
   InfraProviderCreateRequest,
   InfraBillingRecordCreateRequest,
@@ -377,6 +380,12 @@ export function createHttpLumenApiClient({
       request(`/api/v1/node-plugins${nodeId ? `?node_id=${encodeURIComponent(nodeId)}` : ''}`),
     createNodePlugin: (payload: NodePluginCreateRequest) =>
       request('/api/v1/node-plugins', { body: payload, method: 'POST' }),
+    cloneNodePlugin: (pluginId: string, payload: NodePluginCloneRequest) =>
+      request(`/api/v1/node-plugins/${pluginId}/clone`, { body: payload, method: 'POST' }),
+    reorderNodePlugins: (payload: NodePluginReorderRequest) =>
+      request('/api/v1/node-plugins/reorder', { body: payload, method: 'POST' }),
+    applyNodePlugins: (payload: NodePluginApplyRequest) =>
+      request('/api/v1/node-plugins/apply', { body: payload, method: 'POST' }),
     updateNodePlugin: (pluginId: string, payload: NodePluginUpdateRequest) =>
       request(`/api/v1/node-plugins/${pluginId}`, { body: payload, method: 'PATCH' }),
     deleteNodePlugin: (pluginId: string) =>

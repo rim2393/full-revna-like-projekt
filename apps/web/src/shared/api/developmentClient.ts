@@ -28,8 +28,11 @@ import type {
   InfraProviderRecord,
   LumenApiClient,
   NodeBulkActionRequest,
+  NodePluginApplyRequest,
+  NodePluginCloneRequest,
   NodePluginCreateRequest,
   NodePluginRecord,
+  NodePluginReorderRequest,
   NodePluginUpdateRequest,
   NodeCommandCreateRequest,
   NodeCommandRecord,
@@ -1328,11 +1331,78 @@ export function createDevelopmentLumenApiClient(): LumenApiClient {
         name: request.name,
         config_json: request.config_json ?? {},
         enabled: request.enabled ?? true,
+        sort_order: request.sort_order ?? nodePlugins.length * 10,
         created_at: now,
         updated_at: now,
       }
       nodePlugins.unshift(plugin)
       return plugin
+    },
+    cloneNodePlugin: async (
+      pluginId: string,
+      request: NodePluginCloneRequest,
+    ): Promise<NodePluginRecord> => {
+      const source = nodePlugins.find((item) => item.id === pluginId)
+      if (!source) {
+        throw new Error('Node plugin not found')
+      }
+      const now = new Date().toISOString()
+      const plugin: NodePluginRecord = {
+        ...source,
+        id: `plugin_${Date.now()}`,
+        name: request.name ?? `${source.name} copy`,
+        node_id: request.node_id ?? source.node_id,
+        enabled: request.enabled ?? source.enabled,
+        sort_order: nodePlugins.length * 10,
+        created_at: now,
+        updated_at: now,
+      }
+      nodePlugins.push(plugin)
+      return plugin
+    },
+    reorderNodePlugins: async (request: NodePluginReorderRequest) => {
+      request.items.forEach((item) => {
+        const plugin = nodePlugins.find((entry) => entry.id === item.id)
+        if (plugin) {
+          plugin.sort_order = item.sort_order
+          plugin.updated_at = new Date().toISOString()
+        }
+      })
+      nodePlugins.sort((left, right) => left.sort_order - right.sort_order)
+      return { items: [...nodePlugins] }
+    },
+    applyNodePlugins: async (request: NodePluginApplyRequest): Promise<NodeCommandRecord> => {
+      const now = new Date().toISOString()
+      return {
+        id: `cmd_plugin_${Date.now()}`,
+        node_id: request.node_id,
+        command_type: 'firewall.plan.apply',
+        status: 'queued',
+        payload_json: {
+          nodePolicy: {
+            modelVersion: 'lumen.node-policy.v1',
+            plugins: nodePlugins
+              .filter((plugin) => plugin.enabled && (!plugin.node_id || plugin.node_id === request.node_id))
+              .map((plugin) => ({
+                id: plugin.id,
+                nodeId: plugin.node_id,
+                kind: plugin.kind,
+                name: plugin.name,
+                config: plugin.config_json,
+                enabled: plugin.enabled,
+                sortOrder: plugin.sort_order,
+              })),
+          },
+          reason: request.reason ?? 'operator applied node plugin policy',
+        },
+        result_json: null,
+        error_code: null,
+        error_message: null,
+        claimed_at: null,
+        completed_at: null,
+        created_at: now,
+        updated_at: now,
+      }
     },
     updateNodePlugin: async (pluginId: string, request: NodePluginUpdateRequest) => {
       const plugin = nodePlugins.find((item) => item.id === pluginId)

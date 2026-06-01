@@ -980,6 +980,7 @@ export type NodePluginRecord = {
   name: string
   config_json: Record<string, unknown>
   enabled: boolean
+  sort_order: number
   created_at: string
   updated_at: string
 }
@@ -992,6 +993,7 @@ export type NodePluginCreateRequest = {
   name: string
   config_json?: Record<string, unknown>
   enabled?: boolean
+  sort_order?: number | null
 }
 
 export type NodePluginUpdateRequest = {
@@ -1000,6 +1002,22 @@ export type NodePluginUpdateRequest = {
   name?: string
   config_json?: Record<string, unknown>
   enabled?: boolean
+  sort_order?: number | null
+}
+
+export type NodePluginCloneRequest = {
+  name?: string | null
+  node_id?: string | null
+  enabled?: boolean | null
+}
+
+export type NodePluginReorderRequest = {
+  items: Array<{ id: string; sort_order: number }>
+}
+
+export type NodePluginApplyRequest = {
+  node_id: string
+  reason?: string | null
 }
 
 export type InfraProviderRecord = {
@@ -1207,6 +1225,12 @@ export type LumenApiClient = {
   updateUser: (userId: string, request: UserUpdateRequest) => Promise<UserRecord>
   listNodePlugins: (nodeId?: string) => Promise<NodePluginListResponse>
   createNodePlugin: (request: NodePluginCreateRequest) => Promise<NodePluginRecord>
+  cloneNodePlugin: (
+    pluginId: string,
+    request: NodePluginCloneRequest,
+  ) => Promise<NodePluginRecord>
+  reorderNodePlugins: (request: NodePluginReorderRequest) => Promise<NodePluginListResponse>
+  applyNodePlugins: (request: NodePluginApplyRequest) => Promise<NodeCommandRecord>
   updateNodePlugin: (
     pluginId: string,
     request: NodePluginUpdateRequest,

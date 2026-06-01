@@ -9,7 +9,10 @@ import type {
   InfraBillingRecordCreateRequest,
   InfraProviderCreateRequest,
   NodeBulkActionRequest,
+  NodePluginApplyRequest,
+  NodePluginCloneRequest,
   NodePluginCreateRequest,
+  NodePluginReorderRequest,
   NodePluginUpdateRequest,
   NodeCommandCreateRequest,
   NodePauseRequest,
@@ -1202,6 +1205,44 @@ export function useCreateNodePlugin() {
     mutationFn: (request: NodePluginCreateRequest) => apiClient.createNodePlugin(request),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.nodePlugins })
+    },
+  })
+}
+
+export function useCloneNodePlugin() {
+  const apiClient = useApiClient()
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ id, request }: { id: string; request: NodePluginCloneRequest }) =>
+      apiClient.cloneNodePlugin(id, request),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.nodePlugins })
+    },
+  })
+}
+
+export function useReorderNodePlugins() {
+  const apiClient = useApiClient()
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (request: NodePluginReorderRequest) => apiClient.reorderNodePlugins(request),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.nodePlugins })
+    },
+  })
+}
+
+export function useApplyNodePlugins() {
+  const apiClient = useApiClient()
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (request: NodePluginApplyRequest) => apiClient.applyNodePlugins(request),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.nodePlugins })
+      void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.nodes })
     },
   })
 }

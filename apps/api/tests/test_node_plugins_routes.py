@@ -1,5 +1,6 @@
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
+from uuid import UUID
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -10,6 +11,7 @@ from app.core.config import Settings, get_settings
 from app.core.rbac import Permission, Principal, Role, get_current_principal
 from app.db.base import Base
 from app.db.session import create_engine, get_db_session
+from app.domains.nodes.models import Node, NodeCommand
 from app.main import create_app
 
 
@@ -62,12 +64,14 @@ async def test_node_plugin_crud(route_app: RouteApp) -> None:
             "kind": "torrent-blocker",
             "name": "Global torrent blocker",
             "config_json": {"mode": "drop", "log": True},
+            "sort_order": 20,
         },
     )
     assert created.status_code == 201
     plugin = created.json()
     assert plugin["node_id"] is None
     assert plugin["config_json"]["mode"] == "drop"
+    assert plugin["sort_order"] == 20
     plugin_id = plugin["id"]
 
     listed = await route_app.client.get("/api/v1/node-plugins")
@@ -76,7 +80,7 @@ async def test_node_plugin_crud(route_app: RouteApp) -> None:
 
     updated = await route_app.client.patch(
         f"/api/v1/node-plugins/{plugin_id}",
-        json={"enabled": False, "config_json": {"mode": "log-only"}},
+        json={"enabled": False, "config_json": {"mode": "log-only"}, "node_id": None},
     )
     assert updated.status_code == 200
     assert updated.json()["enabled"] is False
@@ -86,6 +90,104 @@ async def test_node_plugin_crud(route_app: RouteApp) -> None:
     assert deleted.status_code == 204
     final = await route_app.client.get("/api/v1/node-plugins")
     assert final.json()["items"] == []
+
+
+async def test_node_plugin_rejects_inline_secret_config(route_app: RouteApp) -> None:
+    response = await route_app.client.post(
+        "/api/v1/node-plugins",
+        json={
+            "kind": "domain-filter",
+            "name": "Bad plugin",
+            "config_json": {"nested": {"private_key": "not-allowed"}},
+        },
+    )
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "node_plugin_inline_secret_rejected"
+
+
+async def test_node_plugin_clone_reorder_and_apply_queue_real_policy(
+    route_app: RouteApp,
+) -> None:
+    async with route_app.sessionmaker() as session:
+        node = Node(
+            name="node-plugin-runtime",
+            region="test",
+            public_address="203.0.113.44",
+            status="active",
+        )
+        session.add(node)
+        await session.commit()
+        node_id = str(node.id)
+
+    first = await route_app.client.post(
+        "/api/v1/node-plugins",
+        json={
+            "kind": "domain-filter",
+            "name": "Domain filter",
+            "config_json": {"domains": ["ads.example"]},
+            "sort_order": 30,
+        },
+    )
+    second = await route_app.client.post(
+        "/api/v1/node-plugins",
+        json={
+            "kind": "torrent-blocker",
+            "name": "Torrent blocker",
+            "node_id": node_id,
+            "config_json": {"mode": "drop"},
+            "sort_order": 10,
+        },
+    )
+    assert first.status_code == 201
+    assert second.status_code == 201
+    first_id = first.json()["id"]
+    second_id = second.json()["id"]
+
+    cloned = await route_app.client.post(
+        f"/api/v1/node-plugins/{first_id}/clone",
+        json={"name": "Domain filter copy", "node_id": node_id, "enabled": False},
+    )
+    assert cloned.status_code == 201
+    assert cloned.json()["name"] == "Domain filter copy"
+    assert cloned.json()["node_id"] == node_id
+    assert cloned.json()["enabled"] is False
+
+    reordered = await route_app.client.post(
+        "/api/v1/node-plugins/reorder",
+        json={
+            "items": [
+                {"id": first_id, "sort_order": 0},
+                {"id": second_id, "sort_order": 40},
+            ]
+        },
+    )
+    assert reordered.status_code == 200
+    reordered_items = reordered.json()["items"]
+    orders_by_name = {item["name"]: item["sort_order"] for item in reordered_items}
+    assert orders_by_name["Domain filter"] == 0
+    assert orders_by_name["Torrent blocker"] == 40
+
+    applied = await route_app.client.post(
+        "/api/v1/node-plugins/apply",
+        json={"node_id": node_id, "reason": "qa apply"},
+    )
+    assert applied.status_code == 201
+    command = applied.json()
+    assert command["command_type"] == "firewall.plan.apply"
+    assert command["status"] == "queued"
+    assert command["payload_json"]["reason"] == "qa apply"
+    policy = command["payload_json"]["nodePolicy"]
+    assert policy["modelVersion"] == "lumen.node-policy.v1"
+    assert [plugin["name"] for plugin in policy["plugins"]] == [
+        "Domain filter",
+        "Torrent blocker",
+    ]
+    assert policy["plugins"][0]["sortOrder"] == 0
+
+    async with route_app.sessionmaker() as session:
+        stored_command = await session.get(NodeCommand, UUID(command["id"]))
+        assert stored_command is not None
+        assert stored_command.command_type == "firewall.plan.apply"
 
 
 async def test_node_plugin_missing_returns_404(route_app: RouteApp) -> None:

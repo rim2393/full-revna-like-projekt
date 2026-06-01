@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from sqlalchemy import JSON, Boolean, ForeignKey, String, Uuid
+from sqlalchemy import JSON, Boolean, ForeignKey, Integer, String, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
@@ -32,3 +32,4 @@ class NodePlugin(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     name: Mapped[str] = mapped_column(String(160), nullable=False)
     config_json: Mapped[dict[str, object]] = mapped_column(JSON, nullable=False, default=dict)
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
