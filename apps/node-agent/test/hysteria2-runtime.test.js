@@ -91,6 +91,55 @@ test("renderHysteria2SingBoxConfig preserves obfs settings", () => {
   });
 });
 
+test("applyHysteria2Config process mode applies sing-box torrent blocker policy", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "lumen-hysteria2-policy-"));
+  const configPath = join(dir, "config.json");
+  const logPath = join(dir, "sing-box.log");
+  const pidFile = join(dir, "sing-box.pid");
+  const execCalls = [];
+  const spawned = [];
+  const result = await applyHysteria2Config(createHysteria2ApplyPlan({
+    hysteria2Config: {
+      listen: ":8443",
+      auth: { type: "password", password: "hy2-password" },
+      tls: { cert: "/tmp/cert.pem", key: "/tmp/key.pem" }
+    }
+  }), {
+    dryRun: false,
+    env: {
+      LUMEN_HYSTERIA2_RELOAD_MODE: "process",
+      LUMEN_HYSTERIA2_CONFIG_FILE: configPath,
+      LUMEN_HYSTERIA2_LOG_FILE: logPath,
+      LUMEN_HYSTERIA2_PID_FILE: pidFile
+    },
+    execFileImpl: async (command, args) => {
+      execCalls.push({ command, args });
+      return { stdout: "", stderr: "" };
+    },
+    nodePolicy: {
+      modelVersion: "lumen.node-policy.v1",
+      plugins: [{
+        id: "torrent",
+        kind: "torrent-blocker",
+        name: "Torrent blocker",
+        enabled: true,
+        config: { mode: "block" }
+      }]
+    },
+    spawnImpl: (command, args) => {
+      spawned.push({ command, args });
+      return { pid: 12345, unref() {} };
+    }
+  });
+
+  const written = JSON.parse(readFileSync(configPath, "utf8"));
+  assert.equal(result.implementationStatus, "hysteria2-managed-process-started");
+  assert.deepEqual(written.route.rules[0], { protocol: ["bittorrent"], outbound: "blocked" });
+  assert.equal(written.outbounds.some((outbound) => outbound.tag === "blocked"), true);
+  assert.equal(execCalls[0].command, "sing-box");
+  assert.equal(spawned[0].command, "sing-box");
+});
+
 test("applyHysteria2Config process mode validates and starts managed sing-box", async () => {
   const dir = mkdtempSync(join(tmpdir(), "lumen-hy2-process-"));
   const configPath = join(dir, "config.json");

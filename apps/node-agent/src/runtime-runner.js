@@ -398,6 +398,7 @@ async function applyRuntimeEffects(command, commandResult, input = {}) {
         dryRun: input.dryRun,
         env: input.env,
         execFileImpl: input.execFileImpl,
+        nodePolicy: policyPlan?.nodePolicy,
         spawnImpl: input.spawnImpl
       });
       const policy = policyPlan ? await applyNodePolicy(policyPlan, input) : null;
@@ -408,6 +409,7 @@ async function applyRuntimeEffects(command, commandResult, input = {}) {
         dryRun: input.dryRun,
         env: input.env,
         execFileImpl: input.execFileImpl,
+        nodePolicy: policyPlan?.nodePolicy,
         spawnImpl: input.spawnImpl
       });
       const policy = policyPlan ? await applyNodePolicy(policyPlan, input) : null;
@@ -428,6 +430,7 @@ async function applyRuntimeEffects(command, commandResult, input = {}) {
         dryRun: input.dryRun,
         env: input.env,
         execFileImpl: input.execFileImpl,
+        nodePolicy: policyPlan?.nodePolicy,
         spawnImpl: input.spawnImpl
       });
       const policy = policyPlan ? await applyNodePolicy(policyPlan, input) : null;
@@ -438,6 +441,7 @@ async function applyRuntimeEffects(command, commandResult, input = {}) {
         dryRun: input.dryRun,
         env: input.env,
         execFileImpl: input.execFileImpl,
+        nodePolicy: policyPlan?.nodePolicy,
         spawnImpl: input.spawnImpl
       });
       const policy = policyPlan ? await applyNodePolicy(policyPlan, input) : null;

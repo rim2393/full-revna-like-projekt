@@ -2,6 +2,7 @@ import { closeSync, existsSync, mkdirSync, openSync, readFileSync, writeFileSync
 import { dirname } from "node:path";
 import { promisify } from "node:util";
 import { execFile as nodeExecFile, spawn } from "node:child_process";
+import { applySingBoxPolicy } from "./sing-box-policy.js";
 
 export const TUIC_RUNTIME_MODEL_VERSION = "lumen.node-agent.tuic-runtime.v1";
 export const DEFAULT_TUIC_CONFIG_PATH = "/var/lib/lumen-node/runtime/tuic/config.json";
@@ -244,7 +245,7 @@ export async function applyTuicConfig(plan, input = {}) {
     plan.reloadArgv ?? parseArgv(env.LUMEN_TUIC_RELOAD_ARGV, DEFAULT_TUIC_RELOAD_ARGV);
   const reloadCommand = [reloadArgv[0], reloadArgv.slice(1)];
   const runtimeConfig = reloadMode === TUIC_RELOAD_MODE_PROCESS
-    ? renderTuicSingBoxConfig(plan.config)
+    ? applySingBoxPolicy(renderTuicSingBoxConfig(plan.config), input.nodePolicy)
     : plan.config;
 
   validateTuicConfig(plan.config);

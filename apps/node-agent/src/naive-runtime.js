@@ -2,6 +2,7 @@ import { closeSync, existsSync, mkdirSync, openSync, readFileSync, writeFileSync
 import { dirname } from "node:path";
 import { promisify } from "node:util";
 import { execFile as nodeExecFile, spawn } from "node:child_process";
+import { applySingBoxPolicy } from "./sing-box-policy.js";
 
 export const NAIVE_RUNTIME_MODEL_VERSION = "lumen.node-agent.naive-runtime.v1";
 export const DEFAULT_NAIVE_CONFIG_PATH = "/var/lib/lumen-node/runtime/naive/config.json";
@@ -258,7 +259,7 @@ export async function applyNaiveConfig(plan, input = {}) {
     plan.reloadArgv ?? parseArgv(env.LUMEN_NAIVE_RELOAD_ARGV, DEFAULT_NAIVE_RELOAD_ARGV);
   const reloadCommand = [reloadArgv[0], reloadArgv.slice(1)];
   const runtimeConfig = reloadMode === NAIVE_RELOAD_MODE_PROCESS
-    ? renderNaiveSingBoxConfig(plan.config)
+    ? applySingBoxPolicy(renderNaiveSingBoxConfig(plan.config), input.nodePolicy)
     : plan.config;
 
   validateNaiveConfig(plan.config);

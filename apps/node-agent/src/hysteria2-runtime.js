@@ -2,6 +2,7 @@ import { closeSync, existsSync, mkdirSync, openSync, readFileSync, writeFileSync
 import { dirname } from "node:path";
 import { promisify } from "node:util";
 import { execFile as nodeExecFile, spawn } from "node:child_process";
+import { applySingBoxPolicy } from "./sing-box-policy.js";
 
 export const HYSTERIA2_RUNTIME_MODEL_VERSION = "lumen.node-agent.hysteria2-runtime.v1";
 export const DEFAULT_HYSTERIA2_CONFIG_PATH = "/var/lib/lumen-node/runtime/hysteria2/config.json";
@@ -249,7 +250,7 @@ export async function applyHysteria2Config(plan, input = {}) {
     plan.reloadArgv ?? parseArgv(env.LUMEN_HYSTERIA2_RELOAD_ARGV, DEFAULT_HYSTERIA2_RELOAD_ARGV);
   const reloadCommand = [reloadArgv[0], reloadArgv.slice(1)];
   const runtimeConfig = reloadMode === HYSTERIA2_RELOAD_MODE_PROCESS
-    ? renderHysteria2SingBoxConfig(plan.config)
+    ? applySingBoxPolicy(renderHysteria2SingBoxConfig(plan.config), input.nodePolicy)
     : plan.config;
 
   validateHysteria2Config(plan.config);

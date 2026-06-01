@@ -124,6 +124,10 @@ export {
   createSingBoxShadowsocksApplyPlan
 } from "./sing-box-shadowsocks-runtime.js";
 export {
+  SING_BOX_POLICY_MODEL_VERSION,
+  applySingBoxPolicy
+} from "./sing-box-policy.js";
+export {
   DEFAULT_NAIVE_BINARY,
   DEFAULT_NAIVE_CONFIG_PATH,
   NAIVE_RUNTIME_MODEL_VERSION,

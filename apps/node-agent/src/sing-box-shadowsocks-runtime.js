@@ -2,6 +2,7 @@ import { closeSync, existsSync, mkdirSync, openSync, readFileSync, writeFileSync
 import { dirname } from "node:path";
 import { promisify } from "node:util";
 import { execFile as nodeExecFile, spawn } from "node:child_process";
+import { applySingBoxPolicy } from "./sing-box-policy.js";
 
 export const SING_BOX_SHADOWSOCKS_RUNTIME_MODEL_VERSION =
   "lumen.node-agent.sing-box-shadowsocks-runtime.v1";
@@ -186,7 +187,7 @@ export async function applySingBoxShadowsocksConfig(plan, input = {}) {
   const configPath =
     plan.configPath ?? env.LUMEN_SHADOWSOCKS_CONFIG_FILE ?? DEFAULT_SING_BOX_SHADOWSOCKS_CONFIG_PATH;
   const binary = env.LUMEN_SHADOWSOCKS_BINARY ?? DEFAULT_SING_BOX_SHADOWSOCKS_BINARY;
-  const runtimeConfig = renderSingBoxConfig(plan.config);
+  const runtimeConfig = applySingBoxPolicy(renderSingBoxConfig(plan.config), input.nodePolicy);
 
   if (input.dryRun !== false) {
     return Object.freeze({
