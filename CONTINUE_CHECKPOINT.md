@@ -1,11 +1,11 @@
 # Continuation Checkpoint
 
-Last audited: 2026-06-01 Europe/Moscow.
+Last audited: 2026-06-01 13:25 Europe/Moscow.
 
 ## Current Working Copy
 
 - Repo: `D:\android-app-new\_work\full-revna-like-projekt`
-- Main branch state: dirty working tree with uncommitted 5.3 changes.
+- Main branch state: clean after `12ae7fd Expand live protocol JS contract`.
 - 5.3 added backend domains/routes/migrations for:
   - `metrics`
   - `ip_control`
@@ -27,6 +27,11 @@ Last audited: 2026-06-01 Europe/Moscow.
   - public `lumen-json` manifests now include concrete per-subscription credentials derived by the same backend renderer helper as Happ/Hiddify/sing-box outputs.
   - Android parses `lumen.subscription-manifest.v1` into real connectable `ServerProfile` entries instead of ignoring the native manifest.
   - profile apply resolves active real subscriptions for the profile/node and replaces `clientsRef` with concrete runtime clients for Xray/Hysteria2/TUIC/WireGuard payload builders where supported.
+- 2026-06-01 protocol contract pass:
+  - Android `wireguard://` imports now materialize a native WireGuard `.conf` before a profile is considered connectable.
+  - Incomplete `wireguard://` links are importable but explicitly not connectable; they no longer fall through as empty sing-box/WireGuard runtime configs.
+  - JS `@lumen/protocol-registry` now exposes live plan adapters for `trojan`, `shadowsocks`, `wireguard`, and `hysteria2` instead of leaving them catalog-only.
+  - JS `@lumen/subscription-renderers` now renders real derived-credential sing-box/Mihomo client configs for `trojan`, `shadowsocks`, and `hysteria2`; `wireguard` remains intentionally rejected there until real key material is available.
 
 ## Verification Done
 
@@ -36,7 +41,8 @@ Last audited: 2026-06-01 Europe/Moscow.
 - Web TypeScript: `cmd /c npx tsc -b` passed.
 - Web production build: `cmd /c npm run build` passed.
 - Node agent: `node --test` passed, `60 passed`.
-- Android: `:app:testDebugUnitTest` passed with `JAVA_HOME=D:\tools\temurin-17\jdk-17.0.18+8`.
+- Android: `:app:testDebugUnitTest` passed with the workspace JDK. Focused `SubscriptionParserTest`, `:app:assembleDebug`, and `:app:assembleRelease` also passed after the WireGuard URI fix.
+- JS package gates after live contract sync: `packages/protocol-registry npm test` passed; `packages/subscription-renderers npm test` passed.
 - Alembic heads: single head `0008_infra_billing`.
 
 ## Fixes Applied During Audit
@@ -53,7 +59,7 @@ Last audited: 2026-06-01 Europe/Moscow.
 
 ## Next Suggested Work
 
-1. Finish RU localization for remaining pages: Subscription, Templates, Response Rules, Tools, License, API Keys, Users, User Detail.
-2. Review new frontend pages in a browser against live API after deploy.
-3. Deploy this integration to the live panel/node and validate that an `outbound.apply` command writes Xray/Hysteria2/TUIC/WireGuard config without unresolved `clientsRef` plus the node policy artifact on the node.
-4. Extend non-Xray protocol runtimes to actively consume the persisted policy file where native protocol support exists.
+1. Continue the remaining real-runtime protocol gaps: OpenVPN over Shadowsocks bridge, Android IKEv2/IPsec, and Clash-to-concrete-profile conversion.
+2. Continue Remnawave parity UI pages only against live API state; no fake counters or static placeholder rows.
+3. Extend non-Xray protocol runtimes to actively consume the persisted policy file where native protocol support exists.
+4. Keep official release/update path mandatory for production validation.
