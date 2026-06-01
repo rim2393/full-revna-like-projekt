@@ -82,7 +82,7 @@ evidence here is wrong or stale.
 
 | ID | Task | Status | Done Criteria | Evidence |
 | --- | --- | --- | --- | --- |
-| SQ-001 | Internal squads CRUD and detail | PARTIAL | Basic CRUD/detail exists; needs full accessible-node/inbound matrix parity | Existing API detail route, evidence incomplete |
+| SQ-001 | Internal squads CRUD and detail | DONE | Squad detail exposes real membership, accessible nodes, profiles, hosts and inbound matrix in UI/API | `5bbd792` + `96e691b`, `v0.1.78`, release run `26784041783`, installer/deploy run `26784116318`, manifest `rim2393/lumen_vpn@7aef27a`; web `tsc`, focused Vitest `squad detail`, backend `ruff`, focused backend pytest `squad_detail_membership_and_reorder_are_persisted` passed; prod health OK; prod containers `lumen-api/web/subscription` on `v0.1.78` healthy; live browser smoke on `/squads` verified real squad `bear` detail panels: `node-01`, `prod-trojan-tcp-reality-live`, `wireguard-amneziawg`, RU headings `Ноды сквада`/`Профили сквада`/`Хосты сквада`, and inbound matrix entries `trojan/tcp/reality` plus `wireguard/tcp/none`. |
 | SQ-002 | Internal squad accessible-node matrix and inbound/profile bindings | OPEN | Matrix editor persists bindings and affects subscriptions/runtime where relevant | Not started |
 | SQ-003 | External squads CRUD and membership | OPEN | External squads manage users, profiles and hosts through real API | Not started |
 | SQ-004 | External squad templates, headers, host overrides, HWID settings, custom remarks, subpage config binding | OPEN | Subscription behavior changes are reflected in public renderers | Not started |
