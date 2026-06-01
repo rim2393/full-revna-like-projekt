@@ -357,6 +357,25 @@ async def test_wireguard_subscription_renders_structured_formats(
     assert create.status_code == 201, create.text
     public_id = create.json()["public_id"]
 
+    raw = await route_app.client.get(
+        f"/api/v1/subscriptions/public/{public_id}/render?target=raw-uri",
+    )
+    assert raw.status_code == 200
+    assert "[Interface]" in raw.text
+    assert "PrivateKey =" in raw.text
+    assert "Address = 10.66.66.2/32" in raw.text
+    assert "[Peer]" in raw.text
+    assert "PublicKey = aGVsbG93b3JsZGhlbGxvd29ybGRoZWxsb3dvcmxkMDA=" in raw.text
+    assert "Endpoint =" in raw.text
+    assert "AllowedIPs = 0.0.0.0/0" in raw.text
+
+    happ = await route_app.client.get(
+        f"/api/v1/subscriptions/public/{public_id}/render?target=happ",
+    )
+    assert happ.status_code == 200
+    assert "[Interface]" in happ.text
+    assert "PrivateKey =" in happ.text
+
     sing_box = await route_app.client.get(
         f"/api/v1/subscriptions/public/{public_id}/render?target=sing-box",
     )

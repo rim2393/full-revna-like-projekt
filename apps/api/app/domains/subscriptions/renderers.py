@@ -280,6 +280,9 @@ def render_share_uri(entry: dict[str, Any], *, settings: Settings) -> str | None
             f"?{urlencode(query)}#{quote(label)}"
         )
 
+    if protocol_type == "wireguard":
+        return render_wireguard_conf(entry, credentials=credentials)
+
     if protocol_type == "socks":
         userinfo = (
             f"{quote(protocol_username(entry), safe='')}:"
@@ -294,9 +297,42 @@ def render_share_uri(entry: dict[str, Any], *, settings: Settings) -> str | None
         )
         return build_uri("http", userinfo, protocol, {}, label)
 
-    # WireGuard/AmneziaWG have no universal single-line share URI; they are only
-    # emitted in the structured client formats (sing-box / mihomo / xray-json).
+    # AmneziaWG has no universal single-line share URI; it is emitted in
+    # structured client formats and the Lumen native manifest.
     return None
+
+
+def render_wireguard_conf(entry: dict[str, Any], *, credentials: ClientCredential) -> str | None:
+    protocol = entry["protocol"]
+    endpoint = protocol.get("endpoint", {})
+    security = protocol.get("security", {})
+    hints = protocol.get("rendererHints", {})
+    peer_public_key = security.get("publicKey")
+    address = hints.get("address")
+    if not endpoint.get("host") or not endpoint.get("port") or not peer_public_key or not address:
+        return None
+    allowed_ips = hints.get("allowedIps") or "0.0.0.0/0, ::/0"
+    lines = [
+        "[Interface]",
+        f"PrivateKey = {credentials.wireguard_private_key}",
+        f"Address = {address}",
+    ]
+    if hints.get("dns"):
+        lines.append(f"DNS = {hints['dns']}")
+    if hints.get("mtu"):
+        lines.append(f"MTU = {hints['mtu']}")
+    lines.extend(
+        [
+            "",
+            "[Peer]",
+            f"PublicKey = {peer_public_key}",
+            f"Endpoint = {endpoint['host']}:{endpoint['port']}",
+            f"AllowedIPs = {allowed_ips}",
+        ]
+    )
+    if hints.get("persistentKeepalive"):
+        lines.append(f"PersistentKeepalive = {hints['persistentKeepalive']}")
+    return "\n".join(lines)
 
 
 def build_uri(
