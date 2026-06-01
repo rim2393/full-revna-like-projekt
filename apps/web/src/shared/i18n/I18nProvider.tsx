@@ -171,6 +171,10 @@ const ru: Record<string, string> = {
   'Set inbound': 'Задать inbound',
   'Set port': 'Задать порт',
   'Host editor': 'Редактор хоста',
+  'Host bulk action failed.': 'Массовое действие с хостами не выполнено.',
+  'Select a node before creating a host.': 'Выберите ноду перед созданием хоста.',
+  'Select a node before saving a host.': 'Выберите ноду перед сохранением хоста.',
+  'Select at least one host first.': 'Сначала выберите хотя бы один хост.',
   'Select host': 'Выберите хост',
   'Edit public endpoint, routing bindings, inbound tag, port and metadata.':
     'Измените публичную точку входа, привязки маршрутизации, inbound-тег, порт и метаданные.',

@@ -59,10 +59,10 @@ Closure evidence:
   `outbound.apply` command `f579715a-dc66-47da-9f1c-8b46b31f3bfa`, and the
   real node-agent completed it as `succeeded` with implementation
   `openvpn-shadowsocks-managed-process-started`.
-- Hosts P0 gap: the create flow can still derive `node_id=""` when no node is
-  selected. The UI must block submit with a clear error before the API 422.
-- Hosts P1 gaps: bulk set-port and host editor port validation need strict
-  `1..65535` checks and user-facing errors before mutation.
+- Hosts P0/P1 validation gaps closed locally: create now blocks empty
+  `node_id` before mutation, host editor blocks empty node before save, and
+  bulk/editor ports are validated as integer `1..65535` before sending a
+  mutation.
 - Users/subscriptions/settings audit findings: user lifecycle/device controls
   are wired to real endpoints; subscription create UI is too narrow for the
   backend contract; subscription delivery profile still has a static

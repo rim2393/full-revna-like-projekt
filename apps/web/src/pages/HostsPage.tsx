@@ -57,10 +57,14 @@ export function HostsPage() {
     event.preventDefault()
     setFormError(null)
     try {
+      const selectedNodeId = nodeId || nodes[0]?.id || ''
+      if (!selectedNodeId) {
+        throw new Error(t('Select a node before creating a host.'))
+      }
       await createHost.mutateAsync({
         hostname: hostname.trim(),
         name: name.trim(),
-        node_id: nodeId || nodes[0]?.id || '',
+        node_id: selectedNodeId,
         protocol_profile_id: profileId || null,
         squad_id: squadId || null,
         status: 'active',
@@ -87,15 +91,20 @@ export function HostsPage() {
 
   async function runBulk(action: string, extra: Omit<Parameters<typeof bulkHosts.mutateAsync>[0]['request'], 'ids'> = {}) {
     if (selectedIds.size === 0) {
-      setFormError('Select at least one host first.')
+      setFormError(t('Select at least one host first.'))
       return
     }
-    await bulkHosts.mutateAsync({
-      action,
-      request: { ids: Array.from(selectedIds), ...extra },
-    })
-    if (action === 'delete') {
-      setSelectedIds(new Set())
+    setFormError(null)
+    try {
+      await bulkHosts.mutateAsync({
+        action,
+        request: { ids: Array.from(selectedIds), ...extra },
+      })
+      if (action === 'delete') {
+        setSelectedIds(new Set())
+      }
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : t('Host bulk action failed.'))
     }
   }
 
@@ -268,6 +277,7 @@ function HostBulkPanel({
   const [inboundTag, setInboundTag] = useState('DEFAULT_INBOUND')
   const [port, setPort] = useState('443')
   const parsedPort = Number(port)
+  const isValidPort = isValidHostPort(parsedPort)
 
   return (
     <article className="panel">
@@ -305,11 +315,12 @@ function HostBulkPanel({
       <button
         type="button"
         className="button button--secondary"
-        disabled={!Number.isInteger(parsedPort)}
+        disabled={!isValidPort}
         onClick={() => void onBulk('set-port', { port: parsedPort })}
       >
         {t('Set port')}
       </button>
+      {!isValidPort ? <p className="auth-card__note">{t('Port must be an integer between 1 and 65535.')}</p> : null}
     </article>
   )
 }
@@ -363,10 +374,16 @@ function HostEditor({
       return
     }
     try {
+      const nextNodeId = typeof draft.node_id === 'string' ? draft.node_id.trim() : ''
+      if (!nextNodeId) {
+        throw new Error(t('Select a node before saving a host.'))
+      }
+      const nextPort = normalizeHostPort(draft.port, t)
       await onSave(host.id, {
         ...draft,
         metadata_json: parseMetadata(metadataJson),
-        port: draft.port === null || draft.port === undefined ? null : Number(draft.port),
+        node_id: nextNodeId,
+        port: nextPort,
         tags: draft.tags ?? [],
       })
     } catch (saveError) {
@@ -392,6 +409,7 @@ function HostEditor({
       <label htmlFor="editor-host-node">
         Node
         <select id="editor-host-node" value={draft.node_id ?? ''} onChange={(event) => setDraft({ ...draft, node_id: event.target.value })}>
+          <option value="">{t('Select node')}</option>
           {nodes.map((node) => <option key={node.id} value={node.id}>{node.name}</option>)}
         </select>
       </label>
@@ -449,4 +467,19 @@ function parseMetadata(value: string): Record<string, unknown> {
     throw new Error('metadata_json must be a JSON object.')
   }
   return parsed as Record<string, unknown>
+}
+
+function isValidHostPort(value: number): boolean {
+  return Number.isInteger(value) && value >= 1 && value <= 65535
+}
+
+function normalizeHostPort(value: HostUpdateRequest['port'], t: (value: string) => string): number | null {
+  if (value === null || value === undefined) {
+    return null
+  }
+  const parsed = Number(value)
+  if (!isValidHostPort(parsed)) {
+    throw new Error(t('Port must be an integer between 1 and 65535.'))
+  }
+  return parsed
 }
