@@ -61,6 +61,10 @@ Last audited: 2026-06-01 19:05 Europe/Moscow.
   - web Nodes page exposes the new actions and uses pause/resume commands for
     enable/disable instead of status-only UI mutations.
   - Alembic head advanced to `0009_node_management_parity`.
+  - restart semantics corrected for the actual Docker node-agent deployment:
+    `node.restart` now schedules `kill -TERM 1`, letting Docker
+    `restart: unless-stopped` restart the real container instead of attempting
+    a non-existent in-container systemd service.
 
 ## Verification Done
 

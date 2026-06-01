@@ -1187,7 +1187,7 @@ test("run once applies node policy artifact from outbound apply", async () => {
   }
 });
 
-test("run once executes node restart as a deferred systemd restart", async () => {
+test("run once executes node restart as a deferred container restart", async () => {
   const stateDir = mkdtempSync(join(tmpdir(), "lumen-agent-state-"));
   const spawned = [];
   try {
@@ -1248,7 +1248,7 @@ test("run once executes node restart as a deferred systemd restart", async () =>
 
     assert.equal(result.command.status, "succeeded");
     assert.equal(spawned[0].binary, "sh");
-    assert.match(spawned[0].args.join(" "), /systemctl restart lumen-node-agent/);
+    assert.match(spawned[0].args.join(" "), /kill -TERM 1/);
     const completed = JSON.parse(calls[2].options.body);
     assert.equal(completed.result_json.outputs.implementationStatus, "node-agent-restart-scheduled");
   } finally {
