@@ -673,6 +673,8 @@ def _manifest_renderer_hints(
         "liveDiagnostic": False,
         "name": profile_title,
         "method": delivery.get("method"),
+        "plugin": delivery.get("plugin"),
+        "pluginOpts": delivery.get("plugin_opts") or delivery.get("pluginOpts"),
         "obfs": delivery.get("obfs"),
         "address": delivery.get("address"),
         "allowedIps": delivery.get("allowed_ips"),
@@ -683,6 +685,10 @@ def _manifest_renderer_hints(
     obfs_config = profile_config.get("obfs") if isinstance(profile_config.get("obfs"), dict) else {}
     if hints.get("obfs") is None and obfs_config.get("type") is not None:
         hints["obfs"] = obfs_config["type"]
+    if hints.get("plugin") is None and profile_config.get("plugin") is not None:
+        hints["plugin"] = profile_config["plugin"]
+    if hints.get("pluginOpts") is None and profile_config.get("plugin_opts") is not None:
+        hints["pluginOpts"] = profile_config["plugin_opts"]
     interface_config = (
         profile_config.get("interface") if isinstance(profile_config.get("interface"), dict) else {}
     )

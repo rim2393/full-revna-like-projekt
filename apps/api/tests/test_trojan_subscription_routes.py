@@ -198,6 +198,62 @@ async def test_shadowsocks_subscription_renders_all_client_formats(
     assert 'type: "ss"' in mihomo.text
 
 
+async def test_shadowsocks_v2ray_plugin_subscription_renders_plugin_fields(
+    route_app: RouteTestApp,
+) -> None:
+    user, license_record, node = await _seed(route_app)
+    create = await route_app.client.post(
+        "/api/v1/subscriptions",
+        json={
+            "user_id": str(user.id),
+            "license_id": str(license_record.id),
+            "node_id": str(node.id),
+            "delivery_profile": {
+                "protocol": "shadowsocks-v2ray-plugin",
+                "adapter": "shadowsocks-v2ray-plugin",
+                "profile_title": "Lumen SS Plugin",
+                "method": "aes-256-gcm",
+                "port": "8390",
+                "plugin": "v2ray-plugin",
+                "plugin_opts": "path=/ss;host=cdn.example.test",
+            },
+            "config_hash": "sha256:ss-plugin",
+        },
+    )
+    assert create.status_code == 201, create.text
+    public_id = create.json()["public_id"]
+
+    raw = await route_app.client.get(
+        f"/api/v1/subscriptions/public/{public_id}/render?target=happ",
+    )
+    assert raw.status_code == 200, raw.text
+    assert raw.text.startswith("ss://")
+    assert "plugin=v2ray-plugin" in raw.text
+
+    manifest = await route_app.client.get(
+        f"/api/v1/subscriptions/public/{public_id}/manifest",
+    )
+    hints = manifest.json()["nodes"][0]["protocols"][0]["rendererHints"]
+    assert hints["plugin"] == "v2ray-plugin"
+    assert hints["pluginOpts"] == "path=/ss;host=cdn.example.test"
+
+    sing_box = await route_app.client.get(
+        f"/api/v1/subscriptions/public/{public_id}/render?target=sing-box",
+    )
+    assert sing_box.status_code == 200
+    outbound = sing_box.json()["outbounds"][0]
+    assert outbound["type"] == "shadowsocks"
+    assert outbound["plugin"] == "v2ray-plugin"
+    assert outbound["plugin_opts"] == "path=/ss;host=cdn.example.test"
+
+    mihomo = await route_app.client.get(
+        f"/api/v1/subscriptions/public/{public_id}/render?target=mihomo",
+    )
+    assert mihomo.status_code == 200
+    assert 'plugin: "v2ray-plugin"' in mihomo.text
+    assert 'plugin-opts: "path=/ss;host=cdn.example.test"' in mihomo.text
+
+
 async def test_vmess_subscription_renders_all_client_formats(route_app: RouteTestApp) -> None:
     user, license_record, node = await _seed(route_app)
     create = await route_app.client.post(

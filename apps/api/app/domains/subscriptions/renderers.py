@@ -277,12 +277,14 @@ def render_share_uri(entry: dict[str, Any], *, settings: Settings) -> str | None
         return build_uri("trojan", credentials.password, protocol, query, label)
 
     if protocol_type == "shadowsocks":
-        method = protocol.get("rendererHints", {}).get("method") or "2022-blake3-aes-128-gcm"
+        hints = protocol.get("rendererHints", {})
+        method = hints.get("method") or "2022-blake3-aes-128-gcm"
         password = shadowsocks_password_for_method(credentials, str(method))
         userinfo = base64.urlsafe_b64encode(
             f"{method}:{password}".encode()
         ).decode("ascii").rstrip("=")
-        return build_uri("ss", userinfo, protocol, {}, label)
+        query = shadowsocks_plugin_query(hints)
+        return build_uri("ss", userinfo, protocol, query, label)
 
     if protocol_type == "hysteria2":
         security = protocol.get("security", {})
@@ -381,6 +383,27 @@ def build_uri(
     )
 
 
+def shadowsocks_plugin_fields(hints: dict[str, Any]) -> dict[str, str] | None:
+    plugin = hints.get("plugin")
+    plugin_opts = hints.get("pluginOpts") or hints.get("plugin_opts") or hints.get("plugin-opts")
+    if not plugin:
+        return None
+    return {
+        "plugin": str(plugin),
+        "plugin_opts": str(plugin_opts or ""),
+    }
+
+
+def shadowsocks_plugin_query(hints: dict[str, Any]) -> dict[str, str]:
+    plugin = shadowsocks_plugin_fields(hints)
+    if not plugin:
+        return {}
+    value = plugin["plugin"]
+    if plugin["plugin_opts"]:
+        value = f"{value};{plugin['plugin_opts']}"
+    return {"plugin": value}
+
+
 def render_mihomo_yaml(manifest: dict[str, Any], *, settings: Settings) -> str:
     proxies = [
         proxy
@@ -466,7 +489,8 @@ def mihomo_proxy(entry: dict[str, Any], *, settings: Settings) -> dict[str, Any]
         return base
 
     if protocol_type == "shadowsocks":
-        method = protocol.get("rendererHints", {}).get("method") or "2022-blake3-aes-128-gcm"
+        hints = protocol.get("rendererHints", {})
+        method = hints.get("method") or "2022-blake3-aes-128-gcm"
         base.update(
             {
                 "type": "ss",
@@ -475,6 +499,9 @@ def mihomo_proxy(entry: dict[str, Any], *, settings: Settings) -> dict[str, Any]
                 "udp": True,
             }
         )
+        plugin = shadowsocks_plugin_fields(hints)
+        if plugin:
+            base.update({"plugin": plugin["plugin"], "plugin-opts": plugin["plugin_opts"]})
         return base
 
     if protocol_type == "hysteria2":
@@ -624,13 +651,17 @@ def sing_box_outbound(entry: dict[str, Any], *, settings: Settings) -> dict[str,
         )
         return compact_object(base)
     if protocol_type == "shadowsocks":
-        method = protocol.get("rendererHints", {}).get("method") or "2022-blake3-aes-128-gcm"
+        hints = protocol.get("rendererHints", {})
+        method = hints.get("method") or "2022-blake3-aes-128-gcm"
         base.update(
             {
                 "method": method,
                 "password": shadowsocks_password_for_method(credentials, str(method)),
             }
         )
+        plugin = shadowsocks_plugin_fields(hints)
+        if plugin:
+            base.update(plugin)
         return compact_object(base)
     if protocol_type == "hysteria2":
         hints = protocol.get("rendererHints", {})
@@ -800,19 +831,22 @@ def xray_outbound(entry: dict[str, Any], *, settings: Settings) -> dict[str, Any
         }
 
     if protocol_type == "shadowsocks":
+        hints = protocol.get("rendererHints", {})
+        method = hints.get("method") or "2022-blake3-aes-128-gcm"
+        server = {
+            "address": protocol["endpoint"]["host"],
+            "port": protocol["endpoint"]["port"],
+            "method": method,
+            "password": shadowsocks_password_for_method(credentials, str(method)),
+        }
+        plugin = shadowsocks_plugin_fields(hints)
+        if plugin:
+            server.update(plugin)
         return {
             "tag": node_label(entry),
             "protocol": "shadowsocks",
             "settings": {
-                "servers": [
-                    {
-                        "address": protocol["endpoint"]["host"],
-                        "port": protocol["endpoint"]["port"],
-                        "method": protocol.get("rendererHints", {}).get("method")
-                        or "2022-blake3-aes-128-gcm",
-                        "password": credentials.shadowsocks_password,
-                    }
-                ]
+                "servers": [server]
             },
         }
 
