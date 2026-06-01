@@ -1,13 +1,21 @@
 # Continuation Checkpoint
 
-Last audited: 2026-06-01 21:08 Europe/Moscow.
+Last audited: 2026-06-01 21:18 Europe/Moscow.
 
 ## Current Working Copy
 
 - Repo: `D:\android-app-new\_work\full-revna-like-projekt`
-- Main branch state: dirty with subscription admin parity changes ready for
-  `v0.1.63` release.
-- Current signed production manifest before this slice: `v0.1.62`.
+- Main branch state: clean after committing and pushing subscription admin
+  parity changes.
+- Current signed public production manifest: `v0.1.63`.
+- `v0.1.63` closed-image release succeeded, and `lumen_vpn` commit `5df4327`
+  promoted `release/prod.json` to `v0.1.63`.
+- Automatic production deploy failed after manifest promotion because the
+  production VPS stopped answering external TCP checks. Local Windows checks
+  timed out on panel HTTPS and SSH ports; GitHub Actions failed during the SSH
+  deploy step. Do not bypass the official signed manifest/upgrade process; the
+  next live step is to restore VPS/provider firewall reachability and rerun the
+  official upgrade smoke.
 - OpenVPN-over-Shadowsocks backend/node runtime is live-validated on production
   through the official closed-image, public signed manifest, public panel
   upgrade, and public node installer flow.
@@ -156,8 +164,9 @@ Last audited: 2026-06-01 21:08 Europe/Moscow.
   This deploy contains subscription create changes: no static panel-domain
   `server_name`, derived host/node `server_name`, and exposed `expires_at` plus
   `config_hash`.
-- Live prod evidence for `v0.1.63`: pending official release/update and VPS
-  smoke.
+- Live prod evidence for `v0.1.63`: images and signed public manifest are
+  published, but VPS upgrade/smoke is blocked by network reachability timeout
+  to the production host.
 - Alembic heads: single head `0009_node_management_parity` after this slice.
 
 ## Fixes Applied During Audit
@@ -174,7 +183,9 @@ Last audited: 2026-06-01 21:08 Europe/Moscow.
 
 ## Next Suggested Work
 
-1. Release and live-validate `v0.1.63` subscription admin parity.
+1. Restore production VPS/provider firewall reachability, then rerun the
+   official deploy/upgrade flow for already-published `v0.1.63` and live-smoke
+   subscription lookup, clone, delete, devices, and raw preview.
 2. Implement real `generic_oauth2`/auth-provider parity; currently the
    provider is catalog-only/read-only and blocked as `unimplemented`.
 3. Continue the remaining real-runtime protocol gaps: Android IKEv2/IPsec.
