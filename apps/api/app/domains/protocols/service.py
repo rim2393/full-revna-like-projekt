@@ -374,12 +374,20 @@ async def apply_profile_to_node(session: AsyncSession, *, profile_id: UUID):
         plugins=plugin_policy_records(plugins),
         ip_control=await build_ip_control_policy(session),
     )
-    payload = build_node_outbound_payload(
-        profile,
-        inbounds,
-        runtime_policy=runtime_policy,
-        runtime_clients=runtime_clients,
-    )
+    if _adapter_family(profile.adapter) == "xray":
+        payload = await build_node_xray_outbound_payload(
+            session,
+            node_id=node.id,
+            target_profile=profile,
+            runtime_policy=runtime_policy,
+        )
+    else:
+        payload = build_node_outbound_payload(
+            profile,
+            inbounds,
+            runtime_policy=runtime_policy,
+            runtime_clients=runtime_clients,
+        )
     return await enqueue_node_command(
         session,
         node_id=node.id,
@@ -1738,6 +1746,107 @@ def build_node_outbound_payload(
     if runtime_policy is not None:
         payload["nodePolicy"] = runtime_policy
     return payload
+
+
+async def build_node_xray_outbound_payload(
+    session: AsyncSession,
+    *,
+    node_id: UUID,
+    target_profile: ProtocolProfile,
+    runtime_policy: dict[str, object] | None = None,
+) -> dict[str, object]:
+    """Build a single Xray config containing every real active Xray inbound on a node."""
+
+    active_profiles = (
+        await session.execute(
+            select(ProtocolProfile)
+            .where(
+                ProtocolProfile.node_id == node_id,
+                ProtocolProfile.status == "active",
+            )
+            .order_by(ProtocolProfile.created_at.asc())
+        )
+    ).scalars().all()
+
+    profile_payloads: list[tuple[ProtocolProfile, dict[str, object]]] = []
+    target_profile_has_clients = False
+    for profile in active_profiles:
+        if _adapter_family(profile.adapter) != "xray":
+            continue
+        inbounds = await list_profile_inbounds(session, profile_id=profile.id)
+        runtime_clients = await list_profile_runtime_clients(session, profile=profile)
+        if not runtime_clients:
+            if profile.id == target_profile.id:
+                target_profile_has_clients = False
+            continue
+        if profile.id == target_profile.id:
+            target_profile_has_clients = True
+        profile_payloads.append(
+            (
+                profile,
+                _computed_xray_config(profile, inbounds, runtime_clients=runtime_clients),
+            )
+        )
+
+    if not target_profile_has_clients:
+        raise APIError(
+            code="profile_runtime_clients_required",
+            message=(
+                "Profile apply requires at least one active real subscription "
+                "bound to this profile and node."
+            ),
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+        )
+
+    xray_config = merge_xray_profile_configs([config for _, config in profile_payloads])
+    if runtime_policy is not None:
+        xray_config = _apply_xray_policy(xray_config, runtime_policy)
+    payload: dict[str, object] = {
+        "adapter": target_profile.adapter,
+        "profileId": str(target_profile.id),
+        "xrayConfig": xray_config,
+        "profileIds": [str(profile.id) for profile, _ in profile_payloads],
+    }
+    if runtime_policy is not None:
+        payload["nodePolicy"] = runtime_policy
+    return payload
+
+
+def merge_xray_profile_configs(profile_configs: list[dict[str, object]]) -> dict[str, object]:
+    merged: dict[str, object] = {
+        "log": {"loglevel": "warning"},
+        "routing": {"rules": []},
+        "outbounds": [{"tag": "direct", "protocol": "freedom"}],
+        "inbounds": [],
+    }
+    outbound_tags = {"direct"}
+    routing_rules: list[object] = []
+    inbounds: list[object] = []
+
+    for config in profile_configs:
+        if isinstance(config.get("log"), dict):
+            merged["log"] = deepcopy(config["log"])
+        config_outbounds = config.get("outbounds")
+        if isinstance(config_outbounds, list):
+            for outbound in config_outbounds:
+                if not isinstance(outbound, dict):
+                    continue
+                tag = str(outbound.get("tag") or "")
+                if tag and tag in outbound_tags:
+                    continue
+                if tag:
+                    outbound_tags.add(tag)
+                merged["outbounds"].append(deepcopy(outbound))  # type: ignore[index]
+        routing = config.get("routing")
+        if isinstance(routing, dict) and isinstance(routing.get("rules"), list):
+            routing_rules.extend(deepcopy(routing["rules"]))
+        config_inbounds = config.get("inbounds")
+        if isinstance(config_inbounds, list):
+            inbounds.extend(deepcopy(config_inbounds))
+
+    merged["routing"] = {"rules": routing_rules}
+    merged["inbounds"] = inbounds
+    return merged
 
 
 def build_node_runtime_policy(

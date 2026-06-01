@@ -190,6 +190,82 @@ async def test_apply_profile_includes_node_policy_and_xray_plugin_rules(
         assert xray_config["routing"]["rules"][0]["outboundTag"] == "blocked"
 
 
+async def test_apply_xray_profile_keeps_other_active_xray_inbounds_on_same_node(
+    route_app: RouteApp,
+) -> None:
+    async with route_app.sessionmaker() as session:
+        node = Node(
+            name="node-xray-multi",
+            region="eu",
+            public_address="203.0.113.91",
+            status="active",
+            capabilities={},
+        )
+        session.add(node)
+        await session.flush()
+        user = User(email="xray-multi@example.test", status="active")
+        license_record = License(
+            license_key_hash=hash_license_key("xray-multi-license"),
+            customer_ref="xray-multi",
+            status="active",
+            max_devices=3,
+            metadata_json={},
+        )
+        session.add_all([user, license_record])
+        await session.flush()
+        profiles = []
+        for adapter, port in (("socks5", 24082), ("http-proxy", 24083)):
+            profile = ProtocolProfile(
+                id=uuid4(),
+                name=f"{adapter}-multi",
+                node_id=node.id,
+                adapter=adapter,
+                status="active",
+                config_json={},
+                port_reservations=[
+                    {"address": "0.0.0.0", "port": port, "protocol": "tcp"}  # noqa: S104
+                ],
+                credentials_ref="vault://subscriptions/profile/creds",
+            )
+            profiles.append(profile)
+            session.add(profile)
+            await session.flush()
+            session.add(
+                Subscription(
+                    public_id=f"lumen_sub_{adapter.replace('-', '_')}_{uuid4().hex}",
+                    user_id=user.id,
+                    license_id=license_record.id,
+                    node_id=node.id,
+                    status="active",
+                    delivery_profile={
+                        "profile_id": str(profile.id),
+                        "protocol": adapter,
+                        "adapter": adapter,
+                    },
+                    config_hash=f"sha256:{adapter}",
+                )
+            )
+        await session.commit()
+        target_profile_id = str(profiles[1].id)
+
+    response = await route_app.client.post(f"/api/v1/profiles/{target_profile_id}/apply-to-node")
+    assert response.status_code == 202, response.text
+
+    async with route_app.sessionmaker() as session:
+        command = (
+            await session.execute(
+                select(NodeCommand).where(NodeCommand.node_id == node.id)
+            )
+        ).scalar_one()
+        xray_config = command.payload_json["xrayConfig"]
+        inbounds = xray_config["inbounds"]
+        assert [(inbound["protocol"], inbound["port"]) for inbound in inbounds] == [
+            ("socks", 24082),
+            ("http", 24083),
+        ]
+        assert set(command.payload_json["profileIds"]) == {str(profile.id) for profile in profiles}
+
+
 async def test_apply_inactive_profile_is_rejected(route_app: RouteApp) -> None:
     profile_id, _ = await _seed_profile(route_app, "hysteria2", status="disabled")
     response = await route_app.client.post(f"/api/v1/profiles/{profile_id}/apply-to-node")
