@@ -1585,6 +1585,31 @@ async def test_node_command_queue_and_metrics(foundation_app: FoundationRouteApp
     assert list_metrics_response.status_code == 200
     assert list_metrics_response.json()["items"][0]["values_json"]["ram_mib"] == 256.0
 
+    node_event_response = await foundation_app.client.post(
+        f"/api/v1/nodes/{node_id}/events",
+        headers={"X-Lumen-Node-Token": NODE_TOKEN},
+        json={
+            "action": "torrent.blocked",
+            "resource_type": "torrent",
+            "resource_id": "btih:test-node-event",
+            "metadata_json": {
+                "profile_id": profile_id,
+                "outbound_tag": "blocked",
+            },
+        },
+    )
+    assert node_event_response.status_code == 201
+    node_event = node_event_response.json()
+    assert node_event["actor_subject"] == f"node-agent:{node_id}"
+    assert node_event["metadata_json"]["source"] == "node-agent"
+    assert node_event["metadata_json"]["node_id"] == node_id
+
+    torrent_reports_response = await foundation_app.client.get(
+        "/api/v1/tools/torrent-blocker-reports",
+    )
+    assert torrent_reports_response.status_code == 200
+    assert torrent_reports_response.json()["items"][0]["resource_id"] == "btih:test-node-event"
+
 
 async def test_node_pause_resume_and_quarantine_enqueue_commands(
     foundation_app: FoundationRouteApp,

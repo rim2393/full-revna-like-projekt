@@ -15,6 +15,7 @@ from app.core.security import (
     hmac_sha256,
     require_secret,
 )
+from app.domains.audit.models import AuditEvent
 from app.domains.licenses.service import enforce_free_node_policy
 from app.domains.nodes.models import (
     Node,
@@ -28,6 +29,7 @@ from app.domains.nodes.schemas import (
     NodeCommandCreateRequest,
     NodeCommandResultRequest,
     NodeCreateRequest,
+    NodeEventCreateRequest,
     NodeHeartbeatRequest,
     NodeMetricCreateRequest,
     NodePauseRequest,
@@ -748,6 +750,37 @@ async def record_node_metric(
     session.add(metric)
     await session.flush()
     return metric
+
+
+async def record_node_event(
+    session: AsyncSession,
+    *,
+    node_id: UUID,
+    node_token: SecretStr,
+    request: NodeEventCreateRequest,
+    settings: Settings,
+) -> AuditEvent:
+    await authenticate_node_token(
+        session,
+        node_id=node_id,
+        node_token=node_token,
+        settings=settings,
+    )
+    event = AuditEvent(
+        actor_subject=f"node-agent:{node_id}",
+        actor_email=None,
+        action=request.action,
+        resource_type=request.resource_type,
+        resource_id=request.resource_id,
+        metadata_json={
+            **request.metadata_json,
+            "node_id": str(node_id),
+            "source": "node-agent",
+        },
+    )
+    session.add(event)
+    await session.flush()
+    return event
 
 
 async def list_node_metrics(

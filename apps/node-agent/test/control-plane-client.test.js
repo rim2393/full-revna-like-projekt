@@ -5,9 +5,11 @@ import {
   createCommandResultRequestBody,
   createHeartbeatRequestBody,
   createInstallTokenExchangeRequest,
+  createNodeEventRequestBody,
   createNodeMetricRequestBody,
   exchangeInstallToken,
   fetchNextNodeCommand,
+  recordNodeEvent,
   recordNodeMetric,
   redactInstallTokenExchangeResponse,
   redactNodeResponse,
@@ -223,4 +225,55 @@ test("records numeric node metrics", async () => {
   assert.equal(calls[0].url, "https://panel.example/api/v1/nodes/node-1/metrics");
   assert.equal(JSON.parse(calls[0].options.body).metric_kind, "runtime");
   assert.equal(response.metric_kind, "runtime");
+});
+
+test("records node telemetry events without leaking node token", async () => {
+  const body = createNodeEventRequestBody({
+    action: "torrent.blocked",
+    resourceType: "torrent",
+    resourceId: "btih:test",
+    metadataJson: {
+      profile_id: "profile-1",
+      count: 2,
+      skipped: null
+    }
+  });
+
+  assert.deepEqual(body, {
+    action: "torrent.blocked",
+    resource_type: "torrent",
+    resource_id: "btih:test",
+    metadata_json: {
+      profile_id: "profile-1",
+      count: "2"
+    }
+  });
+
+  const calls = [];
+  const response = await recordNodeEvent({
+    controlPlaneBaseUrl: "https://panel.example",
+    nodeId: "node-1",
+    nodeToken: "node-secret",
+    action: "torrent.blocked",
+    resourceType: "torrent",
+    resourceId: "btih:test",
+    metadataJson: { outbound_tag: "blocked" },
+    fetchImpl: async (url, options) => {
+      calls.push({ url, options });
+      return jsonResponse({
+        id: "event-1",
+        actor_subject: "node-agent:node-1",
+        action: "torrent.blocked",
+        resource_type: "torrent",
+        resource_id: "btih:test",
+        metadata_json: { outbound_tag: "blocked", source: "node-agent" }
+      });
+    }
+  });
+
+  assert.equal(calls[0].url, "https://panel.example/api/v1/nodes/node-1/events");
+  assert.equal(calls[0].options.headers["x-lumen-node-token"], "node-secret");
+  assert.equal(JSON.stringify(calls[0].options.body).includes("node-secret"), false);
+  assert.equal(JSON.parse(calls[0].options.body).action, "torrent.blocked");
+  assert.equal(response.action, "torrent.blocked");
 });

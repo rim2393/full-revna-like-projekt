@@ -8,6 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import Settings, get_settings
 from app.core.rbac import Permission, Principal, require_permission
 from app.db.session import get_db_session
+from app.domains.audit.schemas import AuditEventResponse
+from app.domains.audit.service import audit_event_response
 from app.domains.nodes.models import Node, NodeCommand, NodeMetric, NodeProvisioningJob
 from app.domains.nodes.schemas import (
     InstallTokenExchangeRequest,
@@ -18,6 +20,7 @@ from app.domains.nodes.schemas import (
     NodeCommandResponse,
     NodeCommandResultRequest,
     NodeCreateRequest,
+    NodeEventCreateRequest,
     NodeHeartbeatRequest,
     NodeListResponse,
     NodeMetricCreateRequest,
@@ -43,6 +46,7 @@ from app.domains.nodes.service import (
     list_node_metrics,
     pause_node,
     quarantine_node,
+    record_node_event,
     record_node_heartbeat,
     record_node_metric,
     resume_node,
@@ -321,6 +325,29 @@ async def create_metric(
     )
     await session.commit()
     return node_metric_response(metric)
+
+
+@router.post(
+    "/{node_id}/events",
+    response_model=AuditEventResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_node_event(
+    node_id: UUID,
+    request: NodeEventCreateRequest,
+    node_token: NodeTokenHeader,
+    session: DatabaseSession,
+    settings: AppSettings,
+) -> AuditEventResponse:
+    event = await record_node_event(
+        session,
+        node_id=node_id,
+        node_token=SecretStr(node_token),
+        request=request,
+        settings=settings,
+    )
+    await session.commit()
+    return audit_event_response(event)
 
 
 @router.post("/{node_id}/pause", response_model=NodeResponse)

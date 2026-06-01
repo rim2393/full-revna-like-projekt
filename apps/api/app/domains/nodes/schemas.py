@@ -172,6 +172,15 @@ class NodeMetricCreateRequest(BaseModel):
     observed_at: datetime | None = None
 
 
+class NodeEventCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    action: str = Field(min_length=1, max_length=128)
+    resource_type: str = Field(min_length=1, max_length=64)
+    resource_id: str | None = Field(default=None, max_length=128)
+    metadata_json: dict[str, str] = Field(default_factory=dict)
+
+
 class NodeMetricResponse(BaseModel):
     id: UUID
     node_id: UUID

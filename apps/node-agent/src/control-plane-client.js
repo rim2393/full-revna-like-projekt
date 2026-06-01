@@ -134,6 +134,26 @@ export function createNodeMetricRequestBody(input = {}) {
   });
 }
 
+export function createNodeEventRequestBody(input = {}) {
+  requireString(input.action, "action");
+  requireString(input.resourceType, "resourceType");
+  const metadataJson = {};
+  for (const [key, value] of Object.entries(input.metadataJson ?? {})) {
+    requireString(key, "metadata key");
+    if (value == null) {
+      continue;
+    }
+    metadataJson[key] = String(value);
+  }
+
+  return Object.freeze({
+    action: input.action,
+    resource_type: input.resourceType,
+    resource_id: input.resourceId ?? null,
+    metadata_json: Object.freeze(metadataJson)
+  });
+}
+
 export function redactNodeResponse(response = {}) {
   return Object.freeze({
     clientVersion: CONTROL_PLANE_CLIENT_VERSION,
@@ -227,4 +247,24 @@ export async function recordNodeMetric(input = {}) {
     body: JSON.stringify(createNodeMetricRequestBody(input))
   });
   return readJsonResponse(response, "node metric record");
+}
+
+export async function recordNodeEvent(input = {}) {
+  requireString(input.nodeToken, "nodeToken");
+  const nodeId = input.nodeId ?? input.config?.nodeId;
+  requireString(nodeId, "nodeId");
+  const fetchImpl = ensureFetch(input.fetchImpl ?? globalThis.fetch);
+  const url = buildUrl(
+    input.controlPlaneBaseUrl ?? input.config?.controlPlaneBaseUrl,
+    `/api/v1/nodes/${nodeId}/events`
+  );
+  const response = await fetchImpl(url, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-lumen-node-token": input.nodeToken
+    },
+    body: JSON.stringify(createNodeEventRequestBody(input))
+  });
+  return readJsonResponse(response, "node event record");
 }
