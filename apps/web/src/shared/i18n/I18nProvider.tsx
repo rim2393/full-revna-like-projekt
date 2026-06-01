@@ -556,6 +556,51 @@ const ru: Record<string, string> = {
   'Edit {name}': 'Редактировать {name}',
   'Disable {name}': 'Отключить {name}',
   'Enable {name}': 'Включить {name}',
+  'API key could not be created.': 'Не удалось создать API-ключ.',
+  'API key inventory': 'Реестр API-ключей',
+  'API keys unavailable': 'API-ключи недоступны',
+  'At least one scope is required.': 'Нужен хотя бы один scope.',
+  'Auth providers unavailable.': 'Провайдеры входа недоступны.',
+  'Backend contract': 'Контракт backend',
+  'Create a scoped automation key below. Secret values are shown once.':
+    'Создайте ниже scoped-ключ автоматизации. Секретное значение показывается один раз.',
+  'Create token': 'Создать токен',
+  'Current browser session cannot be revoked from this row':
+    'Текущую браузерную сессию нельзя отозвать из этой строки',
+  'Default client format': 'Формат клиента по умолчанию',
+  Fingerprint: 'Отпечаток',
+  Format: 'Формат',
+  Host: 'Хост',
+  'Key inventory': 'Реестр ключей',
+  'Loading API keys...': 'Загрузка API-ключей...',
+  'Manage active renderer wrappers that are applied to public subscription output.':
+    'Управляйте активными обертками рендереров, которые применяются к публичной выдаче подписки.',
+  'New template': 'Новый шаблон',
+  Never: 'Никогда',
+  'No API keys issued': 'API-ключи не выданы',
+  'Not signed in': 'Не выполнен вход',
+  'One-time reveal': 'Одноразовый показ',
+  Operator: 'Оператор',
+  'Panel settings appear after an administrator saves the first setting.':
+    'Настройки панели появятся после того, как администратор сохранит первую настройку.',
+  'Profile-Update-Interval': 'Интервал обновления профиля',
+  'Protocol profile': 'Профиль протокола',
+  'Provider could not be updated.': 'Не удалось обновить провайдера.',
+  'Provider has no live login callback and cannot be enabled yet.':
+    'У провайдера нет живого login callback, его пока нельзя включить.',
+  Renderable: 'Можно выдать',
+  'Renderer profile': 'Профиль рендерера',
+  'Scoped token management with API-ready loading, error, and empty states. Secret values are never displayed.':
+    'Управление scoped-токенами с живыми состояниями загрузки, ошибок и пустого списка. Секретные значения не показываются повторно.',
+  'Setting could not be saved.': 'Не удалось сохранить настройку.',
+  'Subscription-Userinfo': 'Информация подписки',
+  'Use delivery profile fields': 'Использовать поля профиля доставки',
+  'Use node public address': 'Использовать публичный адрес ноды',
+  'User, license, and node are required.': 'Пользователь, лицензия и нода обязательны.',
+  'X-Lumen-Inspector-Status': 'Статус инспектора Lumen',
+  over_limit: 'превышен лимит',
+  renderable: 'можно выдать',
+  system: 'система',
   Unavailable: 'Недоступно',
 }
 
@@ -591,4 +636,3 @@ export function useI18n() {
   }
   return context
 }
-

@@ -19,7 +19,7 @@ export function MetricCard({ metric }: MetricCardProps) {
         <p>{t(metric.label)}</p>
         <strong>{metric.value}</strong>
       </div>
-      <StatusBadge tone={metric.tone}>{metric.detail}</StatusBadge>
+      <StatusBadge tone={metric.tone}>{t(metric.detail)}</StatusBadge>
     </article>
   )
 }

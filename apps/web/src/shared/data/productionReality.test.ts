@@ -57,4 +57,33 @@ describe('production reality import boundaries', () => {
 
     expect(offenders).toEqual([])
   })
+
+  it('keeps Russian translations for every literal t() key used by production UI', () => {
+    const dictionarySource = Object.entries(sourceFiles).find(([path]) =>
+      path.replaceAll('\\', '/').includes('I18nProvider.tsx'),
+    )?.[1]
+    expect(dictionarySource).toBeTruthy()
+    if (!dictionarySource) {
+      throw new Error('I18nProvider source was not loaded by the production reality test.')
+    }
+
+    const quotedKeys = Array.from(dictionarySource.matchAll(/^\s*'([^']+)':/gm)).map(
+      (match) => match[1],
+    )
+    const bareKeys = Array.from(
+      dictionarySource.matchAll(/^\s*([A-Za-z][A-Za-z0-9_ -]*):\s*'/gm),
+    ).map((match) => match[1].trim())
+    const dictionaryKeys = new Set([...quotedKeys, ...bareKeys])
+
+    const missing = Object.entries(sourceFiles)
+      .filter(([path]) => !/shared\/i18n\/I18nProvider\.tsx$/.test(path))
+      .flatMap(([path, source]) =>
+        Array.from(source.matchAll(/\bt\(\s*(['"])(.*?)\1/g))
+          .map((match) => match[2])
+          .filter((key) => !dictionaryKeys.has(key))
+          .map((key) => `${path}: ${key}`),
+      )
+
+    expect(missing).toEqual([])
+  })
 })
