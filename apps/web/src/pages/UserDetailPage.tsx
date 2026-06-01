@@ -177,6 +177,34 @@ export function UserDetailPage() {
         <article className="panel">
           <div className="panel__header">
             <div>
+              <p className="eyebrow">{t('Identity')}</p>
+              <h2>{t('User metadata')}</h2>
+            </div>
+            <StatusBadge tone="info">{user.role}</StatusBadge>
+          </div>
+          <dl className="profile-facts">
+            <div>
+              <dt>{t('Username')}</dt>
+              <dd>{user.username ?? t('Not set')}</dd>
+            </div>
+            <div>
+              <dt>{t('Telegram ID')}</dt>
+              <dd>{user.telegram_id ?? t('Not set')}</dd>
+            </div>
+            <div>
+              <dt>{t('Tags')}</dt>
+              <dd>{user.tags.length > 0 ? user.tags.join(', ') : t('none')}</dd>
+            </div>
+            <div>
+              <dt>metadata_json</dt>
+              <dd>{formatRecord(user.metadata_json)}</dd>
+            </div>
+          </dl>
+        </article>
+
+        <article className="panel">
+          <div className="panel__header">
+            <div>
               <p className="eyebrow">{t('HWID')}</p>
               <h2>{detail.devices.length > 0 ? t('Registered devices') : t('Device registry')}</h2>
             </div>

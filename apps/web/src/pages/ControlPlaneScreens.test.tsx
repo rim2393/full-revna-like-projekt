@@ -253,10 +253,10 @@ describe('Control plane resource screens', () => {
       email: 'devices@lumen.local',
       expires_at: null,
       id: 'usr_devices',
-      metadata_json: {},
+      metadata_json: { numeric_id: 77 },
       role: 'user',
       status: 'active',
-      tags: [],
+      tags: ['qa'],
       telegram_id: null,
       traffic_limit_gb: 100,
       traffic_used_gb: 1,
@@ -307,6 +307,8 @@ describe('Control plane resource screens', () => {
     renderWithRouter('/users/usr_devices', { apiClient, initialSession: developmentSession })
 
     expect(await screen.findByRole('table', { name: /registered devices/i })).toBeInTheDocument()
+    expect(screen.getByText(/user metadata/i)).toBeInTheDocument()
+    expect(screen.getByText(/numeric_id=77/i)).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: /delete device phone/i }))
     await waitFor(() => expect(deleteUserDevice).toHaveBeenCalledWith('usr_devices', 'phone'))
     await user.click(screen.getByRole('button', { name: /clear all devices/i }))
