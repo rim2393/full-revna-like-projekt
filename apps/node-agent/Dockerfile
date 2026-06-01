@@ -12,7 +12,7 @@ ENV XRAY_LOCATION_ASSET=/usr/local/share/xray
 
 WORKDIR /srv/lumen-node-agent
 
-RUN apk add --no-cache ca-certificates curl gcompat iproute2 iptables libev pcre tar unzip wireguard-tools wireguard-tools-wg-quick xz \
+RUN apk add --no-cache ca-certificates curl gcompat iproute2 iptables libev openvpn openssl pcre tar unzip wireguard-tools wireguard-tools-wg-quick xz \
   && apk add --no-cache --virtual .simple-obfs-build-deps asciidoc autoconf automake build-base git libev-dev libtool linux-headers openssl-dev pcre-dev xmlto zlib-dev \
   && mkdir -p /usr/local/share/xray \
   && curl -fsSL -o /tmp/xray.zip "https://github.com/XTLS/Xray-core/releases/download/${XRAY_VERSION}/Xray-linux-64.zip" \

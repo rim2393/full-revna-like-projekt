@@ -51,6 +51,7 @@ RENDERABLE_PROTOCOL_PREFIXES = (
     "naive",
     "tuic",
     "wireguard",
+    "openvpn",
     "socks",
     "http",
 )
@@ -720,14 +721,14 @@ def _default_security(protocol_type: str) -> str:
     if (
         protocol_type.endswith("tls")
         or "-tls" in protocol_type
-        or protocol_type in {"hysteria2", "naive", "naiveproxy"}
+        or protocol_type in {"hysteria2", "naive", "naiveproxy", "openvpn", "openvpn-udp"}
     ):
         return "tls"
     return "none"
 
 
 def _default_transport(protocol_type: str) -> str:
-    if protocol_type.startswith(("hysteria2", "tuic", "wireguard")):
+    if protocol_type.startswith(("hysteria2", "tuic", "wireguard", "openvpn")):
         return "udp"
     if "grpc" in protocol_type:
         return "grpc"
@@ -781,6 +782,18 @@ def _manifest_renderer_hints(
         "persistentKeepalive": delivery.get("persistent_keepalive"),
     }
     profile_config = profile.config_json if profile is not None else {}
+    profile_metadata = (
+        profile.metadata_json
+        if profile is not None and isinstance(profile.metadata_json, dict)
+        else {}
+    )
+    openvpn_pki = (
+        profile_metadata.get("openvpn_pki")
+        if isinstance(profile_metadata.get("openvpn_pki"), dict)
+        else {}
+    )
+    if openvpn_pki.get("ca_cert") is not None:
+        hints["caCert"] = openvpn_pki["ca_cert"]
     obfs_config = profile_config.get("obfs") if isinstance(profile_config.get("obfs"), dict) else {}
     if hints.get("obfs") is None and obfs_config.get("type") is not None:
         hints["obfs"] = obfs_config["type"]

@@ -16,6 +16,7 @@ from app.db.session import create_engine, get_db_session
 from app.domains.licenses.models import License
 from app.domains.licenses.service import hash_license_key
 from app.domains.nodes.models import Node
+from app.domains.protocols.models import ProtocolProfile
 from app.domains.users.models import User
 from app.main import create_app
 
@@ -721,3 +722,64 @@ async def test_naiveproxy_subscription_renders_supported_clients(route_app: Rout
     )
     assert xray.status_code == 200
     assert xray.json()["outbounds"] == []
+
+
+async def test_openvpn_subscription_renders_ovpn_from_real_profile_pki(
+    route_app: RouteTestApp,
+) -> None:
+    user, license_record, node = await _seed(route_app)
+    async with route_app.sessionmaker() as session:
+        profile = ProtocolProfile(
+            name="OpenVPN UDP",
+            node_id=node.id,
+            adapter="openvpn-udp",
+            status="active",
+            config_json={"network": "10.88.0.0/24"},
+            port_reservations=[
+                {
+                    "address": "0.0.0.0",  # noqa: S104
+                    "port": 1194,
+                    "protocol": "udp",
+                    "exclusive": True,
+                }
+            ],
+            credentials_ref="vault://subscriptions/openvpn/creds",
+            metadata_json={
+                "openvpn_pki": {
+                    "ca_cert": "-----BEGIN CERTIFICATE-----\nca\n-----END CERTIFICATE-----",
+                    "server_cert": "-----BEGIN CERTIFICATE-----\nserver\n-----END CERTIFICATE-----",
+                    "server_key": "-----BEGIN PRIVATE KEY-----\nserver\n-----END PRIVATE KEY-----",
+                }
+            },
+        )
+        session.add(profile)
+        await session.commit()
+
+    response = await route_app.client.post(
+        "/api/v1/subscriptions",
+        json={
+            "user_id": str(user.id),
+            "license_id": str(license_record.id),
+            "node_id": str(node.id),
+            "delivery_profile": {
+                "profile_id": str(profile.id),
+                "protocol": "openvpn",
+                "adapter": "openvpn-udp",
+                "profile_title": "Lumen OpenVPN",
+                "port": "1194",
+            },
+            "config_hash": "sha256:openvpn",
+        },
+    )
+    assert response.status_code == 201, response.text
+    public_id = response.json()["public_id"]
+
+    raw = await route_app.client.get(
+        f"/api/v1/subscriptions/public/{public_id}/render?target=happ",
+    )
+    assert raw.status_code == 200, raw.text
+    assert raw.text.startswith("client\n")
+    assert "proto udp" in raw.text
+    assert "remote 203.0.113.70 1194" in raw.text
+    assert "<ca>\n-----BEGIN CERTIFICATE-----" in raw.text
+    assert f"<auth-user-pass>\n{public_id}\n" in raw.text

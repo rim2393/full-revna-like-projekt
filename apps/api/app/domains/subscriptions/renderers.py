@@ -316,6 +316,9 @@ def render_share_uri(entry: dict[str, Any], *, settings: Settings) -> str | None
         )
         return build_uri("https", userinfo, protocol, {}, label)
 
+    if protocol_type == "openvpn":
+        return render_openvpn_ovpn(entry, credentials=credentials)
+
     if protocol_type == "wireguard":
         return render_wireguard_conf(entry, credentials=credentials)
 
@@ -336,6 +339,41 @@ def render_share_uri(entry: dict[str, Any], *, settings: Settings) -> str | None
     # AmneziaWG has no universal single-line share URI; it is emitted in
     # structured client formats and the Lumen native manifest.
     return None
+
+
+def render_openvpn_ovpn(entry: dict[str, Any], *, credentials: ClientCredential) -> str | None:
+    protocol = entry["protocol"]
+    endpoint = protocol.get("endpoint", {})
+    hints = protocol.get("rendererHints", {})
+    ca_cert = hints.get("caCert")
+    if not endpoint.get("host") or not endpoint.get("port") or not ca_cert:
+        return None
+    proto = network_type(protocol)
+    if proto not in {"udp", "tcp"}:
+        proto = "udp"
+    lines = [
+        "client",
+        "dev tun",
+        f"proto {proto}",
+        f"remote {endpoint['host']} {endpoint['port']}",
+        "resolv-retry infinite",
+        "nobind",
+        "persist-key",
+        "persist-tun",
+        "remote-cert-tls server",
+        "auth SHA256",
+        "auth-nocache",
+        "data-ciphers AES-256-GCM:AES-128-GCM:CHACHA20-POLY1305",
+        "verb 3",
+        "<ca>",
+        str(ca_cert).strip(),
+        "</ca>",
+        "<auth-user-pass>",
+        protocol_username(entry),
+        credentials.password,
+        "</auth-user-pass>",
+    ]
+    return "\n".join(lines)
 
 
 def render_wireguard_conf(entry: dict[str, Any], *, credentials: ClientCredential) -> str | None:
@@ -1170,6 +1208,8 @@ def normalize_protocol_type(value: object) -> str:
         return "tuic"
     if raw.startswith("naive"):
         return "naive"
+    if raw.startswith("openvpn"):
+        return "openvpn"
     if raw.startswith("wireguard"):
         return "wireguard"
     if raw.startswith("socks"):

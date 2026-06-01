@@ -24,14 +24,16 @@ An adapter descriptor contains:
 The control-plane API exposes a product-size adapter catalog through
 `/api/v1/protocols/adapters`. It includes VLESS Reality/TLS transport variants,
 VMess, Trojan, Shadowsocks, WireGuard/AmneziaWG, Hysteria2, TUIC, NaiveProxy,
-SOCKS/HTTP proxy entries, and legacy aliases.
+OpenVPN UDP, SOCKS/HTTP proxy entries, and legacy aliases.
 
 The currently executable runtime slice includes the adapters that have passed
 backend renderer tests, node-agent runtime tests, and live VPS validation:
 VLESS/VMess/Trojan TCP variants, Shadowsocks native, SOCKS5, HTTP proxy,
-Hysteria2, TUIC v5, WireGuard native, and AmneziaWG. Catalog entries outside
-that set remain metadata only until install, health, export, conflict, and
-client compatibility tests are completed.
+Hysteria2, TUIC v5, WireGuard native, AmneziaWG, and direct OpenVPN UDP.
+OpenVPN-over-Shadowsocks remains a separate bridge task and must not be marked
+complete until a real bridge path is implemented and live-validated. Catalog
+entries outside that set remain metadata only until install, health, export,
+conflict, and client compatibility tests are completed.
 
 The VLESS Reality adapter expects public client subscription fields:
 
@@ -52,6 +54,13 @@ The Hysteria2 Obfs adapter expects:
 - `rendererHints.obfs`, normally `salamander`
 - a derived per-subscription `hysteriaObfsPassword`
 - node-agent process mode with sing-box Hysteria2 inbound support
+
+The OpenVPN UDP adapter expects:
+
+- profile-managed server CA/certificate/private key material
+- per-subscription username/password credentials
+- node-agent process mode with `openvpn` installed, TUN/NET_ADMIN available,
+  IP forwarding enabled, and NAT for the OpenVPN client network
 
 The Xray transport variants use adapter-derived transport defaults:
 

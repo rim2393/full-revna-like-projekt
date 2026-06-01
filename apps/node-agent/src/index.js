@@ -135,6 +135,14 @@ export {
   createNaiveApplyPlan
 } from "./naive-runtime.js";
 export {
+  DEFAULT_OPENVPN_BINARY,
+  DEFAULT_OPENVPN_CONFIG_PATH,
+  OPENVPN_RUNTIME_MODEL_VERSION,
+  applyOpenVpnConfig,
+  createOpenVpnApplyPlan,
+  renderOpenVpnServerConfig
+} from "./openvpn-runtime.js";
+export {
   DEFAULT_SHADOWSOCKS_PLUGIN_CONFIG_PATH,
   DEFAULT_SHADOWSOCKS_SERVER_BINARY,
   SHADOWSOCKS_PLUGIN_RUNTIME_MODEL_VERSION,

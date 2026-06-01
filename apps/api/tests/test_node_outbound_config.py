@@ -78,6 +78,33 @@ def test_naiveproxy_profile_builds_naive_payload():
     assert payload["naiveConfig"]["clientsRef"] == "vault://subscriptions/p/creds"
 
 
+def test_openvpn_profile_builds_real_openvpn_payload_with_generated_pki():
+    payload = build_node_outbound_payload(
+        _profile("openvpn-udp", {"network": "10.88.0.0/24"}),
+        _inbounds(1194, protocol="openvpn", transport="udp"),
+        runtime_clients=[
+            {
+                "public_id": "lumen_sub_live",
+                "password": "openvpn-live-password",
+            }
+        ],
+    )
+
+    assert payload["adapter"] == "openvpn-udp"
+    assert "openvpnConfig" in payload
+    config = payload["openvpnConfig"]
+    assert config["listen_port"] == 1194
+    assert config["proto"] == "udp"
+    assert config["network"] == "10.88.0.0/24"
+    assert config["users"] == [
+        {"username": "lumen_sub_live", "password": "openvpn-live-password"}
+    ]
+    assert "clientsRef" not in config
+    assert "BEGIN CERTIFICATE" in config["pki"]["ca_cert"]
+    assert "BEGIN CERTIFICATE" in config["pki"]["server_cert"]
+    assert "BEGIN PRIVATE KEY" in config["pki"]["server_key"]
+
+
 def test_wireguard_profile_builds_wireguard_payload():
     payload = build_node_outbound_payload(_profile("wireguard-native"), _inbounds(51820))
     assert "wireguardConfig" in payload

@@ -1,13 +1,13 @@
 # Continuation Checkpoint
 
-Last audited: 2026-06-01 15:31 Europe/Moscow.
+Last audited: 2026-06-01 15:58 Europe/Moscow.
 
 ## Current Working Copy
 
 - Repo: `D:\android-app-new\_work\full-revna-like-projekt`
-- Main branch state: clean after `16aa332 Prevent branch builds from deploying prod manifest`.
-- Current signed production manifest: `v0.1.40`.
-- Live production panel and node were validated on `v0.1.40` after the manifest was restored from a temporary `main-...` overwrite.
+- Main branch state: clean after `e38f2ae Apply node policies to sing-box runtimes`.
+- Current signed production manifest: `v0.1.41`.
+- Live production panel and node were validated on `v0.1.41` through the official closed-image, public signed manifest, and public node installer flow.
 - 5.3 added backend domains/routes/migrations for:
   - `metrics`
   - `ip_control`
@@ -41,6 +41,7 @@ Last audited: 2026-06-01 15:31 Europe/Moscow.
   - `v0.1.38` added node-authenticated event ingestion for plugin/torrent reports.
   - `v0.1.39` added node-agent runtime log telemetry from real policy files and persisted offsets.
   - `v0.1.40` added Xray inbound sniffing for torrent-blocker enforcement and live-validated blackhole routing plus `xray -test`.
+  - `v0.1.41` added sing-box policy enforcement for Hysteria2, TUIC, NaiveProxy, and sing-box Shadowsocks 2022. Live validation applied a real `shadowsocks-2022` profile with the global torrent-blocker policy, confirmed the generated sing-box config contains a `block` outbound plus `route.rules[0].protocol=["bittorrent"]`, passed `sing-box check -c`, and confirmed the live TCP listener.
   - CI fix `16aa332`: branch push image builds no longer dispatch the public installer/prod deploy pipeline. Only workflow dispatch/tag releases should change `release/prod.json`.
 - 2026-06-01 Clash/Mihomo Android pass:
   - supported Clash aliases now become concrete runtime profiles: `hy2` -> Hysteria2, TUIC hyphen fields -> runtime keys, SOCKS4/SOCKS4A version preserved, packet-encoding normalized.
@@ -59,7 +60,9 @@ Last audited: 2026-06-01 15:31 Europe/Moscow.
 - Android focused gate after Clash/Mihomo conversion: `SubscriptionParserTest` and `SubscriptionSourceResolverTest` passed; `:app:assembleDebug` and `:app:assembleRelease` passed.
 - Node-agent gate after runtime telemetry: `node --test`, 86 passed.
 - API gate after Xray sniffing enforcement: full API `pytest tests`, 142 passed; focused ruff clean.
+- Node-agent gate after sing-box policy enforcement: `node --test`, 90 passed.
 - Live prod evidence after `v0.1.40`: panel `LUMEN_VERSION=v0.1.40`, node-agent image pinned to `v0.1.40`, HTTP-proxy profile apply succeeded with `dryRun=false`, Xray config contains `blackhole`, `protocol=["bittorrent"]`, sniffing on all active inbounds, and `xray -test` passed.
+- Live prod evidence after `v0.1.41`: panel `LUMEN_VERSION=v0.1.41`, node-agent image pinned to `v0.1.41`, `shadowsocks-2022` profile apply succeeded with `dryRun=false`, node policy applied, generated sing-box Shadowsocks config contains the policy block route, `sing-box check -c` passed against the live config, and TCP `24081` listened on the node.
 - Alembic heads: single head `0008_infra_billing`.
 
 ## Fixes Applied During Audit
@@ -77,6 +80,6 @@ Last audited: 2026-06-01 15:31 Europe/Moscow.
 ## Next Suggested Work
 
 1. Continue the remaining real-runtime protocol gaps: OpenVPN over Shadowsocks bridge and Android IKEv2/IPsec.
-2. Extend non-Xray protocol runtimes to actively consume the persisted policy file where native protocol support exists.
+2. Do not mark WireGuard/AWG torrent blocking complete through a fake policy artifact. Native WireGuard needs a real enforceable design such as nftables marks/routing or an explicit unsupported/enforced-by-edge status; ordinary `wg-quick` cannot do BitTorrent protocol detection by itself.
 3. Continue Remnawave parity UI pages only against live API state; no fake counters or static placeholder rows.
 4. Keep official release/update path mandatory for production validation.

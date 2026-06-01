@@ -1,6 +1,11 @@
 from copy import deepcopy
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
+from cryptography import x509
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
 from fastapi import status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -250,6 +255,12 @@ PROTOCOL_ADAPTERS = (
         required_credential_refs=["username", "password", "tls_certificate"],
     ),
     _adapter(
+        "openvpn-udp",
+        "OpenVPN UDP",
+        capabilities=["openvpn", "udp", "tls", "subscription"],
+        required_credential_refs=["username", "password", "server_certificate"],
+    ),
+    _adapter(
         "socks5",
         "SOCKS5",
         capabilities=["socks", "tcp", "udp", "subscription"],
@@ -461,6 +472,8 @@ async def create_profile(
     )
     session.add(profile)
     await session.flush()
+    _ensure_openvpn_profile_pki(profile)
+    await session.flush()
     return profile
 
 
@@ -512,6 +525,8 @@ async def update_profile(
     data.pop("allow_port_conflicts", None)
     for field, value in data.items():
         setattr(profile, field, value)
+    await session.flush()
+    _ensure_openvpn_profile_pki(profile)
     await session.flush()
     return profile
 
@@ -1396,6 +1411,7 @@ def _compact_object(value: dict[str, object]) -> dict[str, object]:
 _NODE_CONFIG_KEY_BY_FAMILY = {
     "hysteria2": "hysteria2Config",
     "naive": "naiveConfig",
+    "openvpn": "openvpnConfig",
     "sing-box-shadowsocks": "singBoxShadowsocksConfig",
     "shadowsocks-plugin": "shadowsocksPluginConfig",
     "tuic": "tuicConfig",
@@ -1409,6 +1425,8 @@ _DEFAULT_NODE_TLS_KEY_PATH = "/var/lib/lumen-node/runtime/tls/live.key"
 def _adapter_family(adapter: str) -> str:
     if adapter == "naiveproxy":
         return "naive"
+    if adapter.startswith("openvpn"):
+        return "openvpn"
     if adapter == "shadowsocks-2022":
         return "sing-box-shadowsocks"
     if adapter in {"shadowsocks-v2ray-plugin", "shadowsocks-obfs"}:
@@ -1459,6 +1477,109 @@ def _ensure_tuic_tls_paths(config: dict[str, object]) -> None:
 
 def _ensure_naive_tls_paths(config: dict[str, object]) -> None:
     _ensure_node_tls_paths(config)
+
+
+def _pem_private_key(private_key) -> str:
+    return private_key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption(),
+    ).decode("ascii")
+
+
+def _pem_certificate(certificate: x509.Certificate) -> str:
+    return certificate.public_bytes(serialization.Encoding.PEM).decode("ascii")
+
+
+def _generate_openvpn_pki(*, common_name: str) -> dict[str, str]:
+    ca_key = rsa.generate_private_key(public_exponent=65537, key_size=3072)
+    server_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    now = datetime.now(UTC)
+    ca_subject = x509.Name(
+        [
+            x509.NameAttribute(NameOID.ORGANIZATION_NAME, "Lumen"),
+            x509.NameAttribute(NameOID.COMMON_NAME, f"Lumen OpenVPN CA {common_name}"),
+        ]
+    )
+    ca_cert = (
+        x509.CertificateBuilder()
+        .subject_name(ca_subject)
+        .issuer_name(ca_subject)
+        .public_key(ca_key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(now - timedelta(minutes=5))
+        .not_valid_after(now + timedelta(days=3650))
+        .add_extension(x509.BasicConstraints(ca=True, path_length=0), critical=True)
+        .add_extension(
+            x509.KeyUsage(
+                digital_signature=True,
+                key_cert_sign=True,
+                crl_sign=True,
+                key_encipherment=False,
+                content_commitment=False,
+                data_encipherment=False,
+                key_agreement=False,
+                encipher_only=False,
+                decipher_only=False,
+            ),
+            critical=True,
+        )
+        .sign(ca_key, hashes.SHA256())
+    )
+    server_subject = x509.Name(
+        [
+            x509.NameAttribute(NameOID.ORGANIZATION_NAME, "Lumen"),
+            x509.NameAttribute(NameOID.COMMON_NAME, f"Lumen OpenVPN Server {common_name}"),
+        ]
+    )
+    server_cert = (
+        x509.CertificateBuilder()
+        .subject_name(server_subject)
+        .issuer_name(ca_cert.subject)
+        .public_key(server_key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(now - timedelta(minutes=5))
+        .not_valid_after(now + timedelta(days=825))
+        .add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=True)
+        .add_extension(
+            x509.KeyUsage(
+                digital_signature=True,
+                key_encipherment=True,
+                key_cert_sign=False,
+                crl_sign=False,
+                content_commitment=False,
+                data_encipherment=False,
+                key_agreement=False,
+                encipher_only=False,
+                decipher_only=False,
+            ),
+            critical=True,
+        )
+        .add_extension(
+            x509.ExtendedKeyUsage([ExtendedKeyUsageOID.SERVER_AUTH]),
+            critical=False,
+        )
+        .sign(ca_key, hashes.SHA256())
+    )
+    return {
+        "ca_cert": _pem_certificate(ca_cert),
+        "server_cert": _pem_certificate(server_cert),
+        "server_key": _pem_private_key(server_key),
+    }
+
+
+def _ensure_openvpn_profile_pki(profile: ProtocolProfile) -> None:
+    if not profile.adapter.startswith("openvpn"):
+        return
+    metadata = dict(profile.metadata_json or {})
+    pki = metadata.get("openvpn_pki") if isinstance(metadata.get("openvpn_pki"), dict) else {}
+    if all(
+        isinstance(pki.get(key), str) and pki[key]
+        for key in ("ca_cert", "server_cert", "server_key")
+    ):
+        return
+    metadata["openvpn_pki"] = _generate_openvpn_pki(common_name=str(profile.id))
+    profile.metadata_json = metadata
 
 
 async def list_profile_runtime_clients(
@@ -1597,6 +1718,47 @@ def _computed_naive_config(
     return config
 
 
+def _profile_openvpn_pki(profile: ProtocolProfile) -> dict[str, str]:
+    metadata = profile.metadata_json if isinstance(profile.metadata_json, dict) else {}
+    pki = metadata.get("openvpn_pki") if isinstance(metadata.get("openvpn_pki"), dict) else {}
+    if all(
+        isinstance(pki.get(key), str) and pki[key]
+        for key in ("ca_cert", "server_cert", "server_key")
+    ):
+        return {
+            "ca_cert": str(pki["ca_cert"]),
+            "server_cert": str(pki["server_cert"]),
+            "server_key": str(pki["server_key"]),
+        }
+    return _generate_openvpn_pki(common_name=str(profile.id))
+
+
+def _computed_openvpn_config(
+    profile: ProtocolProfile,
+    port: int | None,
+    *,
+    runtime_clients: list[dict[str, object]] | None = None,
+) -> dict[str, object]:
+    config = _profile_config_dict(profile)
+    config.setdefault("listen_port", port or 1194)
+    config.setdefault("proto", "udp")
+    config.setdefault("network", "10.88.0.0/24")
+    config["pki"] = _profile_openvpn_pki(profile)
+    clients = runtime_clients or []
+    if clients:
+        config["users"] = [
+            {
+                "username": str(client["public_id"]),
+                "password": str(client["password"]),
+            }
+            for client in clients
+        ]
+        config.pop("clientsRef", None)
+    else:
+        config["clientsRef"] = profile.credentials_ref
+    return config
+
+
 def _computed_sing_box_shadowsocks_config(
     profile: ProtocolProfile,
     port: int | None,
@@ -1697,6 +1859,12 @@ def compute_node_outbound_config(
         )
     if family == "naive":
         return _computed_naive_config(
+            profile,
+            _first_inbound_port(inbounds),
+            runtime_clients=runtime_clients,
+        )
+    if family == "openvpn":
+        return _computed_openvpn_config(
             profile,
             _first_inbound_port(inbounds),
             runtime_clients=runtime_clients,
@@ -2076,7 +2244,13 @@ def _inbound_transport(profile: ProtocolProfile) -> str:
         return "httpupgrade"
     if "-ws" in profile.adapter or "websocket" in profile.adapter:
         return "ws"
-    if profile.adapter in {"wireguard-native", "wireguard-amneziawg", "hysteria2", "tuic-v5"}:
+    if profile.adapter in {
+        "wireguard-native",
+        "wireguard-amneziawg",
+        "hysteria2",
+        "tuic-v5",
+        "openvpn-udp",
+    }:
         return "udp"
     return "tcp"
 
@@ -2087,7 +2261,12 @@ def _inbound_security(profile: ProtocolProfile) -> str:
         return str(security["type"])
     if "reality" in profile.adapter:
         return "reality"
-    if "tls" in profile.adapter or profile.adapter in {"hysteria2", "tuic-v5", "naiveproxy"}:
+    if "tls" in profile.adapter or profile.adapter in {
+        "hysteria2",
+        "tuic-v5",
+        "naiveproxy",
+        "openvpn-udp",
+    }:
         return "tls"
     return "none"
 
