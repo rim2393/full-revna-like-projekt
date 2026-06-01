@@ -1186,6 +1186,40 @@ export function createDevelopmentLumenApiClient(): LumenApiClient {
         if (action === 'status' && request.status) {
           user.status = request.status
         }
+        if (action === 'revoke') {
+          user.status = 'revoked'
+        }
+        if (action === 'tag') {
+          user.tags = request.tags ?? []
+        }
+        if (action === 'extend') {
+          user.expires_at = request.expires_at ?? null
+        }
+        if (action === 'traffic') {
+          user.traffic_used_gb = Math.max(0, user.traffic_used_gb + (request.traffic_delta_gb ?? 0))
+        }
+      }
+      if (action === 'delete') {
+        for (const user of selected) {
+          const index = users.findIndex((item) => item.id === user.id)
+          if (index >= 0) {
+            users.splice(index, 1)
+          }
+        }
+      }
+      if ((action === 'squad-add' || action === 'squad-remove') && request.squad_id) {
+        const squad = squads.find((item) => item.id === request.squad_id)
+        if (squad) {
+          const current = Array.isArray(squad.metadata_json.user_ids)
+            ? squad.metadata_json.user_ids.map(String)
+            : []
+          squad.metadata_json = {
+            ...squad.metadata_json,
+            user_ids: action === 'squad-add'
+              ? Array.from(new Set([...current, ...request.user_ids]))
+              : current.filter((userId) => !request.user_ids.includes(userId)),
+          }
+        }
       }
       return { items: selected, updated: selected.length }
     },

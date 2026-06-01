@@ -155,6 +155,7 @@ export type UserLookupResponse = {
 
 export type UserBulkActionRequest = {
   expires_at?: string | null
+  squad_id?: string | null
   status?: string | null
   tags?: string[] | null
   traffic_delta_gb?: number | null

@@ -48,6 +48,7 @@ class UserBulkActionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     user_ids: list[UUID] = Field(min_length=1)
+    squad_id: UUID | None = None
     status: str | None = None
     expires_at: datetime | None = None
     traffic_delta_gb: float | None = None

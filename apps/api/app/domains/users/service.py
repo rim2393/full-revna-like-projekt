@@ -10,6 +10,7 @@ from app.core.security import hash_password
 from app.domains.audit.models import AuditEvent
 from app.domains.audit.service import audit_event_response
 from app.domains.nodes.models import Node
+from app.domains.protocols.models import Squad
 from app.domains.subscriptions.service import list_subscriptions_for_user, subscription_to_response
 from app.domains.users.models import User
 from app.domains.users.schemas import (
@@ -405,6 +406,38 @@ async def apply_bulk_user_action(
                 0.0,
                 user.traffic_used_gb + (request.traffic_delta_gb or 0.0),
             )
+        elif action == "delete":
+            await session.delete(user)
+        elif action == "squad-add":
+            if request.squad_id is None:
+                raise APIError(
+                    code="bulk_squad_id_required",
+                    message="squad_id is required for squad-add bulk action.",
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                )
+            squad = await _get_squad_for_bulk(session, squad_id=request.squad_id)
+            current = _squad_user_ids(squad)
+            for selected_user in users:
+                if str(selected_user.id) not in current:
+                    current.append(str(selected_user.id))
+            squad.metadata_json = {**squad.metadata_json, "user_ids": current}
+            break
+        elif action == "squad-remove":
+            if request.squad_id is None:
+                raise APIError(
+                    code="bulk_squad_id_required",
+                    message="squad_id is required for squad-remove bulk action.",
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                )
+            squad = await _get_squad_for_bulk(session, squad_id=request.squad_id)
+            remove_ids = {str(selected_user.id) for selected_user in users}
+            squad.metadata_json = {
+                **squad.metadata_json,
+                "user_ids": [
+                    user_id for user_id in _squad_user_ids(squad) if user_id not in remove_ids
+                ],
+            }
+            break
         else:
             raise APIError(
                 code="bulk_action_unknown",
@@ -414,6 +447,25 @@ async def apply_bulk_user_action(
             )
     await session.flush()
     return users
+
+
+async def _get_squad_for_bulk(session: AsyncSession, *, squad_id: UUID) -> Squad:
+    squad = await session.get(Squad, squad_id)
+    if squad is None:
+        raise APIError(
+            code="squad_not_found",
+            message="Squad was not found.",
+            status_code=status.HTTP_404_NOT_FOUND,
+            details=[str(squad_id)],
+        )
+    return squad
+
+
+def _squad_user_ids(squad: Squad) -> list[str]:
+    user_ids = squad.metadata_json.get("user_ids")
+    if not isinstance(user_ids, list):
+        return []
+    return [str(user_id) for user_id in user_ids]
 
 
 async def _ensure_unique_identity(

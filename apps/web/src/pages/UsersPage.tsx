@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
-import { Ban, RefreshCw, RotateCcw, Save, Search, Trash2 } from 'lucide-react'
+import { Ban, CalendarClock, RefreshCw, RotateCcw, Save, Search, Tags, Trash2, UserPlus, UserMinus } from 'lucide-react'
 import {
   useBulkUsers,
   useCreateUser,
@@ -10,6 +10,7 @@ import {
   useLookupUsers,
   useResetUserTraffic,
   useRevokeUser,
+  useSquadsPageData,
   useUpdateUser,
   useUsersPageData,
 } from '../shared/api/resourceHooks'
@@ -47,6 +48,7 @@ export function UsersPage() {
   const { t } = useI18n()
   const spec = sectionSpecs.users
   const query = useUsersPageData()
+  const squadsQuery = useSquadsPageData()
   const createUser = useCreateUser()
   const updateUser = useUpdateUser()
   const deleteUser = useDeleteUser()
@@ -64,6 +66,10 @@ export function UsersPage() {
   const [displayName, setDisplayName] = useState('')
   const [trafficLimit, setTrafficLimit] = useState('300')
   const [deviceLimit, setDeviceLimit] = useState('5')
+  const [bulkTags, setBulkTags] = useState('')
+  const [bulkExpiresAt, setBulkExpiresAt] = useState('')
+  const [bulkTrafficDelta, setBulkTrafficDelta] = useState('')
+  const [bulkSquadId, setBulkSquadId] = useState('')
   const [formError, setFormError] = useState<string | null>(null)
 
   function toggleSelected(id: string) {
@@ -109,6 +115,19 @@ export function UsersPage() {
   }
 
   async function runBulk(action: string, status?: string) {
+    await runBulkWithRequest(action, { status })
+  }
+
+  async function runBulkWithRequest(
+    action: string,
+    request: {
+      expires_at?: string | null
+      squad_id?: string | null
+      status?: string | null
+      tags?: string[] | null
+      traffic_delta_gb?: number | null
+    } = {},
+  ) {
     if (selectedIds.size === 0) {
       setFormError(t('Select at least one user first.'))
       return
@@ -116,8 +135,45 @@ export function UsersPage() {
     setFormError(null)
     await bulkUsers.mutateAsync({
       action,
-      request: { status, user_ids: Array.from(selectedIds) },
+      request: { ...request, user_ids: Array.from(selectedIds) },
     })
+    if (action === 'delete') {
+      setSelectedIds(new Set())
+    }
+  }
+
+  async function runBulkTags() {
+    const tags = bulkTags.split(',').map((tag) => tag.trim()).filter(Boolean)
+    if (tags.length === 0) {
+      setFormError(t('Enter at least one tag.'))
+      return
+    }
+    await runBulkWithRequest('tag', { tags })
+  }
+
+  async function runBulkExtend() {
+    if (!bulkExpiresAt) {
+      setFormError(t('Set an expiration date first.'))
+      return
+    }
+    await runBulkWithRequest('extend', { expires_at: new Date(bulkExpiresAt).toISOString() })
+  }
+
+  async function runBulkTrafficDelta() {
+    const value = Number(bulkTrafficDelta)
+    if (!Number.isFinite(value)) {
+      setFormError(t('Traffic delta must be a valid number.'))
+      return
+    }
+    await runBulkWithRequest('traffic', { traffic_delta_gb: value })
+  }
+
+  async function runBulkSquad(action: 'squad-add' | 'squad-remove') {
+    if (!bulkSquadId) {
+      setFormError(t('Select a squad first.'))
+      return
+    }
+    await runBulkWithRequest(action, { squad_id: bulkSquadId })
   }
 
   async function handleLookup(event: FormEvent<HTMLFormElement>) {
@@ -194,6 +250,93 @@ export function UsersPage() {
               <RotateCcw size={16} aria-hidden="true" />
               {t('Reset traffic')}
             </button>
+            <button
+              type="button"
+              className="button button--secondary"
+              onClick={() => void runBulkWithRequest('revoke')}
+            >
+              <Ban size={16} aria-hidden="true" />
+              {t('Revoke selected')}
+            </button>
+            <button
+              type="button"
+              className="button button--secondary"
+              onClick={() => void runBulkWithRequest('delete')}
+            >
+              <Trash2 size={16} aria-hidden="true" />
+              {t('Delete selected')}
+            </button>
+          </div>
+          <div className="resource-list">
+            <div className="resource-list__item">
+              <span>{t('Selected users')}</span>
+              <small>{selectedIds.size}</small>
+            </div>
+            <label htmlFor="bulk-user-tags">
+              {t('Tags')}
+              <input
+                id="bulk-user-tags"
+                value={bulkTags}
+                onChange={(event) => setBulkTags(event.target.value)}
+                placeholder="vip, trial"
+              />
+            </label>
+            <button type="button" className="button button--secondary" onClick={() => void runBulkTags()}>
+              <Tags size={16} aria-hidden="true" />
+              {t('Apply tags')}
+            </button>
+            <label htmlFor="bulk-user-expires-at">
+              {t('Expiration')}
+              <input
+                id="bulk-user-expires-at"
+                type="datetime-local"
+                value={bulkExpiresAt}
+                onChange={(event) => setBulkExpiresAt(event.target.value)}
+              />
+            </label>
+            <button type="button" className="button button--secondary" onClick={() => void runBulkExtend()}>
+              <CalendarClock size={16} aria-hidden="true" />
+              {t('Extend selected')}
+            </button>
+            <label htmlFor="bulk-user-traffic-delta">
+              {t('Traffic delta GB')}
+              <input
+                id="bulk-user-traffic-delta"
+                inputMode="decimal"
+                value={bulkTrafficDelta}
+                onChange={(event) => setBulkTrafficDelta(event.target.value)}
+                placeholder="10 or -5"
+              />
+            </label>
+            <button type="button" className="button button--secondary" onClick={() => void runBulkTrafficDelta()}>
+              <RotateCcw size={16} aria-hidden="true" />
+              {t('Apply traffic delta')}
+            </button>
+            <label htmlFor="bulk-user-squad">
+              {t('Squad')}
+              <select
+                id="bulk-user-squad"
+                value={bulkSquadId}
+                onChange={(event) => setBulkSquadId(event.target.value)}
+              >
+                <option value="">{t('Select squad')}</option>
+                {(squadsQuery.data?.items ?? []).map((squad) => (
+                  <option key={squad.id} value={squad.id}>
+                    {squad.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="inline-actions">
+              <button type="button" className="button button--secondary" onClick={() => void runBulkSquad('squad-add')}>
+                <UserPlus size={16} aria-hidden="true" />
+                {t('Add to squad')}
+              </button>
+              <button type="button" className="button button--secondary" onClick={() => void runBulkSquad('squad-remove')}>
+                <UserMinus size={16} aria-hidden="true" />
+                {t('Remove from squad')}
+              </button>
+            </div>
           </div>
           <DataTable
             caption={t('User directory')}

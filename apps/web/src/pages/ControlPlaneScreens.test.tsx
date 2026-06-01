@@ -254,6 +254,76 @@ describe('Control plane resource screens', () => {
     await waitFor(() => expect(revokeUser).toHaveBeenCalledWith('usr_lifecycle'))
   })
 
+  it('wires user bulk controls to the real bulk API contract', async () => {
+    const user = userEvent.setup()
+    const users: UserRecord[] = [
+      {
+        created_at: '2026-05-27T00:00:00Z',
+        device_limit: 3,
+        display_name: 'Bulk User',
+        email: 'bulk-user@lumen.local',
+        expires_at: null,
+        id: 'usr_bulk',
+        metadata_json: {},
+        role: 'user',
+        status: 'active',
+        tags: [],
+        telegram_id: null,
+        traffic_limit_gb: 300,
+        traffic_used_gb: 42,
+        updated_at: '2026-05-27T00:00:00Z',
+        username: 'bulk-user',
+      },
+    ]
+    const developmentClient = createDevelopmentLumenApiClient()
+    const bulkUsers = vi.fn(async () => ({ items: users, updated: users.length }))
+    const apiClient: LumenApiClient = {
+      ...developmentClient,
+      bulkUsers,
+      listUsers: async () => ({ items: users }),
+      listSquads: async () => ({
+        items: [
+          {
+            created_at: '2026-05-27T00:00:00Z',
+            id: 'squad_bulk',
+            kind: 'internal',
+            metadata_json: {},
+            name: 'Bulk squad',
+            status: 'active',
+            updated_at: '2026-05-27T00:00:00Z',
+          },
+        ],
+      }),
+    }
+
+    renderWithRouter('/users', { apiClient, initialSession: developmentSession })
+
+    expect(await screen.findByText('Bulk User')).toBeInTheDocument()
+    await user.click(screen.getByRole('checkbox', { name: /select bulk user/i }))
+    await user.type(screen.getByLabelText(/tags/i), 'vip, trial')
+    await user.click(screen.getByRole('button', { name: /apply tags/i }))
+    await user.type(screen.getByLabelText(/traffic delta gb/i), '5')
+    await user.click(screen.getByRole('button', { name: /apply traffic delta/i }))
+    await user.selectOptions(screen.getByLabelText(/^squad$/i), 'squad_bulk')
+    await user.click(screen.getByRole('button', { name: /add to squad/i }))
+    await user.click(screen.getByRole('button', { name: /revoke selected/i }))
+
+    await waitFor(() => expect(bulkUsers).toHaveBeenCalledTimes(4))
+    expect(bulkUsers.mock.calls[0]).toEqual([
+      'tag',
+      { tags: ['vip', 'trial'], user_ids: ['usr_bulk'] },
+    ])
+    expect(bulkUsers.mock.calls[1]).toEqual([
+      'traffic',
+      { traffic_delta_gb: 5, user_ids: ['usr_bulk'] },
+    ])
+    expect(bulkUsers.mock.calls[2]).toEqual([
+      'squad-add',
+      { squad_id: 'squad_bulk', user_ids: ['usr_bulk'] },
+    ])
+    expect(bulkUsers.mock.calls[3]).toEqual(['revoke', { user_ids: ['usr_bulk'] }])
+  })
+
   it('wires user detail HWID device deletion controls to backend requests', async () => {
     const user = userEvent.setup()
     const owner: UserRecord = {

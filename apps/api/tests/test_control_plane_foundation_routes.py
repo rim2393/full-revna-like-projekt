@@ -606,6 +606,84 @@ async def test_user_list_returns_existing_local_service_addresses(
     assert "openvpn-ss-live-20260601145746@lumen.local" in emails
 
 
+async def test_user_bulk_actions_cover_tags_expiry_squads_and_delete(
+    foundation_app: FoundationRouteApp,
+) -> None:
+    first_response = await foundation_app.client.post(
+        "/api/v1/users",
+        json={"email": "bulk-one@example.com", "username": "bulk-one", "traffic_used_gb": 10},
+    )
+    second_response = await foundation_app.client.post(
+        "/api/v1/users",
+        json={"email": "bulk-two@example.com", "username": "bulk-two", "traffic_used_gb": 20},
+    )
+    assert first_response.status_code == 201
+    assert second_response.status_code == 201
+    user_ids = [first_response.json()["id"], second_response.json()["id"]]
+
+    tag_response = await foundation_app.client.post(
+        "/api/v1/users/bulk/tag",
+        json={"user_ids": user_ids, "tags": ["vip", "trial"]},
+    )
+    assert tag_response.status_code == 200
+    assert {tuple(item["tags"]) for item in tag_response.json()["items"]} == {("vip", "trial")}
+
+    expires_at = (datetime.now(UTC) + timedelta(days=30)).isoformat()
+    extend_response = await foundation_app.client.post(
+        "/api/v1/users/bulk/extend",
+        json={"user_ids": user_ids, "expires_at": expires_at},
+    )
+    assert extend_response.status_code == 200
+    assert all(item["expires_at"] is not None for item in extend_response.json()["items"])
+
+    traffic_response = await foundation_app.client.post(
+        "/api/v1/users/bulk/traffic",
+        json={"user_ids": user_ids, "traffic_delta_gb": 5},
+    )
+    assert traffic_response.status_code == 200
+    assert sorted(item["traffic_used_gb"] for item in traffic_response.json()["items"]) == [15, 25]
+
+    squad_response = await foundation_app.client.post(
+        "/api/v1/squads",
+        json={"name": "Bulk squad", "kind": "internal"},
+    )
+    assert squad_response.status_code == 201
+    squad_id = squad_response.json()["id"]
+
+    squad_add_response = await foundation_app.client.post(
+        "/api/v1/users/bulk/squad-add",
+        json={"user_ids": user_ids, "squad_id": squad_id},
+    )
+    assert squad_add_response.status_code == 200
+    squad_detail_response = await foundation_app.client.get(f"/api/v1/squads/{squad_id}/detail")
+    assert {item["id"] for item in squad_detail_response.json()["users"]} == set(user_ids)
+
+    squad_remove_response = await foundation_app.client.post(
+        "/api/v1/users/bulk/squad-remove",
+        json={"user_ids": [user_ids[0]], "squad_id": squad_id},
+    )
+    assert squad_remove_response.status_code == 200
+    squad_detail_after_remove = await foundation_app.client.get(f"/api/v1/squads/{squad_id}/detail")
+    assert [item["id"] for item in squad_detail_after_remove.json()["users"]] == [user_ids[1]]
+
+    revoke_response = await foundation_app.client.post(
+        "/api/v1/users/bulk/revoke",
+        json={"user_ids": user_ids},
+    )
+    assert revoke_response.status_code == 200
+    assert {item["status"] for item in revoke_response.json()["items"]} == {"revoked"}
+
+    delete_response = await foundation_app.client.post(
+        "/api/v1/users/bulk/delete",
+        json={"user_ids": user_ids},
+    )
+    assert delete_response.status_code == 200
+    assert delete_response.json()["updated"] == 2
+    list_response = await foundation_app.client.get("/api/v1/users")
+    remaining_ids = {item["id"] for item in list_response.json()["items"]}
+    assert not set(user_ids) & remaining_ids
+
+
 async def test_remna_parity_profile_host_subscription_flow(
     foundation_app: FoundationRouteApp,
 ) -> None:
