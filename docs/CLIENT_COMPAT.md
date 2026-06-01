@@ -34,6 +34,8 @@ private keys, access tokens, or generated subscription URLs.
 | `vless-tcp-tls` | Yes | Yes | Yes | `allowInsecure` is rejected |
 | `hysteria2` | Yes | Yes | Yes | Derived Hysteria2 password |
 | `hysteria2-obfs` | Yes | Yes | Yes | Derived Hysteria2 password plus derived obfs password |
+| `vmess-ws-tls` | Yes | Yes | Yes | WebSocket transport path is rendered |
+| Xray WS/gRPC/HTTPUpgrade/XHTTP variants | Yes | Partial by client support | Partial by client support | Backend emits concrete Xray transport settings; client support varies by app |
 | Catalog-only protocols | Yes | Not emitted | Not emitted | Hidden from production provisioning until their adapter is implemented |
 
 ## Fallback Landing

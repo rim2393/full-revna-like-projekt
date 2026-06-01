@@ -1296,6 +1296,11 @@ def _xray_inbound_stream_settings(inbound: ProfileInboundResponse) -> dict[str, 
         "network": inbound.transport,
         "security": inbound.security,
     }
+    transport_settings = _xray_transport_settings(
+        inbound.transport,
+        inbound.config_json,
+    )
+    stream.update(transport_settings)
     security = inbound.config_json.get("security")
     security_config = security if isinstance(security, dict) else {}
     if inbound.security == "reality":
@@ -1321,6 +1326,42 @@ def _xray_inbound_stream_settings(inbound: ProfileInboundResponse) -> dict[str, 
         if isinstance(certificates, list) and certificates:
             stream["tlsSettings"] = {"certificates": certificates}
     return _compact_object(stream)
+
+
+def _xray_transport_settings(
+    transport: str,
+    config: dict[str, object],
+) -> dict[str, object]:
+    path = str(config.get("path") or "/")
+    host = config.get("host") or config.get("serverName") or config.get("server_name")
+    if transport == "ws":
+        headers = {"Host": str(host)} if host else None
+        return {"wsSettings": _compact_object({"path": path, "headers": headers})}
+    if transport == "grpc":
+        service_name = str(
+            config.get("serviceName")
+            or config.get("service_name")
+            or config.get("grpc_service_name")
+            or "lumen"
+        )
+        return {"grpcSettings": {"serviceName": service_name}}
+    if transport == "httpupgrade":
+        return {
+            "httpupgradeSettings": _compact_object(
+                {"path": path, "host": str(host) if host else None}
+            )
+        }
+    if transport == "xhttp":
+        return {
+            "xhttpSettings": _compact_object(
+                {
+                    "path": path,
+                    "host": str(host) if host else None,
+                    "mode": str(config.get("mode") or "auto"),
+                }
+            )
+        }
+    return {}
 
 
 def _compact_object(value: dict[str, object]) -> dict[str, object]:

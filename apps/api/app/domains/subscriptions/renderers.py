@@ -242,6 +242,7 @@ def render_share_uri(entry: dict[str, Any], *, settings: Settings) -> str | None
             query["sid"] = str(security["shortId"])
         if security.get("spiderX"):
             query["spx"] = str(security["spiderX"])
+        _add_share_transport_query(query, protocol)
         return build_uri("vless", credentials.uuid, protocol, query, label)
 
     if protocol_type == "vmess":
@@ -271,6 +272,7 @@ def render_share_uri(entry: dict[str, Any], *, settings: Settings) -> str | None
         query = {"type": network_type(protocol), "security": security_name(protocol)}
         if security.get("serverName"):
             query["sni"] = str(security["serverName"])
+        _add_share_transport_query(query, protocol)
         return build_uri("trojan", credentials.password, protocol, query, label)
 
     if protocol_type == "shadowsocks":
@@ -437,6 +439,7 @@ def mihomo_proxy(entry: dict[str, Any], *, settings: Settings) -> dict[str, Any]
         )
         if protocol.get("flow"):
             base["flow"] = protocol["flow"]
+        add_mihomo_transport_fields(base, protocol)
         add_mihomo_tls_fields(base, security)
         return base
 
@@ -450,11 +453,13 @@ def mihomo_proxy(entry: dict[str, Any], *, settings: Settings) -> dict[str, Any]
                 "tls": security_name(protocol) != "none",
             }
         )
+        add_mihomo_transport_fields(base, protocol)
         add_mihomo_tls_fields(base, security)
         return base
 
     if protocol_type == "trojan":
         base.update({"password": credentials.password, "udp": True, "tls": True})
+        add_mihomo_transport_fields(base, protocol)
         add_mihomo_tls_fields(base, security)
         return base
 
@@ -590,6 +595,7 @@ def sing_box_outbound(entry: dict[str, Any], *, settings: Settings) -> dict[str,
                 "uuid": credentials.uuid,
                 "flow": protocol.get("flow"),
                 "tls": sing_box_tls(protocol),
+                "transport": sing_box_transport(protocol),
             }
         )
         return compact_object(base)
@@ -600,11 +606,18 @@ def sing_box_outbound(entry: dict[str, Any], *, settings: Settings) -> dict[str,
                 "security": "auto",
                 "alter_id": 0,
                 "tls": sing_box_tls(protocol),
+                "transport": sing_box_transport(protocol),
             }
         )
         return compact_object(base)
     if protocol_type == "trojan":
-        base.update({"password": credentials.password, "tls": sing_box_tls(protocol)})
+        base.update(
+            {
+                "password": credentials.password,
+                "tls": sing_box_tls(protocol),
+                "transport": sing_box_transport(protocol),
+            }
+        )
         return compact_object(base)
     if protocol_type == "shadowsocks":
         base.update(
@@ -882,6 +895,7 @@ def xray_outbound(entry: dict[str, Any], *, settings: Settings) -> dict[str, Any
 def xray_stream_settings(protocol: dict[str, Any]) -> dict[str, Any]:
     security = protocol.get("security", {})
     stream = {"network": network_type(protocol), "security": security_name(protocol)}
+    stream.update(xray_transport_settings(protocol))
     if security.get("type") == "reality":
         stream["realitySettings"] = compact_object(
             {
@@ -897,6 +911,63 @@ def xray_stream_settings(protocol: dict[str, Any]) -> dict[str, Any]:
             {"serverName": security.get("serverName"), "alpn": security.get("alpn") or None}
         )
     return stream
+
+
+def _add_share_transport_query(query: dict[str, str], protocol: dict[str, Any]) -> None:
+    transport = network_type(protocol)
+    if transport in {"ws", "httpupgrade", "xhttp"} and protocol.get("path"):
+        query["path"] = str(protocol["path"])
+    if transport == "grpc" and protocol.get("serviceName"):
+        query["serviceName"] = str(protocol["serviceName"])
+    if transport == "xhttp":
+        query["mode"] = str(protocol.get("mode") or "auto")
+
+
+def sing_box_transport(protocol: dict[str, Any]) -> dict[str, Any] | None:
+    transport = network_type(protocol)
+    if transport == "tcp":
+        return None
+    if transport == "ws":
+        return compact_object({"type": "ws", "path": protocol.get("path") or "/"})
+    if transport == "grpc":
+        return compact_object(
+            {"type": "grpc", "service_name": protocol.get("serviceName") or "lumen"}
+        )
+    if transport == "httpupgrade":
+        return compact_object({"type": "httpupgrade", "path": protocol.get("path") or "/"})
+    return None
+
+
+def add_mihomo_transport_fields(output: dict[str, Any], protocol: dict[str, Any]) -> None:
+    transport = network_type(protocol)
+    if transport in {"ws", "httpupgrade"} and protocol.get("path"):
+        output["ws-opts"] = {"path": protocol["path"]}
+    elif transport == "grpc":
+        output["grpc-opts"] = {"grpc-service-name": protocol.get("serviceName") or "lumen"}
+    elif transport == "xhttp":
+        output["xhttp-opts"] = {
+            "path": protocol.get("path") or "/",
+            "mode": protocol.get("mode") or "auto",
+        }
+
+
+def xray_transport_settings(protocol: dict[str, Any]) -> dict[str, Any]:
+    transport = network_type(protocol)
+    path = str(protocol.get("path") or "/")
+    if transport == "ws":
+        return {"wsSettings": {"path": path}}
+    if transport == "grpc":
+        return {"grpcSettings": {"serviceName": protocol.get("serviceName") or "lumen"}}
+    if transport == "httpupgrade":
+        return {"httpupgradeSettings": {"path": path}}
+    if transport == "xhttp":
+        return {
+            "xhttpSettings": {
+                "path": path,
+                "mode": str(protocol.get("mode") or "auto"),
+            }
+        }
+    return {}
 
 
 def derive_credentials(

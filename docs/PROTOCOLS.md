@@ -53,6 +53,13 @@ The Hysteria2 Obfs adapter expects:
 - a derived per-subscription `hysteriaObfsPassword`
 - node-agent process mode with sing-box Hysteria2 inbound support
 
+The Xray transport variants use adapter-derived transport defaults:
+
+- `*-ws*` -> `streamSettings.network=ws` plus `wsSettings.path`
+- `*-grpc*` -> `streamSettings.network=grpc` plus `grpcSettings.serviceName`
+- `*-httpupgrade*` -> `streamSettings.network=httpupgrade` plus `httpupgradeSettings.path`
+- `*-xhttp*` -> `streamSettings.network=xhttp` plus `xhttpSettings.path/mode`
+
 ## Runtime Enablement
 
 Adapters marked `legacy` are compatibility entries. Catalog entries outside the

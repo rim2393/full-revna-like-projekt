@@ -256,6 +256,12 @@ async def build_subscription_manifest(
                             protocol_type=protocol_type,
                         ),
                         "flow": delivery.get("flow"),
+                        "path": delivery.get("path") or _profile_config_string(profile, "path"),
+                        "mode": delivery.get("mode") or _profile_config_string(profile, "mode"),
+                        "serviceName": delivery.get("service_name")
+                        or delivery.get("serviceName")
+                        or _profile_config_string(profile, "serviceName")
+                        or _profile_config_string(profile, "service_name"),
                         "credentialsRef": credentials_ref,
                         "credentials": _manifest_credentials(credentials),
                         "capabilities": _manifest_capabilities(protocol_type),
@@ -614,7 +620,25 @@ def _default_security(protocol_type: str) -> str:
 def _default_transport(protocol_type: str) -> str:
     if protocol_type.startswith(("hysteria2", "tuic", "wireguard")):
         return "udp"
+    if "grpc" in protocol_type:
+        return "grpc"
+    if "xhttp" in protocol_type:
+        return "xhttp"
+    if "httpupgrade" in protocol_type:
+        return "httpupgrade"
+    if "-ws" in protocol_type or "websocket" in protocol_type:
+        return "ws"
     return "tcp"
+
+
+def _profile_config_string(profile: ProtocolProfile | None, key: str) -> str | None:
+    if profile is None:
+        return None
+    value = profile.config_json.get(key)
+    if value is None:
+        return None
+    normalized = str(value).strip()
+    return normalized or None
 
 
 def _manifest_alpn(*, security: dict[str, object], delivery: dict[str, str]) -> list[str]:

@@ -211,6 +211,7 @@ async def test_vmess_subscription_renders_all_client_formats(route_app: RouteTes
                 "adapter": "vmess-ws-tls",
                 "profile_title": "Lumen VMess",
                 "server_name": "vmess.example.test",
+                "path": "/lumen-ws",
                 "port": "443",
             },
             "config_hash": "sha256:vmess",
@@ -226,6 +227,8 @@ async def test_vmess_subscription_renders_all_client_formats(route_app: RouteTes
     assert raw.text.startswith("vmess://")
     decoded = json.loads(base64.b64decode(raw.text.removeprefix("vmess://").strip()))
     assert decoded["add"] == "203.0.113.70"
+    assert decoded["net"] == "ws"
+    assert decoded["path"] == "/lumen-ws"
     assert decoded["tls"] == "tls"
     assert decoded["sni"] == "vmess.example.test"
 
@@ -233,7 +236,9 @@ async def test_vmess_subscription_renders_all_client_formats(route_app: RouteTes
         f"/api/v1/subscriptions/public/{public_id}/render?target=sing-box",
     )
     assert sing_box.status_code == 200
-    assert sing_box.json()["outbounds"][0]["type"] == "vmess"
+    outbound = sing_box.json()["outbounds"][0]
+    assert outbound["type"] == "vmess"
+    assert outbound["transport"] == {"type": "ws", "path": "/lumen-ws"}
 
     xray = await route_app.client.get(
         f"/api/v1/subscriptions/public/{public_id}/render?target=amnezia",

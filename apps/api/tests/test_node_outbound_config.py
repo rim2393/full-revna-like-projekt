@@ -19,6 +19,7 @@ def _inbounds(
     *,
     protocol: str = "vless",
     security: str = "none",
+    transport: str = "tcp",
     config_json: dict | None = None,
 ):
     return [
@@ -27,7 +28,7 @@ def _inbounds(
             listen="0.0.0.0",  # noqa: S104
             port=port,
             protocol=protocol,
-            transport="tcp",
+            transport=transport,
             security=security,
             credentials_ref="vault://subscriptions/p/creds",
             config_json=config_json or {},
@@ -153,6 +154,36 @@ def test_xray_reality_profile_builds_server_stream_settings():
         "privateKey": "server-private-key",
         "shortIds": ["abcd1234"],
     }
+
+
+def test_xray_transport_variants_build_server_stream_settings():
+    cases = [
+        ("vless-ws-tls", "ws", {"path": "/lumen-ws"}, "wsSettings"),
+        ("vless-grpc-tls", "grpc", {"serviceName": "lumenGrpc"}, "grpcSettings"),
+        ("vless-httpupgrade-tls", "httpupgrade", {"path": "/upgrade"}, "httpupgradeSettings"),
+        ("vless-xhttp-tls", "xhttp", {"path": "/xhttp", "mode": "stream-up"}, "xhttpSettings"),
+    ]
+    for adapter, transport, config, settings_key in cases:
+        payload = build_node_outbound_payload(
+            _profile(adapter, {"security": {"type": "tls"}, **config}),
+            _inbounds(
+                18443,
+                protocol="vless",
+                security="tls",
+                transport=transport,
+                config_json={"security": {"type": "tls"}, **config},
+            ),
+            runtime_clients=[
+                {
+                    "public_id": "lumen_sub_live",
+                    "uuid": "11111111-1111-4111-8111-111111111111",
+                }
+            ],
+        )
+
+        stream = payload["xrayConfig"]["inbounds"][0]["streamSettings"]
+        assert stream["network"] == transport
+        assert stream[settings_key]
 
 
 def test_shadowsocks_payload_uses_concrete_runtime_password():
