@@ -25,7 +25,7 @@ import {
 import { createNodeAgentRuntimeConfig, loadNodeAgentConfigFromEnv } from "./runtime-loop.js";
 import { readSecretFromEnv } from "./secret-input.js";
 import { createTcpDiagnosticListenerPlan, startTcpDiagnosticListener, stopLiveListener } from "./live-listeners.js";
-import { applyXrayConfig, createXrayApplyPlan } from "./xray-runtime.js";
+import { applyXrayConfig, createXrayApplyPlan, ensureManagedXrayProcess } from "./xray-runtime.js";
 import { applyHysteria2Config, createHysteria2ApplyPlan } from "./hysteria2-runtime.js";
 import { applyTuicConfig, createTuicApplyPlan } from "./tuic-runtime.js";
 import { applyWireguardConfig, createWireguardApplyPlan } from "./wireguard-runtime.js";
@@ -331,7 +331,8 @@ async function applyRuntimeEffects(command, commandResult, input = {}) {
       const xray = await applyXrayConfig(commandResult.runtimeAction.plan, {
         dryRun: input.dryRun,
         env: input.env,
-        execFileImpl: input.execFileImpl
+        execFileImpl: input.execFileImpl,
+        spawnImpl: input.spawnImpl
       });
       const policy = policyPlan ? await applyNodePolicy(policyPlan, input) : null;
       return withResultOutputs(commandResult, policy ? { ...xray, nodePolicy: policy } : xray);
@@ -645,6 +646,19 @@ export async function runNodeAgentOnce(input = {}) {
   const enrollment = await enrollNodeAgent(input);
   const paths = statePaths(input.env ?? {});
   const currentState = loadProvisioningState(paths, enrollment.config);
+  let runtimeRestore = null;
+  try {
+    runtimeRestore = await ensureManagedXrayProcess({
+      env: input.env ?? {},
+      execFileImpl: input.execFileImpl,
+      spawnImpl: input.spawnImpl
+    });
+  } catch (error) {
+    runtimeRestore = Object.freeze({
+      implementationStatus: "xray-managed-process-restore-failed",
+      error: error.message
+    });
+  }
   const response = await sendHeartbeat({
     config: enrollment.config,
     fetchImpl: input.fetchImpl,
@@ -671,7 +685,8 @@ export async function runNodeAgentOnce(input = {}) {
       dryRun: enrollment.config.dryRun,
       enableLiveDiagnostic: (input.env ?? {}).LUMEN_ENABLE_LIVE_DIAGNOSTIC === "true",
       env: input.env ?? {},
-      execFileImpl: input.execFileImpl
+      execFileImpl: input.execFileImpl,
+      spawnImpl: input.spawnImpl
     });
     if (commandResult.state) {
       latestState = commandResult.state;
@@ -715,6 +730,7 @@ export async function runNodeAgentOnce(input = {}) {
       id: metric.id ?? null,
       metricKind: metric.metric_kind ?? "runtime"
     }),
+    runtimeRestore,
     reusedExistingToken: enrollment.reusedExistingToken
   });
 }

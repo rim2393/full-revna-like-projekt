@@ -4,7 +4,11 @@ import { mkdtemp } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import test from "node:test";
-import { applyXrayConfig, createXrayApplyPlan } from "../src/xray-runtime.js";
+import {
+  applyXrayConfig,
+  createXrayApplyPlan,
+  ensureManagedXrayProcess
+} from "../src/xray-runtime.js";
 
 test("xray process reload mode writes config and starts managed xray", async () => {
   const tmp = await mkdtemp(join(tmpdir(), "lumen-xray-runtime-"));
@@ -57,6 +61,59 @@ test("xray process reload mode writes config and starts managed xray", async () 
   assert.equal(spawned[0].command, "xray-test-bin");
   assert.deepEqual(spawned[0].args, ["run", "-config", configPath]);
   assert.equal(JSON.parse(readFileSync(configPath, "utf8")).inbounds[0].port, 18444);
+
+  rmSync(tmp, { recursive: true, force: true });
+});
+
+test("managed xray process is restored from existing config", async () => {
+  const tmp = await mkdtemp(join(tmpdir(), "lumen-xray-restore-"));
+  const configPath = join(tmp, "config.json");
+  const logPath = join(tmp, "xray.log");
+  const config = {
+    inbounds: [
+      {
+        listen: "0.0.0.0",
+        port: 18444,
+        protocol: "vless",
+        settings: { decryption: "none", clients: [{ id: "client-id" }] }
+      }
+    ]
+  };
+  const calls = [];
+  const spawned = [];
+  await import("node:fs").then(({ writeFileSync }) => {
+    writeFileSync(configPath, `${JSON.stringify(config)}\n`);
+  });
+
+  const result = await ensureManagedXrayProcess({
+    env: {
+      LUMEN_XRAY_BINARY: "xray-test-bin",
+      LUMEN_XRAY_CONFIG_FILE: configPath,
+      LUMEN_XRAY_LOG_FILE: logPath,
+      LUMEN_XRAY_RELOAD_MODE: "process"
+    },
+    execFileImpl: async (command, args) => {
+      calls.push({ command, args });
+      if (command === "pgrep") {
+        const error = new Error("not running");
+        error.code = 1;
+        throw error;
+      }
+      return { stdout: "", stderr: "" };
+    },
+    spawnImpl: (command, args) => {
+      spawned.push({ command, args });
+      return { pid: 12346, unref() {} };
+    }
+  });
+
+  assert.equal(result.implementationStatus, "xray-managed-process-restored");
+  assert.equal(result.pid, 12346);
+  assert.deepEqual(calls, [
+    { command: "xray-test-bin", args: ["-test", "-config", configPath] },
+    { command: "pgrep", args: ["-x", "xray"] }
+  ]);
+  assert.equal(spawned[0].command, "xray-test-bin");
 
   rmSync(tmp, { recursive: true, force: true });
 });

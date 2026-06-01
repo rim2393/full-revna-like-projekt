@@ -1,4 +1,4 @@
-import { mkdirSync, openSync, closeSync, writeFileSync } from "node:fs";
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { promisify } from "node:util";
 import { execFile as nodeExecFile, spawn } from "node:child_process";
@@ -109,6 +109,18 @@ async function stopManagedXray(execFileImpl) {
   }
 }
 
+async function isManagedXrayRunning(execFileImpl) {
+  try {
+    await runExecFile(execFileImpl, "pgrep", ["-x", "xray"]);
+    return true;
+  } catch (error) {
+    if (error?.code === 1) {
+      return false;
+    }
+    throw error;
+  }
+}
+
 function startManagedXray(xrayBinary, configPath, logPath, spawnImpl = spawn) {
   mkdirSync(dirname(logPath), { recursive: true, mode: 0o700 });
   const stdout = openSync(logPath, "a", 0o600);
@@ -124,6 +136,36 @@ function startManagedXray(xrayBinary, configPath, logPath, spawnImpl = spawn) {
     closeSync(stdout);
     closeSync(stderr);
   }
+}
+
+export async function ensureManagedXrayProcess(input = {}) {
+  const env = input.env ?? {};
+  if (env.LUMEN_XRAY_RELOAD_MODE !== XRAY_RELOAD_MODE_PROCESS) {
+    return null;
+  }
+  const configPath = env.LUMEN_XRAY_CONFIG_FILE ?? DEFAULT_XRAY_CONFIG_PATH;
+  if (!existsSync(configPath)) {
+    return null;
+  }
+  const xrayBinary = env.LUMEN_XRAY_BINARY ?? DEFAULT_XRAY_BINARY;
+  const logPath = env.LUMEN_XRAY_LOG_FILE ?? "/var/lib/lumen-node/runtime/xray/xray.log";
+  const config = JSON.parse(readFileSync(configPath, "utf8"));
+  validateXrayConfig(config);
+  await runExecFile(input.execFileImpl, xrayBinary, ["-test", "-config", configPath]);
+  if (await isManagedXrayRunning(input.execFileImpl)) {
+    return Object.freeze({
+      implementationStatus: "xray-managed-process-running",
+      configPath,
+      logPath
+    });
+  }
+  const pid = startManagedXray(xrayBinary, configPath, logPath, input.spawnImpl);
+  return Object.freeze({
+    implementationStatus: "xray-managed-process-restored",
+    configPath,
+    logPath,
+    pid
+  });
 }
 
 export async function applyXrayConfig(plan, input = {}) {
