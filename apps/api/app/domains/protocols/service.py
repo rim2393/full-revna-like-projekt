@@ -1264,10 +1264,9 @@ def _xray_inbound_settings(
 #
 # Each generator returns the node-runtime config for one adapter family in the
 # exact shape the node-agent dispatcher reads (xrayConfig / hysteria2Config /
-# tuicConfig / wireguardConfig). Client secrets are referenced via `clientsRef`
-# (a vault reference) and resolved to concrete credentials by the secret layer
-# before the command reaches the node; the node-agent rejects any config that
-# still contains an unresolved `clientsRef`/`credentialsRef`.
+# tuicConfig / wireguardConfig). The panel resolves active subscription clients
+# into concrete runtime credentials before queueing the command; node-agent
+# rejects configs that still contain unresolved `clientsRef`/`credentialsRef`.
 
 _NODE_CONFIG_KEY_BY_FAMILY = {
     "hysteria2": "hysteria2Config",

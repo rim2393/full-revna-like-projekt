@@ -1,12 +1,13 @@
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, openSync, closeSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { promisify } from "node:util";
-import { execFile as nodeExecFile } from "node:child_process";
+import { execFile as nodeExecFile, spawn } from "node:child_process";
 
 export const XRAY_RUNTIME_MODEL_VERSION = "lumen.node-agent.xray-runtime.v1";
-export const DEFAULT_XRAY_CONFIG_PATH = "/etc/xray/config.json";
+export const DEFAULT_XRAY_CONFIG_PATH = "/var/lib/lumen-node/runtime/xray/config.json";
 export const DEFAULT_XRAY_BINARY = "xray";
 export const DEFAULT_XRAY_RELOAD_ARGV = Object.freeze(["systemctl", "reload", "xray"]);
+export const XRAY_RELOAD_MODE_PROCESS = "process";
 
 const execFileAsync = promisify(nodeExecFile);
 const FORBIDDEN_UNRESOLVED_FIELDS = new Set(["clientsRef", "credentialsRef"]);
@@ -98,10 +99,38 @@ async function runExecFile(execFileImpl, command, args) {
   return await execFileAsync(command, args);
 }
 
+async function stopManagedXray(execFileImpl) {
+  try {
+    await runExecFile(execFileImpl, "pkill", ["-TERM", "-x", "xray"]);
+  } catch (error) {
+    if (error?.code !== 1) {
+      throw error;
+    }
+  }
+}
+
+function startManagedXray(xrayBinary, configPath, logPath, spawnImpl = spawn) {
+  mkdirSync(dirname(logPath), { recursive: true, mode: 0o700 });
+  const stdout = openSync(logPath, "a", 0o600);
+  const stderr = openSync(logPath, "a", 0o600);
+  try {
+    const child = spawnImpl(xrayBinary, ["run", "-config", configPath], {
+      detached: true,
+      stdio: ["ignore", stdout, stderr]
+    });
+    child.unref();
+    return child.pid;
+  } finally {
+    closeSync(stdout);
+    closeSync(stderr);
+  }
+}
+
 export async function applyXrayConfig(plan, input = {}) {
   const env = input.env ?? {};
   const configPath = plan.configPath ?? env.LUMEN_XRAY_CONFIG_FILE ?? DEFAULT_XRAY_CONFIG_PATH;
   const xrayBinary = plan.xrayBinary ?? env.LUMEN_XRAY_BINARY ?? DEFAULT_XRAY_BINARY;
+  const reloadMode = env.LUMEN_XRAY_RELOAD_MODE ?? "";
   const reloadArgv = plan.reloadArgv ?? parseArgv(env.LUMEN_XRAY_RELOAD_ARGV, DEFAULT_XRAY_RELOAD_ARGV);
   const testArgv = [xrayBinary, ["-test", "-config", configPath]];
   const reloadCommand = [reloadArgv[0], reloadArgv.slice(1)];
@@ -120,6 +149,18 @@ export async function applyXrayConfig(plan, input = {}) {
   mkdirSync(dirname(configPath), { recursive: true, mode: 0o700 });
   writeFileSync(configPath, `${JSON.stringify(plan.config, null, 2)}\n`, { mode: 0o600 });
   await runExecFile(input.execFileImpl, testArgv[0], testArgv[1]);
+  if (reloadMode === XRAY_RELOAD_MODE_PROCESS) {
+    await stopManagedXray(input.execFileImpl);
+    const logPath = env.LUMEN_XRAY_LOG_FILE ?? "/var/lib/lumen-node/runtime/xray/xray.log";
+    const pid = startManagedXray(xrayBinary, configPath, logPath, input.spawnImpl);
+    return Object.freeze({
+      implementationStatus: "xray-managed-process-started",
+      configPath,
+      pid,
+      logPath,
+      testCommand: summarizeArgv([testArgv[0], ...testArgv[1]])
+    });
+  }
   await runExecFile(input.execFileImpl, reloadCommand[0], reloadCommand[1]);
 
   return Object.freeze({
