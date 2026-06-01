@@ -33,9 +33,9 @@ evidence here is wrong or stale.
 
 | Item | Current Evidence |
 | --- | --- |
-| Latest production release | `v0.1.84` |
-| Product repo head | `a143edd Translate node status feedback` |
-| Public installer manifest | `rim2393/lumen_vpn@0b57d06` |
+| Latest production release | `v0.1.85` |
+| Product repo head | `9155773 Complete node plugin management parity` |
+| Public installer manifest | `rim2393/lumen_vpn@88b6d54` |
 | Prod health | `GET /api/v1/health/ready -> {"status":"ok","dependencies":{"api":"ok"}}` |
 | Current rule | Continue from this tracker; do not restart already closed host/subscription renderer work. |
 
@@ -93,7 +93,7 @@ evidence here is wrong or stale.
 | --- | --- | --- | --- | --- |
 | N-001 | Node management P0 actions | DONE | update/delete/reorder/restart/reset traffic/restart all/bulk, real node-agent commands | `v0.1.59`, live restart evidence |
 | N-002 | Node management UX polish | DONE | UI flows are clear, all buttons explain state/result and avoid fake success | `090e027` + `2982531` + `a143edd`, `v0.1.84`, release run `26787224997`, installer/deploy run `26787279368`, manifest `rim2393/lumen_vpn@0b57d06`; web `npm run build` passed, focused Vitest `src/pages/NodesPage.test.tsx` 4 passed; prod health OK and prod containers `lumen-api/web/subscription` on `v0.1.84` healthy; live browser `/nodes?focus=d40a27ae-29fa-4cd1-88ee-269957de1e30` verified real node `node-01` at `85.192.60.8`, heartbeat, node operations panel, command queue, metrics, bulk actions, queued-command UX, and localized statuses (`активна`/`успешно`) with no fake success state. |
-| N-003 | Node plugins CRUD/clone/reorder/executor | OPEN | Plugin management is full CRUD and runtime policy evidence exists | Partial policy integration exists; management parity open |
+| N-003 | Node plugins CRUD/clone/reorder/executor | DONE | Plugin management is full CRUD and runtime policy evidence exists | `9155773`, `v0.1.85`, release run `26787913955`, installer/deploy run `26787977779`, manifest `rim2393/lumen_vpn@88b6d54`; backend `ruff`, `pytest tests/test_node_plugins_routes.py` 4 passed, web `npm run build`, focused Vitest `NodePluginsPage.test.tsx` passed, node-agent `node --test test\policy-runtime.test.js test\runtime-runner.test.js` 19 passed; prod health OK and prod containers `lumen-api/web/subscription` on `v0.1.85` healthy; live `/node-plugins` showed real plugin inventory, create/edit/delete, clone, reorder and executor controls; live prod service smoke created disabled QA plugin, cloned it, reordered both records, queued real `firewall.plan.apply` for `node-01`, deleted QA records, queued cleanup apply, verified `qa-n003-*` leftovers `0`, and node-agent completed the latest `firewall.plan.apply` commands as `succeeded` with no error. |
 | N-004 | Node stats, bandwidth, metadata, infra billing, provider history | OPEN | Real metrics/history surfaces only, no fake counters | Not started |
 
 ## P1: Settings, Auth, Tokens
@@ -166,15 +166,15 @@ evidence here is wrong or stale.
 
 ## Next Slice
 
-`N-003`: node plugins CRUD/clone/reorder/executor.
+`N-004`: node stats, bandwidth, metadata, infra billing, provider history.
 
 Proposed implementation:
 
-1. Audit current node plugin backend/API/UI/runtime policy surface.
-2. Add real CRUD, clone, reorder and executor controls without inline secrets.
-3. Wire plugin changes into node runtime policy evidence where required.
-4. Test backend and UI paths with real command/policy contracts.
-5. Release through signed manifest and verify on the live panel/node path before marking DONE.
+1. Audit current node metrics, bandwidth, provider metadata and command/history data sources.
+2. Remove or replace any fake node counters with real DB/runtime telemetry only.
+3. Add missing API contracts for provider history, traffic windows, node metadata and billing-related infrastructure facts.
+4. Wire the UI to those contracts with empty/error states that say when data is unavailable instead of inventing values.
+5. Test backend/UI contracts, release through the signed manifest, then verify on the live panel/node path before marking DONE.
 
 ## Checkpoint Notes
 
