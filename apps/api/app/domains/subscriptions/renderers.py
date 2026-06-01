@@ -309,6 +309,13 @@ def render_share_uri(entry: dict[str, Any], *, settings: Settings) -> str | None
             f"?{urlencode(query)}#{quote(label)}"
         )
 
+    if protocol_type == "naive":
+        userinfo = (
+            f"{quote(protocol_username(entry), safe='')}:"
+            f"{quote(credentials.password, safe='')}"
+        )
+        return build_uri("https", userinfo, protocol, {}, label)
+
     if protocol_type == "wireguard":
         return render_wireguard_conf(entry, credentials=credentials)
 
@@ -528,6 +535,17 @@ def mihomo_proxy(entry: dict[str, Any], *, settings: Settings) -> dict[str, Any]
             base["sni"] = security["serverName"]
         return base
 
+    if protocol_type == "naive":
+        base.update(
+            {
+                "username": protocol_username(entry),
+                "password": credentials.password,
+                "tls": True,
+            }
+        )
+        add_mihomo_tls_fields(base, security)
+        return base
+
     if protocol_type == "wireguard":
         hints = protocol.get("rendererHints", {})
         client_address = hints.get("address")
@@ -678,6 +696,15 @@ def sing_box_outbound(entry: dict[str, Any], *, settings: Settings) -> dict[str,
                 "uuid": credentials.uuid,
                 "password": credentials.password,
                 "congestion_control": "bbr",
+                "tls": sing_box_tls(protocol),
+            }
+        )
+        return compact_object(base)
+    if protocol_type == "naive":
+        base.update(
+            {
+                "username": protocol_username(entry),
+                "password": credentials.password,
                 "tls": sing_box_tls(protocol),
             }
         )
@@ -927,6 +954,9 @@ def xray_outbound(entry: dict[str, Any], *, settings: Settings) -> dict[str, Any
             },
         }
 
+    if protocol_type == "naive":
+        return None
+
     return None
 
 
@@ -1138,6 +1168,8 @@ def normalize_protocol_type(value: object) -> str:
         return "hysteria2"
     if raw.startswith("tuic"):
         return "tuic"
+    if raw.startswith("naive"):
+        return "naive"
     if raw.startswith("wireguard"):
         return "wireguard"
     if raw.startswith("socks"):

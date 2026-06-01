@@ -1386,6 +1386,7 @@ def _compact_object(value: dict[str, object]) -> dict[str, object]:
 
 _NODE_CONFIG_KEY_BY_FAMILY = {
     "hysteria2": "hysteria2Config",
+    "naive": "naiveConfig",
     "sing-box-shadowsocks": "singBoxShadowsocksConfig",
     "shadowsocks-plugin": "shadowsocksPluginConfig",
     "tuic": "tuicConfig",
@@ -1397,6 +1398,8 @@ _DEFAULT_NODE_TLS_KEY_PATH = "/var/lib/lumen-node/runtime/tls/live.key"
 
 
 def _adapter_family(adapter: str) -> str:
+    if adapter == "naiveproxy":
+        return "naive"
     if adapter == "shadowsocks-2022":
         return "sing-box-shadowsocks"
     if adapter in {"shadowsocks-v2ray-plugin", "shadowsocks-obfs"}:
@@ -1443,6 +1446,10 @@ def _ensure_tuic_tls_paths(config: dict[str, object]) -> None:
         return
     config.setdefault("certificate", _DEFAULT_NODE_TLS_CERT_PATH)
     config.setdefault("private_key", _DEFAULT_NODE_TLS_KEY_PATH)
+
+
+def _ensure_naive_tls_paths(config: dict[str, object]) -> None:
+    _ensure_node_tls_paths(config)
 
 
 async def list_profile_runtime_clients(
@@ -1557,6 +1564,30 @@ def _computed_tuic_config(
     return config
 
 
+def _computed_naive_config(
+    profile: ProtocolProfile,
+    port: int | None,
+    *,
+    runtime_clients: list[dict[str, object]] | None = None,
+) -> dict[str, object]:
+    config = _profile_config_dict(profile)
+    config.setdefault("listen", f":{port}" if port else ":443")
+    _ensure_naive_tls_paths(config)
+    clients = runtime_clients or []
+    if clients:
+        config["users"] = [
+            {
+                "username": str(client["public_id"]),
+                "password": str(client["password"]),
+            }
+            for client in clients
+        ]
+        config.pop("clientsRef", None)
+    else:
+        config["clientsRef"] = profile.credentials_ref
+    return config
+
+
 def _computed_sing_box_shadowsocks_config(
     profile: ProtocolProfile,
     port: int | None,
@@ -1651,6 +1682,12 @@ def compute_node_outbound_config(
         )
     if family == "tuic":
         return _computed_tuic_config(
+            profile,
+            _first_inbound_port(inbounds),
+            runtime_clients=runtime_clients,
+        )
+    if family == "naive":
+        return _computed_naive_config(
             profile,
             _first_inbound_port(inbounds),
             runtime_clients=runtime_clients,
@@ -1881,7 +1918,7 @@ def _inbound_protocol(adapter: str) -> str:
     if adapter.startswith("tuic"):
         return "tuic"
     if adapter == "naiveproxy":
-        return "http"
+        return "naive"
     if adapter == "socks5":
         return "socks"
     if adapter == "http-proxy":

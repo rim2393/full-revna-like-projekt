@@ -19,6 +19,7 @@ const FORBIDDEN_INLINE_SECRET_KEYS = new Set([
 const RUNTIME_CREDENTIAL_PAYLOAD_ROOTS = Object.freeze([
   "$.payload.xrayConfig",
   "$.payload.hysteria2Config",
+  "$.payload.naiveConfig",
   "$.payload.singBoxShadowsocksConfig",
   "$.payload.shadowsocksPluginConfig",
   "$.payload.tuicConfig",

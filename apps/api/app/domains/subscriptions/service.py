@@ -48,6 +48,7 @@ RENDERABLE_PROTOCOL_PREFIXES = (
     "trojan",
     "shadowsocks",
     "hysteria2",
+    "naive",
     "tuic",
     "wireguard",
     "socks",
@@ -268,6 +269,7 @@ async def build_subscription_manifest(
                         "credentialsRef": credentials_ref,
                         "credentials": _manifest_credentials(
                             credentials,
+                            username=subscription.public_id,
                             method=(
                                 delivery.get("method")
                                 or _profile_config_string(profile, "method")
@@ -622,7 +624,11 @@ def _manifest_security(
 def _default_security(protocol_type: str) -> str:
     if protocol_type.endswith("reality") or "-reality" in protocol_type:
         return "reality"
-    if protocol_type.endswith("tls") or "-tls" in protocol_type or protocol_type == "hysteria2":
+    if (
+        protocol_type.endswith("tls")
+        or "-tls" in protocol_type
+        or protocol_type in {"hysteria2", "naive", "naiveproxy"}
+    ):
         return "tls"
     return "none"
 
@@ -700,8 +706,9 @@ def _manifest_renderer_hints(
     return hints
 
 
-def _manifest_credentials(credentials, *, method: str) -> dict[str, str]:
+def _manifest_credentials(credentials, *, username: str, method: str) -> dict[str, str]:
     return {
+        "username": username,
         "uuid": credentials.uuid,
         "password": credentials.password,
         "shadowsocksPassword": shadowsocks_password_for_method(credentials, method),

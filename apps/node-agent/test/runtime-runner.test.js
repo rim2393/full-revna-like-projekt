@@ -915,6 +915,42 @@ test("xray apply fails when config still contains unresolved refs", () => {
   assert.match(result.errorMessage, /unresolved refs/);
 });
 
+test("outbound apply dispatches NaiveProxy config to managed sing-box runtime", () => {
+  const active = createProvisioningState({
+    nodeId: "node-1",
+    updatedAt: "2026-05-27T00:00:00.000Z"
+  });
+
+  const result = applyNodeCommand(
+    {
+      id: "cmd-naive-apply-1",
+      node_id: "node-1",
+      command_type: COMMAND_TYPES.OUTBOUND_APPLY,
+      created_at: "2026-05-27T00:02:00.000Z",
+      payload_json: {
+        adapter: "naiveproxy",
+        naiveConfig: {
+          listen: ":18476",
+          users: [{ username: "lumen_sub_live", password: "naive-live-password" }],
+          tls: {
+            cert: "/var/lib/lumen-node/runtime/tls/live.crt",
+            key: "/var/lib/lumen-node/runtime/tls/live.key"
+          }
+        }
+      }
+    },
+    active,
+    {
+      startedAt: "2026-05-27T00:02:01.000Z",
+      finishedAt: "2026-05-27T00:02:02.000Z"
+    }
+  );
+
+  assert.equal(result.status, "succeeded");
+  assert.equal(result.runtimeAction.type, "naive.apply");
+  assert.equal(result.resultJson.outputs.implementationStatus, "naive-apply-pending");
+});
+
 test("run once applies node policy artifact from outbound apply", async () => {
   const stateDir = mkdtempSync(join(tmpdir(), "lumen-state-"));
   const xrayDir = mkdtempSync(join(tmpdir(), "lumen-xray-"));

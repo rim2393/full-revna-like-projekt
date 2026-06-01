@@ -66,6 +66,18 @@ def test_tuic_profile_builds_tuic_payload():
     assert payload["tuicConfig"]["clientsRef"] == "vault://subscriptions/p/creds"
 
 
+def test_naiveproxy_profile_builds_naive_payload():
+    payload = build_node_outbound_payload(_profile("naiveproxy"), _inbounds(8443))
+    assert payload["adapter"] == "naiveproxy"
+    assert "naiveConfig" in payload
+    assert payload["naiveConfig"]["listen"] == ":8443"
+    assert payload["naiveConfig"]["tls"] == {
+        "cert": "/var/lib/lumen-node/runtime/tls/live.crt",
+        "key": "/var/lib/lumen-node/runtime/tls/live.key",
+    }
+    assert payload["naiveConfig"]["clientsRef"] == "vault://subscriptions/p/creds"
+
+
 def test_wireguard_profile_builds_wireguard_payload():
     payload = build_node_outbound_payload(_profile("wireguard-native"), _inbounds(51820))
     assert "wireguardConfig" in payload
@@ -396,3 +408,24 @@ def test_tuic_payload_uses_concrete_runtime_clients_when_available():
     assert config["users"] == {
         "11111111-1111-4111-8111-111111111111": "tuic-live-password",
     }
+
+
+def test_naiveproxy_payload_uses_concrete_runtime_clients_when_available():
+    payload = build_node_outbound_payload(
+        _profile("naiveproxy"),
+        _inbounds(8443),
+        runtime_clients=[
+            {
+                "public_id": "lumen_sub_live",
+                "password": "naive-live-password",
+            }
+        ],
+    )
+    config = payload["naiveConfig"]
+    assert "clientsRef" not in config
+    assert config["users"] == [
+        {
+            "username": "lumen_sub_live",
+            "password": "naive-live-password",
+        }
+    ]

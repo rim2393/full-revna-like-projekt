@@ -115,6 +115,13 @@ export {
   createSingBoxShadowsocksApplyPlan
 } from "./sing-box-shadowsocks-runtime.js";
 export {
+  DEFAULT_NAIVE_BINARY,
+  DEFAULT_NAIVE_CONFIG_PATH,
+  NAIVE_RUNTIME_MODEL_VERSION,
+  applyNaiveConfig,
+  createNaiveApplyPlan
+} from "./naive-runtime.js";
+export {
   DEFAULT_SHADOWSOCKS_PLUGIN_CONFIG_PATH,
   DEFAULT_SHADOWSOCKS_SERVER_BINARY,
   SHADOWSOCKS_PLUGIN_RUNTIME_MODEL_VERSION,

@@ -670,7 +670,7 @@ async def test_proxy_subscriptions_render_client_formats(
     assert f'username: "{public_id}"' in mihomo.text
 
 
-async def test_unsupported_protocol_is_still_rejected(route_app: RouteTestApp) -> None:
+async def test_naiveproxy_subscription_renders_supported_clients(route_app: RouteTestApp) -> None:
     user, license_record, node = await _seed(route_app)
     response = await route_app.client.post(
         "/api/v1/subscriptions",
@@ -678,9 +678,46 @@ async def test_unsupported_protocol_is_still_rejected(route_app: RouteTestApp) -
             "user_id": str(user.id),
             "license_id": str(license_record.id),
             "node_id": str(node.id),
-            "delivery_profile": {"protocol": "naiveproxy", "adapter": "naiveproxy"},
+            "delivery_profile": {
+                "protocol": "naiveproxy",
+                "adapter": "naiveproxy",
+                "profile_title": "Lumen Naive",
+                "server_name": "naive.example.test",
+                "port": "8443",
+            },
             "config_hash": "sha256:naive",
         },
     )
-    assert response.status_code == 422
-    assert response.json()["error"]["code"] == "subscription_protocol_required"
+    assert response.status_code == 201, response.text
+    public_id = response.json()["public_id"]
+
+    raw = await route_app.client.get(
+        f"/api/v1/subscriptions/public/{public_id}/render?target=happ",
+    )
+    assert raw.status_code == 200, raw.text
+    assert raw.text.startswith("https://")
+    assert f"{public_id}:" in raw.text
+    assert ":8443" in raw.text
+
+    sing_box = await route_app.client.get(
+        f"/api/v1/subscriptions/public/{public_id}/render?target=sing-box",
+    )
+    assert sing_box.status_code == 200
+    outbound = sing_box.json()["outbounds"][0]
+    assert outbound["type"] == "naive"
+    assert outbound["username"] == public_id
+    assert outbound["password"]
+    assert outbound["tls"]["server_name"] == "naive.example.test"
+
+    mihomo = await route_app.client.get(
+        f"/api/v1/subscriptions/public/{public_id}/render?target=mihomo",
+    )
+    assert mihomo.status_code == 200
+    assert 'type: "naive"' in mihomo.text
+    assert f'username: "{public_id}"' in mihomo.text
+
+    xray = await route_app.client.get(
+        f"/api/v1/subscriptions/public/{public_id}/render?target=amnezia",
+    )
+    assert xray.status_code == 200
+    assert xray.json()["outbounds"] == []
