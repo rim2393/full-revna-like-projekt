@@ -1584,11 +1584,11 @@ def _computed_shadowsocks_plugin_config(
     runtime_clients: list[dict[str, object]] | None = None,
 ) -> dict[str, object]:
     config = _profile_config_dict(profile)
-    config.setdefault("listen", "::")
     config.setdefault("listen_port", port or 8388)
     config.setdefault("method", "aes-256-gcm")
     config.setdefault("network", "tcp")
     if profile.adapter == "shadowsocks-obfs":
+        config.setdefault("listen", WILDCARD_BIND_ADDRESS)
         config["plugin"] = "obfs-server"
         config.setdefault("obfs", "http")
         config.setdefault("obfs_host", "www.bing.com")
@@ -1598,6 +1598,7 @@ def _computed_shadowsocks_plugin_config(
             config.get("plugin_opts") or f"obfs={obfs};obfs-host={obfs_host}"
         )
     else:
+        config.setdefault("listen", "::")
         config["plugin"] = "v2ray-plugin"
         config.setdefault("plugin_opts", "server")
     clients = runtime_clients or []

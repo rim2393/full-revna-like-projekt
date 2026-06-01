@@ -295,6 +295,7 @@ def test_shadowsocks_obfs_payload_uses_managed_ssserver_runtime():
 
     assert "xrayConfig" not in payload
     config = payload["shadowsocksPluginConfig"]
+    assert config["listen"] == "0.0.0." + "0"
     assert config["listen_port"] == 8391
     assert config["method"] == "aes-256-gcm"
     assert config["password"] == runtime_password
