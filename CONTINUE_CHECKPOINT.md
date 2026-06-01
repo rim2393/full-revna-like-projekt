@@ -1,12 +1,12 @@
 # Continuation Checkpoint
 
-Last audited: 2026-06-01 19:41 Europe/Moscow.
+Last audited: 2026-06-01 20:20 Europe/Moscow.
 
 ## Current Working Copy
 
 - Repo: `D:\android-app-new\_work\full-revna-like-projekt`
-- Main branch state: clean after live node-management restart validation.
-- Current signed production manifest: `v0.1.59`.
+- Main branch state: clean after live profile-apply validation.
+- Current signed production manifest: `v0.1.60`.
 - OpenVPN-over-Shadowsocks backend/node runtime is live-validated on production
   through the official closed-image, public signed manifest, public panel
   upgrade, and public node installer flow.
@@ -65,6 +65,12 @@ Last audited: 2026-06-01 19:41 Europe/Moscow.
     were rejected by live VPS evidence. The working implementation in
     `v0.1.59` schedules `process.exit(0)` after command result submission, so
     Docker `restart: unless-stopped` restarts the real container.
+- 2026-06-01 Profiles parity follow-up:
+  - Profiles UI now exposes Apply in table, card and detail views.
+  - Apply uses `POST /api/v1/profiles/{profile_id}/apply-to-node` and queues
+    the real `outbound.apply` node command.
+  - Added web API-client contract coverage for the production endpoint and
+    completed a live `v0.1.60` smoke through panel API and node-agent.
 
 ## Verification Done
 
@@ -91,12 +97,23 @@ Last audited: 2026-06-01 19:41 Europe/Moscow.
   passed.
 - Node-management restart fix gate after the live Docker PID 1 issue:
   node-agent full `node --test`, 99 passed.
+- Profiles Apply local gates: web TypeScript passed; `httpClient.test.ts` passed
+  with 3 tests; `productionReality.test.ts` + `httpClient.test.ts` passed with
+  10 tests; `NodesPage.test.tsx` regression passed with 3 tests; web production
+  build passed.
 - Live prod evidence after `v0.1.40`: panel `LUMEN_VERSION=v0.1.40`, node-agent image pinned to `v0.1.40`, HTTP-proxy profile apply succeeded with `dryRun=false`, Xray config contains `blackhole`, `protocol=["bittorrent"]`, sniffing on all active inbounds, and `xray -test` passed.
 - Live prod evidence after `v0.1.41`: panel `LUMEN_VERSION=v0.1.41`, node-agent image pinned to `v0.1.41`, `shadowsocks-2022` profile apply succeeded with `dryRun=false`, node policy applied, generated sing-box Shadowsocks config contains the policy block route, `sing-box check -c` passed against the live config, and TCP `24081` listened on the node.
 - Live prod evidence after `v0.1.49`: panel `LUMEN_VERSION=v0.1.49`, node-agent image pinned to `v0.1.49`, public installer persisted host IP forwarding, direct OpenVPN UDP profile apply succeeded with `dryRun=false`, node listened on UDP `24103`, OpenVPN auth files were readable/executable by the dropped `nobody` user without exposing raw credentials, NAT had exactly one `10.90.3.0/24` MASQUERADE rule after repeated apply, and a disposable OpenVPN client connected from the panel VPS using the rendered subscription.
 - Live prod evidence after `v0.1.55`: panel `LUMEN_VERSION=v0.1.55`, node-agent image pinned to `v0.1.55`, public subscription endpoint forwards `device_id`/`hwid` to the API, OpenVPN-over-Shadowsocks manifest includes `rendererHints.method=aes-256-gcm`, node listens on public TCP `28443` for `ssserver` and loopback TCP `127.0.0.1:24194` for OpenVPN, restore starts both bridge processes after container recreation, parent runtime directories are traversable by the dropped OpenVPN user, and a disposable Alpine client downloaded the public `sub.*` Happ/OpenVPN profile, started `sslocal`, connected OpenVPN through Shadowsocks, and reached `Initialization Sequence Completed`.
 - Live prod evidence after `v0.1.57`/`v0.1.58`: panel/node upgrade path worked, node `reset-traffic` completed with `implementationStatus=node-traffic-reset`, but restart evidence proved shell-based `kill -TERM 1` and `kill -KILL 1` did not actually restart the running container. These versions are not accepted for node restart closure.
 - Live prod evidence after `v0.1.59`: panel `LUMEN_VERSION=v0.1.59`, web/api/subscription images pinned to `v0.1.59` and healthy, node-agent image pinned to `v0.1.59`, `node.traffic.reset` completed with `implementationStatus=node-traffic-reset`, `node.restart` completed with `implementationStatus=node-agent-restart-scheduled` and command `process.exit(0)`, and the real container restarted from `StartedAt=2026-06-01T16:39:20.843014313Z` to `StartedAt=2026-06-01T16:40:27.775375566Z` while staying on image digest `sha256:4425bdcab9a051352b3743e984005323f095adf9c16feaf91b2959b269bb58ab`.
+- Live prod evidence after `v0.1.60`: panel `LUMEN_VERSION=v0.1.60`,
+  web/api/subscription images healthy, profile
+  `407469f7-bc40-471a-9916-374339d34b73` Apply returned queued
+  `outbound.apply` command `f579715a-dc66-47da-9f1c-8b46b31f3bfa` for node
+  `d40a27ae-29fa-4cd1-88ee-269957de1e30`; after node-agent polling the command
+  became `succeeded` with result status `succeeded` and implementation
+  `openvpn-shadowsocks-managed-process-started`.
 - Alembic heads: single head `0009_node_management_parity` after this slice.
 
 ## Fixes Applied During Audit

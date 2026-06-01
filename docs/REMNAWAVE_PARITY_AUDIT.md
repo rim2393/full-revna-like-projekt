@@ -55,6 +55,10 @@ Closure evidence:
   detail panel. The action calls the real backend endpoint
   `POST /api/v1/profiles/{profile_id}/apply-to-node`, which queues the node
   `outbound.apply` command instead of only editing a database row.
+- Live closure for this Apply surface: `v0.1.60` panel API returned queued
+  `outbound.apply` command `f579715a-dc66-47da-9f1c-8b46b31f3bfa`, and the
+  real node-agent completed it as `succeeded` with implementation
+  `openvpn-shadowsocks-managed-process-started`.
 - Hosts P0 gap: the create flow can still derive `node_id=""` when no node is
   selected. The UI must block submit with a clear error before the API 422.
 - Hosts P1 gaps: bulk set-port and host editor port validation need strict
