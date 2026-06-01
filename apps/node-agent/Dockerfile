@@ -2,6 +2,7 @@ FROM node:24.13.0-alpine AS runtime
 
 ARG XRAY_VERSION=v26.5.9
 ARG SING_BOX_VERSION=1.13.12
+ARG AMNEZIAWG_TOOLS_VERSION=1.0.20260223
 
 ENV NODE_ENV=production
 ENV XRAY_LOCATION_ASSET=/usr/local/share/xray
@@ -16,7 +17,10 @@ RUN apk add --no-cache ca-certificates curl gcompat iproute2 iptables unzip wire
   && curl -fsSL -o /tmp/sing-box.tar.gz "https://github.com/SagerNet/sing-box/releases/download/v${SING_BOX_VERSION}/sing-box-${SING_BOX_VERSION}-linux-amd64.tar.gz" \
   && tar -xzf /tmp/sing-box.tar.gz -C /tmp \
   && install -m 0755 "/tmp/sing-box-${SING_BOX_VERSION}-linux-amd64/sing-box" /usr/local/bin/sing-box \
-  && rm -rf /tmp/xray.zip /tmp/sing-box.tar.gz "/tmp/sing-box-${SING_BOX_VERSION}-linux-amd64"
+  && curl -fsSL -o /tmp/amneziawg-tools.zip "https://github.com/amnezia-vpn/amneziawg-tools/releases/download/v${AMNEZIAWG_TOOLS_VERSION}/alpine-3.19-amneziawg-tools.zip" \
+  && unzip -j /tmp/amneziawg-tools.zip "alpine-3.19-amneziawg-tools/awg" "alpine-3.19-amneziawg-tools/awg-quick" -d /usr/local/bin \
+  && chmod 0755 /usr/local/bin/awg /usr/local/bin/awg-quick \
+  && rm -rf /tmp/xray.zip /tmp/sing-box.tar.gz /tmp/amneziawg-tools.zip "/tmp/sing-box-${SING_BOX_VERSION}-linux-amd64"
 
 COPY --chown=node:node package.json ./
 COPY --chown=node:node src ./src
