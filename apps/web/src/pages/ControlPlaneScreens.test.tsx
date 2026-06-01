@@ -694,6 +694,55 @@ describe('Control plane resource screens', () => {
     })
   })
 
+  it('filters external squads and creates external squads through the typed API contract', async () => {
+    const user = userEvent.setup()
+    const createSquad = vi.fn(async (request: SquadCreateRequest) => ({
+      id: 'squad_external_new',
+      kind: request.kind ?? 'internal',
+      metadata_json: request.metadata_json ?? {},
+      name: request.name,
+      status: request.status ?? 'active',
+    }))
+    const apiClient: LumenApiClient = {
+      ...createDevelopmentLumenApiClient(),
+      createSquad,
+      listSquads: async () => ({
+        items: [
+          {
+            id: 'squad_internal',
+            kind: 'internal',
+            metadata_json: {},
+            name: 'Internal squad',
+            status: 'active',
+          },
+          {
+            id: 'squad_external',
+            kind: 'external',
+            metadata_json: {},
+            name: 'External squad',
+            status: 'active',
+          },
+        ],
+      }),
+    }
+
+    renderWithRouter('/squads', { apiClient, initialSession: developmentSession })
+
+    expect(await screen.findByText('Internal squad')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /external squads/i }))
+    expect(screen.getByText('External squad')).toBeInTheDocument()
+    expect(screen.queryByText('Internal squad')).not.toBeInTheDocument()
+    await user.type(screen.getByLabelText(/^name$/i), 'Partner lane')
+    await user.selectOptions(screen.getByLabelText(/^kind$/i), 'external')
+    await user.click(screen.getByRole('button', { name: /create squad/i }))
+
+    await waitFor(() => expect(createSquad).toHaveBeenCalledTimes(1))
+    expect(createSquad.mock.calls[0][0]).toMatchObject({
+      kind: 'external',
+      name: 'Partner lane',
+    })
+  })
+
   it('renders squad detail nodes profiles hosts and inbounds from the detail API contract', async () => {
     const detail: SquadDetailResponse = {
       hosts: [

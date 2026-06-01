@@ -49,15 +49,26 @@ export function SquadsPage() {
   const [memberUserId, setMemberUserId] = useState('')
   const [matrixProfileId, setMatrixProfileId] = useState('')
   const [matrixHostId, setMatrixHostId] = useState('')
+  const [kindFilter, setKindFilter] = useState<'all' | 'internal' | 'external'>('all')
   const squads = query.data?.items ?? []
   const users = usersQuery.data?.items ?? []
   const profiles = profilesQuery.data?.items ?? []
   const hosts = hostsQuery.data?.items ?? []
+  const visibleSquads = useMemo(
+    () => squads.filter((squad) => kindFilter === 'all' || squad.kind === kindFilter),
+    [kindFilter, squads],
+  )
   const selectedSquad = useMemo(
     () => squads.find((squad) => squad.id === selectedSquadId) ?? squads[0],
     [selectedSquadId, squads],
   )
   const detailQuery = useSquadDetailData(selectedSquad?.id)
+
+  useEffect(() => {
+    if (visibleSquads.length > 0 && !visibleSquads.some((squad) => squad.id === selectedSquad?.id)) {
+      setSelectedSquadId(visibleSquads[0].id)
+    }
+  }, [selectedSquad?.id, visibleSquads])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -175,7 +186,7 @@ export function SquadsPage() {
       isError={query.isError}
       isLoading={query.isLoading}
       isSuccess={query.isSuccess}
-      items={squads}
+      items={visibleSquads}
       loadingLabel="Loading squads..."
       onRefresh={() => void query.refetch()}
       renderRow={(squad) => {
@@ -229,6 +240,26 @@ export function SquadsPage() {
       }}
       rightPanel={
         <div className="side-stack">
+          <article className="panel">
+            <div className="panel__header">
+              <div>
+                <p className="eyebrow">{t('Squad scope')}</p>
+                <h2>{t('Internal and external')}</h2>
+              </div>
+            </div>
+            <div className="inline-actions" role="group" aria-label={t('Squad kind filter')}>
+              {(['all', 'internal', 'external'] as const).map((nextFilter) => (
+                <button
+                  key={nextFilter}
+                  type="button"
+                  className={`button ${kindFilter === nextFilter ? 'button--primary' : 'button--secondary'}`}
+                  onClick={() => setKindFilter(nextFilter)}
+                >
+                  {t(nextFilter === 'all' ? 'All squads' : `${nextFilter} squads`)}
+                </button>
+              ))}
+            </div>
+          </article>
           <SquadEditor
             onReorder={() => void reorderSquads.mutateAsync(squads.map((squad) => squad.id).reverse())}
             onSave={async (id, request) => {

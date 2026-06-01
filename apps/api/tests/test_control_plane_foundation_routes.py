@@ -1105,6 +1105,50 @@ async def test_squad_detail_membership_and_reorder_are_persisted(
     assert detail["nodes"][0]["id"] == node_id
     assert detail["inbound_matrix"][0]["tag"] == "SQUAD_DETAIL_INBOUND"
 
+    add_external_user_response = await foundation_app.client.post(
+        f"/api/v1/squads/{second_squad_id}/users",
+        json={"user_ids": [user_id]},
+    )
+    assert add_external_user_response.status_code == 200
+    external_profile_response = await foundation_app.client.post(
+        "/api/v1/profiles",
+        json={
+            "name": "External Squad Detail Profile",
+            "node_id": node_id,
+            "squad_id": second_squad_id,
+            "adapter": "vless-reality",
+            "credentials_ref": "vault://protocols/external-squad-detail",
+            "port_reservations": [
+                {"address": WILDCARD_BIND_ADDRESS, "port": 30444, "protocol": "tcp"}
+            ],
+        },
+    )
+    assert external_profile_response.status_code == 201
+    external_profile_id = external_profile_response.json()["id"]
+    external_host_response = await foundation_app.client.post(
+        "/api/v1/hosts",
+        json={
+            "name": "External Squad Detail Host",
+            "hostname": "external-squad-detail.example.test",
+            "node_id": node_id,
+            "protocol_profile_id": external_profile_id,
+            "squad_id": second_squad_id,
+            "inbound_tag": "EXTERNAL_SQUAD_DETAIL_INBOUND",
+            "port": 30444,
+        },
+    )
+    assert external_host_response.status_code == 201
+    external_detail_response = await foundation_app.client.get(
+        f"/api/v1/squads/{second_squad_id}/detail"
+    )
+    assert external_detail_response.status_code == 200
+    external_detail = external_detail_response.json()
+    assert external_detail["squad"]["kind"] == "external"
+    assert external_detail["users"][0]["id"] == user_id
+    assert external_detail["profiles"][0]["name"] == "External Squad Detail Profile"
+    assert external_detail["hosts"][0]["hostname"] == "external-squad-detail.example.test"
+    assert external_detail["inbound_matrix"][0]["tag"] == "EXTERNAL_SQUAD_DETAIL_INBOUND"
+
     reorder_response = await foundation_app.client.post(
         "/api/v1/squads/actions/reorder",
         json={"ids": [second_squad_id, first_squad_id]},
