@@ -798,6 +798,17 @@ def _manifest_renderer_hints(
     if openvpn_pki.get("ca_cert") is not None:
         hints["caCert"] = openvpn_pki["ca_cert"]
     if profile is not None and profile.adapter == "openvpn-shadowsocks":
+        shadowsocks_config = (
+            profile_config.get("shadowsocks")
+            if isinstance(profile_config.get("shadowsocks"), dict)
+            else {}
+        )
+        if hints.get("method") is None:
+            hints["method"] = (
+                shadowsocks_config.get("method")
+                or profile_config.get("method")
+                or "aes-256-gcm"
+            )
         openvpn_config = (
             profile_config.get("openvpn")
             if isinstance(profile_config.get("openvpn"), dict)

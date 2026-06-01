@@ -857,6 +857,7 @@ async def test_openvpn_shadowsocks_subscription_renders_bridge_ovpn_and_blocks_w
     assert protocol["adapter"] == "openvpn-shadowsocks"
     assert protocol["endpoint"]["transport"] == "tcp"
     assert protocol["credentials"]["shadowsocksPassword"]
+    assert protocol["rendererHints"]["method"] == "aes-256-gcm"
 
     sing_box = await route_app.client.get(
         f"/api/v1/subscriptions/public/{public_id}/render?target=sing-box",
