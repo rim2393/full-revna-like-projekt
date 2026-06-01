@@ -6,6 +6,12 @@ const sourceFiles = import.meta.glob('../../**/*.{ts,tsx}', {
   query: '?raw',
 }) as Record<string, string>
 
+const cssFiles = import.meta.glob('../styles/**/*.css', {
+  eager: true,
+  import: 'default',
+  query: '?raw',
+}) as Record<string, string>
+
 describe('production reality import boundaries', () => {
   it('keeps development fixtures out of production modules', () => {
     const offenders = Object.entries(sourceFiles)
@@ -85,5 +91,27 @@ describe('production reality import boundaries', () => {
       )
 
     expect(missing).toEqual([])
+  })
+
+  it('keeps the operator language switcher visible on narrow production viewports', () => {
+    const globalCss = Object.entries(cssFiles).find(([path]) =>
+      path.replaceAll('\\', '/').endsWith('global.css'),
+    )?.[1]
+    expect(globalCss).toBeTruthy()
+    if (!globalCss) {
+      throw new Error('global.css source was not loaded by the production reality test.')
+    }
+
+    const narrowViewportStart = globalCss.indexOf('@media (max-width: 860px)')
+    const nextMediaStart = globalCss.indexOf('@media', narrowViewportStart + 1)
+    const narrowViewportBlock = globalCss.slice(
+      narrowViewportStart,
+      nextMediaStart > narrowViewportStart ? nextMediaStart : undefined,
+    )
+
+    expect(narrowViewportStart).toBeGreaterThanOrEqual(0)
+    expect(narrowViewportBlock).toContain('.topbar__actions')
+    expect(narrowViewportBlock).toContain('display: flex')
+    expect(narrowViewportBlock).not.toContain('.topbar__actions {\n    display: none;')
   })
 })
