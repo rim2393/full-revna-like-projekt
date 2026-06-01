@@ -136,6 +136,7 @@ def ensure_supported_node_command(request: NodeCommandCreateRequest) -> None:
             isinstance(request.payload_json.get("xrayConfig"), dict)
             or isinstance(request.payload_json.get("hysteria2Config"), dict)
             or isinstance(request.payload_json.get("naiveConfig"), dict)
+            or isinstance(request.payload_json.get("openvpnConfig"), dict)
             or isinstance(request.payload_json.get("singBoxShadowsocksConfig"), dict)
             or isinstance(request.payload_json.get("shadowsocksPluginConfig"), dict)
             or isinstance(request.payload_json.get("tuicConfig"), dict)
@@ -146,8 +147,8 @@ def ensure_supported_node_command(request: NodeCommandCreateRequest) -> None:
             raise APIError(
                 code="node_command_payload_not_live",
                 message=(
-                    "outbound.apply requires a live Xray, Hysteria2, NaiveProxy, TUIC, or "
-                    "WireGuard config, managed sing-box Shadowsocks config, "
+                    "outbound.apply requires a live Xray, Hysteria2, NaiveProxy, OpenVPN, "
+                    "TUIC, or WireGuard config, managed sing-box Shadowsocks config, "
                     "managed Shadowsocks plugin config, or a tcp diagnostic "
                     "listener payload."
                 ),
@@ -155,6 +156,7 @@ def ensure_supported_node_command(request: NodeCommandCreateRequest) -> None:
                 details=[
                     "payload_json.xrayConfig",
                     "payload_json.naiveConfig",
+                    "payload_json.openvpnConfig",
                     "payload_json.singBoxShadowsocksConfig",
                     "payload_json.shadowsocksPluginConfig",
                 ],

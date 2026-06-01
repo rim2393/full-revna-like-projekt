@@ -13,6 +13,7 @@ from app.db.session import create_engine, create_sessionmaker
 from app.domains.nodes.models import Node, NodeInstallToken, NodeProvisioningJob
 from app.domains.nodes.schemas import (
     InstallTokenExchangeRequest,
+    NodeCommandCreateRequest,
     NodeHeartbeatRequest,
     NodeStatus,
     PreflightStatus,
@@ -22,6 +23,7 @@ from app.domains.nodes.schemas import (
 )
 from app.domains.nodes.service import (
     create_provisioning_job,
+    ensure_supported_node_command,
     exchange_install_token,
     issue_install_token,
     record_node_heartbeat,
@@ -65,6 +67,32 @@ def build_job_request(
             "credentials_ref": "vault://lumen/nodes/edge-1/ssh",
         },
         requested_capabilities={"service_manager": "systemd"},
+    )
+
+
+def test_outbound_apply_accepts_openvpn_live_payload() -> None:
+    ensure_supported_node_command(
+        NodeCommandCreateRequest(
+            command_type="outbound.apply",
+            payload_json={
+                "adapter": "openvpn-udp",
+                "openvpnConfig": {
+                    "listen_port": 1194,
+                    "proto": "udp",
+                    "network": "10.88.0.0/24",
+                    "pki": {
+                        "ca_cert": "-----BEGIN CERTIFICATE-----\nca\n-----END CERTIFICATE-----",
+                        "server_cert": (
+                            "-----BEGIN CERTIFICATE-----\nserver\n-----END CERTIFICATE-----"
+                        ),
+                        "server_key": (
+                            "-----BEGIN PRIVATE KEY-----\nserver\n-----END PRIVATE KEY-----"
+                        ),
+                    },
+                    "users": [{"username": "lumen_sub_live", "password": "pass"}],
+                },
+            },
+        )
     )
 
 
