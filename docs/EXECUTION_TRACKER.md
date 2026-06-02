@@ -33,9 +33,9 @@ evidence here is wrong or stale.
 
 | Item | Current Evidence |
 | --- | --- |
-| Latest production release | `v0.1.100` |
-| Product repo head | `ca04d36 Add real user IP tools reports` |
-| Public installer manifest | `rim2393/lumen_vpn@809a713` |
+| Latest production release | `v0.1.101` |
+| Product repo head | `ccee679 Add real connection drop tools command` |
+| Public installer manifest | `rim2393/lumen_vpn@1752355` |
 | Prod health | `GET /api/v1/health/ready -> {"status":"ok","dependencies":{"api":"ok"}}` |
 | Current rule | Continue from this tracker; do not restart already closed host/subscription renderer work. |
 
@@ -124,8 +124,8 @@ evidence here is wrong or stale.
 | T-001 | HWID inspector and device delete/delete-all | DONE | Device list exists for subscription admin; full tools surface open | `28a6e9c`, `v0.1.98`, product release run `26794957822`, installer/deploy run `26795013148`, manifest `rim2393/lumen_vpn@e1bfc07`; backend `ruff`, focused backend pytest `test_tools_reports_are_real_database_views`, web `npm run build`, focused Vitest `HWID inspector` passed; prod containers `lumen-api/web/subscription` on `v0.1.98` healthy; live smoke created a temporary real user/license/subscription, public manifest registered HWID on the real user, Tools HWID lookup found `hwid`, `last_seen_at`, and `subscription_id`, delete-one removed the HWID, a second public request registered another HWID, clear-all removed every device, and cleanup left `0` QA users/licenses. |
 | T-002 | Top users | DONE | Real database stats and UI table, no fake counters | `601cec8`, `v0.1.99`, product release run `26795333815`, installer/deploy run `26795381599`, manifest `rim2393/lumen_vpn@1f2ac54`; backend `ruff`, focused backend pytest `test_tools_reports_are_real_database_views`, focused Vitest `HWID inspector` with Top users tab, and web `npm run build` passed; prod containers `lumen-api/web/subscription` on `v0.1.99` healthy; live public API smoke created temporary real users `qa-t002-*` with traffic/device/expiration states, verified `/api/v1/tools/top-users` metrics `traffic_used`, `traffic_percent`, `device_count`, `expiration_risk`, verified invalid metric returns `422 top_users_metric_invalid`, deleted temp users and lookup cleanup left `0` QA users. |
 | T-003 | Fetch user IPs and node user IPs | DONE | Real session/runtime/IP-control views | `ca04d36`, `v0.1.100`, product release run `26796011040`, installer/deploy run `26796063657`, manifest `rim2393/lumen_vpn@809a713`; public subscription requests now record client IP and node id in `subscription.public.rendered` audit events; protected Tools API exposes `/api/v1/tools/user-ips` and `/api/v1/tools/node-user-ips` from real subscription audit and IP-control events; local gates passed: backend `ruff`, focused backend pytest `test_tools_reports_are_real_database_views`, web `npm run build`, focused Vitest `HWID inspector`; prod containers `lumen-api/web/subscription` on `v0.1.100` healthy; live public API smoke created temporary real user/subscription on `node-01`, rendered public manifest through the real prod domain, verified `user-ips` and `node-user-ips` evidence for the created subscription, deleted temp records and cleanup left `0` QA users. |
-| T-004 | Drop connections | NEXT | Backend queues/executes real node-agent disconnect operation | Not started |
-| T-005 | Full HApp routing encryption | OPEN | Utility/API/UI produce usable encrypted routing payloads | Not started |
+| T-004 | Drop connections | DONE | Backend queues/executes real node-agent disconnect operation | `ccee679`, `v0.1.101`, product release run `26796676040` passed after rerun of transient Docker Hub timeout, installer/deploy run `26796770778`, manifest `rim2393/lumen_vpn@1752355`; local gates passed: backend `ruff`, focused backend pytest `test_tools_reports_are_real_database_views`, node-agent `node --test test\runtime-runner.test.js`, web `npm run build`, focused Vitest `HWID inspector`; prod containers `lumen-api/web/subscription` on `v0.1.101` healthy and prod node-agent on `v0.1.101`; live protected API smoke created temporary real user/license/subscription on `node-01`, queued `node.connections.drop` command `11f72276-42c6-4ee4-880e-7af7c1259c6d`, node-agent completed it as `succeeded` with `implementationStatus = connection-drop-attempted`, `dryRun = false`, and real `ss -K dst/src 203.0.113.44` attempts; temporary API key was revoked and QA users/licenses/subscriptions cleanup counts returned `0`. |
+| T-005 | Full HApp routing encryption | NEXT | Utility/API/UI produce usable encrypted routing payloads | Not started |
 | T-006 | X25519 generation UI/API | OPEN | Generates keys without logging/storing secrets incorrectly | Not started |
 | T-007 | Torrent report management | OPEN | Real reports, truncate, filters and evidence from node events | Partial ingestion exists; UI parity open |
 
@@ -166,15 +166,15 @@ evidence here is wrong or stale.
 
 ## Next Slice
 
-`T-004`: Drop connections.
+`T-005`: Full HApp routing encryption.
 
 Proposed implementation:
 
-1. Audit node-agent runtime support for active connection/session inspection and disconnect commands.
-2. Add protected backend Tools API that queues a real node-agent disconnect/drop command by user, node, IP or subscription evidence.
-3. Add node-agent command handler with explicit unsupported/protocol-specific errors instead of fake success.
-4. Wire Tools UI actions from the IP/session reports to queue and display drop-connection status.
-5. Add backend/node-agent/frontend tests, then release through signed manifest and verify live command queue behavior on production.
+1. Audit the current HApp routing inspector/output and the target client encryption contract.
+2. Add real backend utility/API for encrypted HApp routing payload generation with key/version metadata and no secret logging.
+3. Wire Tools UI to generate, inspect and copy/download encrypted routing payloads from real settings/templates.
+4. Add renderer/client compatibility tests for encrypted HApp routing output.
+5. Release through signed manifest and verify the encrypted payload on production against a real subscription/render path.
 
 ## Checkpoint Notes
 
