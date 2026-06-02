@@ -53,6 +53,7 @@ RENDERABLE_PROTOCOL_PREFIXES = (
     "trojan",
     "shadowsocks",
     "hysteria2",
+    "ikev2",
     "naive",
     "tuic",
     "wireguard",
@@ -1311,6 +1312,7 @@ def _default_security(protocol_type: str) -> str:
         or "-tls" in protocol_type
         or protocol_type
         in {"hysteria2", "naive", "naiveproxy", "openvpn", "openvpn-udp", "openvpn-shadowsocks"}
+        or protocol_type.startswith("ikev2")
     ):
         return "tls"
     return "none"
@@ -1319,7 +1321,7 @@ def _default_security(protocol_type: str) -> str:
 def _default_transport(protocol_type: str) -> str:
     if protocol_type == "openvpn-shadowsocks":
         return "tcp"
-    if protocol_type.startswith(("hysteria2", "tuic", "wireguard", "openvpn")):
+    if protocol_type.startswith(("hysteria2", "ikev2", "tuic", "wireguard", "openvpn")):
         return "udp"
     if "grpc" in protocol_type:
         return "grpc"
@@ -1389,6 +1391,17 @@ def _manifest_renderer_hints(
     )
     if openvpn_pki.get("ca_cert") is not None:
         hints["caCert"] = openvpn_pki["ca_cert"]
+    ikev2_pki = (
+        profile_metadata.get("ikev2_pki")
+        if isinstance(profile_metadata.get("ikev2_pki"), dict)
+        else {}
+    )
+    if ikev2_pki.get("ca_cert") is not None:
+        hints["ikev2CaCert"] = ikev2_pki["ca_cert"]
+    if profile is not None and profile.adapter.startswith("ikev2"):
+        hints["ikev2ServerId"] = (
+            profile_config.get("server_id") or profile_config.get("server_name")
+        )
     if profile is not None and profile.adapter == "openvpn-shadowsocks":
         shadowsocks_config = (
             profile_config.get("shadowsocks")

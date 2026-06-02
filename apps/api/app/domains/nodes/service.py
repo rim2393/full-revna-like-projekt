@@ -167,6 +167,7 @@ def ensure_supported_node_command(request: NodeCommandCreateRequest) -> None:
         has_live_payload = (
             isinstance(request.payload_json.get("xrayConfig"), dict)
             or isinstance(request.payload_json.get("hysteria2Config"), dict)
+            or isinstance(request.payload_json.get("ikev2Config"), dict)
             or isinstance(request.payload_json.get("naiveConfig"), dict)
             or isinstance(request.payload_json.get("openvpnConfig"), dict)
             or isinstance(request.payload_json.get("openvpnShadowsocksConfig"), dict)
@@ -181,13 +182,14 @@ def ensure_supported_node_command(request: NodeCommandCreateRequest) -> None:
                 code="node_command_payload_not_live",
                 message=(
                     "outbound.apply requires a live Xray, Hysteria2, NaiveProxy, OpenVPN, "
-                    "OpenVPN-over-Shadowsocks, TUIC, or WireGuard config, managed "
+                    "OpenVPN-over-Shadowsocks, IKEv2, TUIC, or WireGuard config, managed "
                     "sing-box Shadowsocks config, managed Shadowsocks plugin config, "
                     "or a tcp diagnostic listener payload."
                 ),
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 details=[
                     "payload_json.xrayConfig",
+                    "payload_json.ikev2Config",
                     "payload_json.naiveConfig",
                     "payload_json.openvpnConfig",
                     "payload_json.openvpnShadowsocksConfig",

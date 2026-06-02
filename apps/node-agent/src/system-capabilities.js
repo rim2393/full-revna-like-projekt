@@ -12,8 +12,10 @@ export const SYSTEM_CAPABILITIES = Object.freeze({
   UDP_QUIC: "network.udp_quic",
   BIND_PRIVILEGED_PORTS: "bind.privileged_ports",
   WIREGUARD_KERNEL: "protocol.wireguard_kernel",
+  IPSEC_KERNEL: "protocol.ipsec_kernel",
   SING_BOX: "runtime.sing_box",
   XRAY_CORE: "runtime.xray_core",
+  STRONGSWAN: "runtime.strongswan",
   DOCKER: "runtime.docker"
 });
 

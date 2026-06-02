@@ -144,6 +144,32 @@ async def test_apply_hysteria2_profile_queues_outbound_apply(route_app: RouteApp
         assert command.payload_json["hysteria2Config"]["auth"]["password"]
 
 
+async def test_apply_ikev2_profile_queues_concrete_strongswan_config(
+    route_app: RouteApp,
+) -> None:
+    profile_id, node_id = await _seed_profile(
+        route_app,
+        "ikev2-eap",
+        config_json={"server_id": "vpn.example.test", "pool": "10.92.0.0/24"},
+    )
+    response = await route_app.client.post(f"/api/v1/profiles/{profile_id}/apply-to-node")
+    assert response.status_code == 202, response.text
+
+    async with route_app.sessionmaker() as session:
+        command = (
+            await session.execute(select(NodeCommand).where(NodeCommand.node_id == UUID(node_id)))
+        ).scalar_one()
+        assert command.payload_json["adapter"] == "ikev2-eap"
+        config = command.payload_json["ikev2Config"]
+        assert config["server_id"] == "vpn.example.test"
+        assert config["users"][0]["username"].startswith("lumen_sub_")
+        assert config["users"][0]["password"]
+        assert "clientsRef" not in config
+        assert "BEGIN CERTIFICATE" in config["pki"]["ca_cert"]
+        assert "BEGIN CERTIFICATE" in config["pki"]["server_cert"]
+        assert "BEGIN PRIVATE KEY" in config["pki"]["server_key"]
+
+
 async def test_apply_wireguard_rejects_missing_server_private_key_before_queue(
     route_app: RouteApp,
 ) -> None:

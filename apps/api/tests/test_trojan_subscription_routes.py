@@ -947,6 +947,77 @@ async def test_openvpn_subscription_renders_ovpn_from_real_profile_pki(
     assert f"<auth-user-pass>\n{public_id}\n" in raw.text
 
 
+async def test_ikev2_subscription_renders_strongswan_android_profile(
+    route_app: RouteTestApp,
+) -> None:
+    user, license_record, node = await _seed(route_app)
+    ca_cert = "-----BEGIN CERTIFICATE-----\nca\n-----END CERTIFICATE-----"
+    async with route_app.sessionmaker() as session:
+        profile = ProtocolProfile(
+            name="IKEv2 EAP",
+            node_id=node.id,
+            adapter="ikev2-eap",
+            status="active",
+            config_json={"server_id": "vpn.example.test", "pool": "10.92.0.0/24"},
+            port_reservations=[
+                {
+                    "address": "0.0.0.0",  # noqa: S104
+                    "port": 500,
+                    "protocol": "udp",
+                    "exclusive": True,
+                }
+            ],
+            credentials_ref="vault://subscriptions/ikev2/creds",
+            metadata_json={
+                "ikev2_pki": {
+                    "ca_cert": ca_cert,
+                    "server_cert": "-----BEGIN CERTIFICATE-----\nserver\n-----END CERTIFICATE-----",
+                    "server_key": "-----BEGIN PRIVATE KEY-----\nserver\n-----END PRIVATE KEY-----",
+                }
+            },
+        )
+        session.add(profile)
+        await session.commit()
+
+    response = await route_app.client.post(
+        "/api/v1/subscriptions",
+        json={
+            "user_id": str(user.id),
+            "license_id": str(license_record.id),
+            "node_id": str(node.id),
+            "delivery_profile": {
+                "profile_id": str(profile.id),
+                "protocol": "ikev2",
+                "adapter": "ikev2-eap",
+                "profile_title": "Lumen IKEv2",
+                "port": "500",
+            },
+            "config_hash": "sha256:ikev2",
+        },
+    )
+    assert response.status_code == 201, response.text
+    public_id = response.json()["public_id"]
+
+    raw = await route_app.client.get(
+        f"/api/v1/subscriptions/public/{public_id}/render?target=raw-uri",
+    )
+    assert raw.status_code == 200, raw.text
+    payload = json.loads(raw.text)
+    assert payload["type"] == "ikev2-eap"
+    assert payload["remote"]["addr"] == "203.0.113.70"
+    assert payload["remote"]["port"] == 500
+    assert payload["remote"]["id"] == "vpn.example.test"
+    assert base64.b64decode(payload["remote"]["cert"]).decode("utf-8") == ca_cert
+    assert payload["local"]["eap_id"] == public_id
+    assert payload["local"]["shared_secret"]
+
+    sing_box = await route_app.client.get(
+        f"/api/v1/subscriptions/public/{public_id}/render?target=sing-box",
+    )
+    assert sing_box.status_code == 422
+    assert sing_box.json()["error"]["code"] == "subscription_render_target_unsupported_for_protocol"
+
+
 async def test_openvpn_shadowsocks_subscription_renders_bridge_ovpn_and_blocks_wrong_targets(
     route_app: RouteTestApp,
 ) -> None:

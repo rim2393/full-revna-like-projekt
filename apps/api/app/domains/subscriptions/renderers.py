@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import quote, urlencode
-from uuid import UUID
+from uuid import NAMESPACE_URL, UUID, uuid5
 
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import x25519
@@ -111,6 +111,20 @@ def render_subscription_for_target(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             details=[normalized_target, "openvpn-shadowsocks"],
         )
+    if manifest_contains_ikev2(manifest) and (
+        normalized_target in MIHOMO_TARGETS
+        or normalized_target in SING_BOX_TARGETS
+        or normalized_target in XRAY_TARGETS
+    ):
+        raise APIError(
+            code="subscription_render_target_unsupported_for_protocol",
+            message=(
+                "IKEv2/IPsec can be rendered as the Lumen native manifest "
+                "or strongSwan Android .sswan raw profile only."
+            ),
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            details=[normalized_target, "ikev2"],
+        )
 
     if normalized_target == "lumen-json":
         return RenderedSubscription(
@@ -180,6 +194,13 @@ def render_subscription_for_target(
 def manifest_contains_openvpn_shadowsocks(manifest: dict[str, Any]) -> bool:
     return any(
         is_openvpn_shadowsocks_protocol(entry["protocol"])
+        for entry in iter_protocol_entries(manifest)
+    )
+
+
+def manifest_contains_ikev2(manifest: dict[str, Any]) -> bool:
+    return any(
+        normalize_protocol_type(entry["protocol"].get("type")) == "ikev2"
         for entry in iter_protocol_entries(manifest)
     )
 
@@ -347,6 +368,9 @@ def render_share_uri(entry: dict[str, Any], *, settings: Settings) -> str | None
             query["obfs-password"] = credentials.hysteria_obfs_password
         return build_uri("hysteria2", credentials.hysteria_password, protocol, query, label)
 
+    if protocol_type == "ikev2":
+        return render_ikev2_sswan(entry, credentials=credentials)
+
     if protocol_type == "tuic":
         security = protocol.get("security", {})
         endpoint = protocol["endpoint"]
@@ -478,6 +502,50 @@ def render_wireguard_conf(entry: dict[str, Any], *, credentials: ClientCredentia
     if hints.get("persistentKeepalive"):
         lines.append(f"PersistentKeepalive = {hints['persistentKeepalive']}")
     return "\n".join(lines)
+
+
+def render_ikev2_sswan(entry: dict[str, Any], *, credentials: ClientCredential) -> str | None:
+    protocol = entry["protocol"]
+    endpoint = protocol.get("endpoint", {})
+    hints = protocol.get("rendererHints", {})
+    ca_cert = hints.get("ikev2CaCert")
+    host = endpoint.get("host")
+    if not host or not ca_cert:
+        return None
+    profile_uuid = str(
+        uuid5(
+            NAMESPACE_URL,
+            f"lumen:ikev2:{entry['manifest']['subscription']['id']}:{protocol.get('id')}",
+        )
+    )
+    payload = {
+        "uuid": profile_uuid,
+        "name": node_label(entry),
+        "type": "ikev2-eap",
+        "remote": {
+            "addr": host,
+            "port": int(endpoint.get("port") or 500),
+            "id": hints.get("ikev2ServerId") or host,
+            "cert": base64.b64encode(str(ca_cert).encode("utf-8")).decode("ascii"),
+        },
+        "local": {
+            "eap_id": protocol_username(entry),
+            "shared_secret": credentials.password,
+        },
+        "split-tunneling": {
+            "block-ipv4": True,
+            "block-ipv6": False,
+        },
+    }
+    if hints.get("mtu") is not None:
+        payload["mtu"] = int(hints["mtu"])
+    if hints.get("dns"):
+        payload["dns-servers"] = [
+            value.strip()
+            for value in str(hints["dns"]).split(",")
+            if value.strip()
+        ]
+    return json.dumps(payload, ensure_ascii=False, indent=2)
 
 
 def build_uri(
@@ -1283,6 +1351,8 @@ def normalize_protocol_type(value: object) -> str:
         return "shadowsocks"
     if raw.startswith("hysteria2"):
         return "hysteria2"
+    if raw.startswith("ikev2") or raw.startswith("ipsec"):
+        return "ikev2"
     if raw.startswith("tuic"):
         return "tuic"
     if raw.startswith("naive"):

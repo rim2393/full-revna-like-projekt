@@ -130,6 +130,33 @@ def test_outbound_apply_accepts_openvpn_shadowsocks_live_payload() -> None:
     )
 
 
+def test_outbound_apply_accepts_ikev2_live_payload() -> None:
+    ensure_supported_node_command(
+        NodeCommandCreateRequest(
+            command_type="outbound.apply",
+            payload_json={
+                "adapter": "ikev2-eap",
+                "ikev2Config": {
+                    "ike_port": 500,
+                    "nat_port": 4500,
+                    "server_id": "vpn.example.test",
+                    "pool": "10.92.0.0/24",
+                    "pki": {
+                        "ca_cert": "-----BEGIN CERTIFICATE-----\nca\n-----END CERTIFICATE-----",
+                        "server_cert": (
+                            "-----BEGIN CERTIFICATE-----\nserver\n-----END CERTIFICATE-----"
+                        ),
+                        "server_key": (
+                            "-----BEGIN PRIVATE KEY-----\nserver\n-----END PRIVATE KEY-----"
+                        ),
+                    },
+                    "users": [{"username": "lumen_sub_live", "password": "pass"}],
+                },
+            },
+        )
+    )
+
+
 def test_outbound_apply_accepts_wireguard_native_live_payload() -> None:
     ensure_supported_node_command(
         NodeCommandCreateRequest(

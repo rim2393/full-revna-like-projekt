@@ -26,6 +26,7 @@ export const SUPPORTED_SUBSCRIPTION_PROTOCOLS = Object.freeze([
   "shadowsocks",
   "wireguard",
   "wireguard-amneziawg",
+  "ikev2",
   "hysteria2",
   "openvpn",
   "openvpn-shadowsocks"
@@ -50,7 +51,8 @@ const PROTOCOL_SECURITY_DEFAULTS = Object.freeze({
   "trojan-grpc-tls": "tls",
   "trojan-httpupgrade-tls": "tls",
   "trojan-xhttp-tls": "tls",
-  "trojan-tcp-reality": "reality"
+  "trojan-tcp-reality": "reality",
+  ikev2: "tls"
 });
 const PROTOCOL_TRANSPORT_DEFAULTS = Object.freeze({
   "vless-reality": "tcp",
@@ -74,7 +76,8 @@ const PROTOCOL_TRANSPORT_DEFAULTS = Object.freeze({
   "trojan-xhttp-tls": "xhttp",
   "trojan-tcp-reality": "tcp",
   "wireguard": "udp",
-  "wireguard-amneziawg": "udp"
+  "wireguard-amneziawg": "udp",
+  ikev2: "udp"
 });
 
 const SUPPORTED_SECURITY_TYPES = new Set(["none", "reality", "tls"]);
@@ -414,6 +417,10 @@ function validateProtocolSecurity(protocol, protocolPath, errors) {
   if (protocol.type === "wireguard" || protocol.type === "wireguard-amneziawg") {
     requireString(security.publicKey, `${protocolPath}.security.publicKey`, errors);
   }
+
+  if (protocol.type === "ikev2") {
+    requireString(security.serverName, `${protocolPath}.security.serverName`, errors);
+  }
 }
 
 function validateProtocolRendererHints(protocol, protocolPath, errors) {
@@ -425,5 +432,8 @@ function validateProtocolRendererHints(protocol, protocolPath, errors) {
   if (protocol.type === "wireguard" || protocol.type === "wireguard-amneziawg") {
     requireString(hints.address, `${protocolPath}.rendererHints.address`, errors);
     requireString(hints.allowedIps, `${protocolPath}.rendererHints.allowedIps`, errors);
+  }
+  if (protocol.type === "ikev2") {
+    requireString(hints.ikev2CaCert, `${protocolPath}.rendererHints.ikev2CaCert`, errors);
   }
 }

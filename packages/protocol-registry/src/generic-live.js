@@ -34,6 +34,12 @@ const PROTOCOL_RUNTIMES = Object.freeze({
     capability: "runtime.openvpn_shadowsocks",
     credentialSlots: Object.freeze(["usernameRef", "passwordRef", "shadowsocksPasswordRef"]),
     transport: "tcp"
+  }),
+  ikev2: Object.freeze({
+    runtime: "strongswan",
+    capability: "runtime.strongswan",
+    credentialSlots: Object.freeze(["usernameRef", "passwordRef", "serverCertificateRef"]),
+    transport: "udp"
   })
 });
 
@@ -210,5 +216,12 @@ export const runtimeProtocolAdapters = Object.freeze([
     capabilities: Object.freeze(["tcp", "openvpn", "shadowsocks"]),
     requiredCredentialRefs: Object.freeze(["usernameRef", "passwordRef", "shadowsocksPasswordRef"]),
     rendererHints: Object.freeze({ rawType: "openvpn", delivery: "ovpn-socks-proxy" })
+  }),
+  runtimeAdapter({
+    protocol: "ikev2",
+    displayName: "IKEv2/IPsec",
+    capabilities: Object.freeze(["udp", "ipsec", "strongswan"]),
+    requiredCredentialRefs: Object.freeze(["usernameRef", "passwordRef", "serverCertificateRef"]),
+    rendererHints: Object.freeze({ rawType: "strongswan-android-sswan" })
   })
 ]);

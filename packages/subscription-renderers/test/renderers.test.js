@@ -227,6 +227,41 @@ test("rejects OpenVPN-over-Shadowsocks from generic sing-box and Mihomo renderer
   );
 });
 
+test("rejects IKEv2 from generic sing-box and Mihomo renderers without fake conversion", () => {
+  const manifest = createSubscriptionManifest({
+    generatedAt: "2026-05-26T00:00:00.000Z",
+    provider: { id: "lumen", name: "Lumen VPN" },
+    subscription: { id: "sub_123", audience: "android" },
+    nodes: [
+      {
+        id: "ams-1",
+        displayName: "Amsterdam 1",
+        region: "nl-ams",
+        protocols: [
+          {
+            type: "ikev2",
+            endpoint: { host: "vpn.example.net", port: 500, transport: "udp" },
+            security: { serverName: "vpn.example.net" },
+            credentialsRef: "vault://subscriptions/sub_123/ikev2",
+            rendererHints: {
+              ikev2CaCert: "-----BEGIN CERTIFICATE-----\\nca\\n-----END CERTIFICATE-----"
+            }
+          }
+        ]
+      }
+    ]
+  });
+
+  assert.throws(
+    () => renderSingBoxConfig(manifest, { credentialSeed: CREDENTIAL_SEED }),
+    /not enabled for client rendering/
+  );
+  assert.throws(
+    () => renderMihomoYaml(manifest, { credentialSeed: CREDENTIAL_SEED }),
+    /not enabled for client rendering/
+  );
+});
+
 test("renders VLESS VMess and Trojan edge transports for sing-box and Mihomo", () => {
   const manifest = createSubscriptionManifest({
     generatedAt: "2026-05-26T00:00:00.000Z",

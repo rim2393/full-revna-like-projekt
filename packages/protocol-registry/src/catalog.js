@@ -37,6 +37,13 @@ export const protocolCatalogEntries = Object.freeze([
     capabilities: Object.freeze(["udp", "quic"]),
     requiredCredentialRefs: Object.freeze(["authRef"]),
     rendererHints: Object.freeze({ singBoxType: "hysteria2", clashMetaType: "hysteria2" })
+  }),
+  Object.freeze({
+    protocol: "ikev2",
+    displayName: "IKEv2/IPsec",
+    capabilities: Object.freeze(["udp", "ipsec", "strongswan"]),
+    requiredCredentialRefs: Object.freeze(["usernameRef", "passwordRef", "serverCertificateRef"]),
+    rendererHints: Object.freeze({ rawType: "strongswan-android-sswan" })
   })
 ]);
 

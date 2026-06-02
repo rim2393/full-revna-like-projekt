@@ -210,6 +210,35 @@ test("validates WireGuard renderability fields early", () => {
   assert.equal(amnezia.nodes[0].protocols[0].type, "wireguard-amneziawg");
 });
 
+test("validates IKEv2 strongSwan Android renderability fields early", () => {
+  const missingFields = validateSubscriptionManifest(createUncheckedManifest({
+    type: "ikev2",
+    endpoint: { host: "vpn.example.net", port: 500, transport: "udp" },
+    security: {}
+  }));
+  assert.equal(missingFields.ok, false);
+  assert.match(missingFields.errors.join("\n"), /security\.serverName/);
+  assert.match(missingFields.errors.join("\n"), /rendererHints\.ikev2CaCert/);
+
+  const wrongTransport = validateSubscriptionManifest(createUncheckedManifest({
+    type: "ikev2",
+    endpoint: { host: "vpn.example.net", port: 500, transport: "tcp" },
+    security: { serverName: "vpn.example.net" },
+    rendererHints: { ikev2CaCert: "-----BEGIN CERTIFICATE-----\\nca\\n-----END CERTIFICATE-----" }
+  }));
+  assert.equal(wrongTransport.ok, false);
+  assert.match(wrongTransport.errors.join("\n"), /endpoint\.transport must be udp/);
+
+  const manifest = createSubscriptionManifest(createUncheckedManifest({
+    type: "ikev2",
+    endpoint: { host: "vpn.example.net", port: 500, transport: "udp" },
+    security: { serverName: "vpn.example.net" },
+    rendererHints: { ikev2CaCert: "-----BEGIN CERTIFICATE-----\\nca\\n-----END CERTIFICATE-----" }
+  }));
+  assert.equal(validateSubscriptionManifest(manifest).ok, true);
+  assert.equal(manifest.nodes[0].protocols[0].type, "ikev2");
+});
+
 function createUncheckedManifest(protocol) {
   return {
     schemaVersion: SUBSCRIPTION_MANIFEST_SCHEMA_VERSION,

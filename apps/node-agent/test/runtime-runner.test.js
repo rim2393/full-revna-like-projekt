@@ -1380,6 +1380,101 @@ for (const scenario of [
   });
 }
 
+test("run once applies ikev2-eap outbound.apply via strongSwan runtime", async () => {
+  const stateDir = mkdtempSync(join(tmpdir(), "lumen-agent-state-"));
+  const swanctlDir = mkdtempSync(join(tmpdir(), "lumen-swanctl-"));
+  const execCalls = [];
+  const calls = [];
+  try {
+    writeFileSync(join(stateDir, "node-token"), "persisted-node-token\n", { mode: 0o600 });
+    writeFileSync(join(stateDir, "heartbeat-path"), "/api/v1/nodes/node-1/heartbeat\n", { mode: 0o600 });
+    const result = await runNodeAgentOnce({
+      env: {
+        LUMEN_CONTROL_PLANE_URL: "https://panel.example",
+        LUMEN_NODE_NAME: "node-1",
+        LUMEN_STATE_DIR: stateDir,
+        LUMEN_DRY_RUN: "false"
+      },
+      execFileImpl: async (command, args) => {
+        execCalls.push([command, args]);
+        return { stdout: "", stderr: "" };
+      },
+      fetchImpl: async (url, options) => {
+        calls.push({ url, options });
+        if (url.endsWith("/heartbeat")) {
+          return jsonResponse({
+            id: "node-1",
+            name: "node-1",
+            status: "active",
+            last_seen_at: "2026-05-27T00:00:00Z",
+            capabilities: {}
+          });
+        }
+        if (url.endsWith("/commands/next")) {
+          return jsonResponse({
+            id: "cmd-ikev2-apply-1",
+            node_id: "node-1",
+            command_type: COMMAND_TYPES.OUTBOUND_APPLY,
+            status: "claimed",
+            payload_json: {
+              profileId: "profile-ikev2",
+              adapter: "ikev2-eap",
+              ikev2ConfigDir: swanctlDir,
+              ikev2Config: {
+                ike_port: 500,
+                nat_port: 4500,
+                server_id: "vpn.example.test",
+                pool: "10.92.0.0/24",
+                pki: {
+                  ca_cert: "-----BEGIN CERTIFICATE-----\nca\n-----END CERTIFICATE-----",
+                  server_cert: "-----BEGIN CERTIFICATE-----\nserver\n-----END CERTIFICATE-----",
+                  server_key: "-----BEGIN PRIVATE KEY-----\nkey\n-----END PRIVATE KEY-----"
+                },
+                users: [{ username: "lumen_sub_live", password: "ikev2-password" }]
+              }
+            },
+            created_at: "2026-05-27T00:01:00.000Z"
+          });
+        }
+        if (url.endsWith("/result")) {
+          return jsonResponse({
+            id: "cmd-ikev2-apply-1",
+            node_id: "node-1",
+            command_type: COMMAND_TYPES.OUTBOUND_APPLY,
+            status: JSON.parse(options.body).status,
+            payload_json: {},
+            result_json: JSON.parse(options.body).result_json
+          });
+        }
+        return jsonResponse({
+          id: "metric-1",
+          node_id: "node-1",
+          metric_kind: "runtime",
+          values_json: JSON.parse(options.body).values_json
+        });
+      }
+    });
+
+    assert.equal(result.command.status, "succeeded");
+    assert.deepEqual(execCalls.map(([command, args]) => [command, args[0]]), [
+      ["sh", "-c"],
+      ["ipsec", "stop"],
+      ["ipsec", "start"],
+      ["swanctl", "--load-all"],
+      ["swanctl", "--list-conns"]
+    ]);
+    const written = readFileSync(join(swanctlDir, "swanctl.conf"), "utf8");
+    assert.match(written, /auth = eap-mschapv2/);
+    assert.match(written, /lumen_sub_live/);
+    const resultBody = JSON.parse(calls[2].options.body);
+    assert.equal(resultBody.result_json.outputs.implementationStatus, "ikev2-applied");
+    assert.equal(resultBody.result_json.outputs.userCount, 1);
+  } finally {
+    rmSync(stateDir, { recursive: true, force: true });
+    rmSync(swanctlDir, { recursive: true, force: true });
+  }
+});
+
 test("run once executes node restart as a deferred container restart", async () => {
   const stateDir = mkdtempSync(join(tmpdir(), "lumen-agent-state-"));
   const scheduled = [];

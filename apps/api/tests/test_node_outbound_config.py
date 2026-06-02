@@ -143,6 +143,43 @@ def test_openvpn_shadowsocks_profile_builds_real_bridge_payload():
     assert "clientsRef" not in config["shadowsocks"]
 
 
+def test_ikev2_profile_builds_real_strongswan_payload_with_users_and_pki():
+    payload = build_node_outbound_payload(
+        _profile("ikev2-eap", {"server_id": "vpn.example.test", "pool": "10.92.0.0/24"}),
+        _inbounds(500, protocol="ikev2", transport="udp"),
+        runtime_clients=[
+            {
+                "public_id": "lumen_sub_live",
+                "password": "ikev2-live-password",
+            }
+        ],
+    )
+
+    assert payload["adapter"] == "ikev2-eap"
+    assert "ikev2Config" in payload
+    config = payload["ikev2Config"]
+    assert config["ike_port"] == 500
+    assert config["nat_port"] == 4500
+    assert config["server_id"] == "vpn.example.test"
+    assert config["pool"] == "10.92.0.0/24"
+    assert config["users"] == [{"username": "lumen_sub_live", "password": "ikev2-live-password"}]
+    assert "clientsRef" not in config
+    assert "BEGIN CERTIFICATE" in config["pki"]["ca_cert"]
+    assert "BEGIN CERTIFICATE" in config["pki"]["server_cert"]
+    assert "BEGIN PRIVATE KEY" in config["pki"]["server_key"]
+
+
+def test_ikev2_apply_payload_requires_real_users_and_pki():
+    with pytest.raises(APIError) as exc_info:
+        build_node_outbound_payload(
+            _profile("ikev2-eap", {"pki": {}, "server_id": "vpn.example.test"}),
+            _inbounds(500, protocol="ikev2", transport="udp"),
+            runtime_clients=[],
+        )
+    assert exc_info.value.code == "ikev2_runtime_config_incomplete"
+    assert "users" in exc_info.value.details
+
+
 def test_wireguard_profile_builds_wireguard_payload():
     payload = build_node_outbound_payload(_profile("wireguard-native"), _inbounds(51820))
     assert "wireguardConfig" in payload

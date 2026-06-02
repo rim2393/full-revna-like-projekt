@@ -17,6 +17,7 @@ PRODUCTION_LIVE_ADAPTERS = frozenset(
         "http-proxy",
         "hysteria2",
         "hysteria2-obfs",
+        "ikev2-eap",
         "naiveproxy",
         "openvpn-shadowsocks",
         "openvpn-udp",
@@ -54,6 +55,7 @@ PRODUCTION_LIVE_ADAPTERS = frozenset(
 
 EXPECTED_RUNTIME_FAMILY = {
     "hysteria2": {"hysteria2", "hysteria2-obfs"},
+    "ikev2": {"ikev2-eap"},
     "naive": {"naiveproxy"},
     "openvpn": {"openvpn-udp"},
     "openvpn-shadowsocks": {"openvpn-shadowsocks"},
@@ -105,6 +107,7 @@ EXPECTED_TRANSPORTS = {
     "udp": {
         "hysteria2",
         "hysteria2-obfs",
+        "ikev2-eap",
         "openvpn-udp",
         "tuic-v5",
         "wireguard-amneziawg",
@@ -138,6 +141,7 @@ EXPECTED_SECURITY = {
     "tls": {
         "hysteria2",
         "hysteria2-obfs",
+        "ikev2-eap",
         "naiveproxy",
         "openvpn-shadowsocks",
         "openvpn-udp",
@@ -209,6 +213,7 @@ def test_production_live_adapters_have_stable_inbound_mappings() -> None:
         assert _inbound_protocol(adapter) in {
             "http",
             "hysteria2",
+            "ikev2",
             "naive",
             "openvpn",
             "shadowsocks",

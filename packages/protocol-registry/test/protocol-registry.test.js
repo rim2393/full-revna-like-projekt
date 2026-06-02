@@ -35,12 +35,14 @@ test("default registry exposes all production-plan adapters while catalog entrie
     "shadowsocks",
     "wireguard",
     "hysteria2",
-    "openvpn-shadowsocks"
+    "openvpn-shadowsocks",
+    "ikev2"
   ]);
-  assert.deepEqual(protocolCatalogEntries.map((adapter) => adapter.protocol), ["vless", "trojan", "shadowsocks", "wireguard", "hysteria2"]);
+  assert.deepEqual(protocolCatalogEntries.map((adapter) => adapter.protocol), ["vless", "trojan", "shadowsocks", "wireguard", "hysteria2", "ikev2"]);
   assert.equal(defaultProtocolRegistry.require("vless-reality").status, "experimental");
   assert.equal(defaultProtocolRegistry.require("vless-tcp-tls").status, "experimental");
   assert.equal(defaultProtocolRegistry.require("hysteria2").status, "experimental");
+  assert.equal(defaultProtocolRegistry.require("ikev2").status, "experimental");
   assert.equal(defaultProtocolRegistry.get("vless"), null);
 });
 
@@ -150,4 +152,16 @@ test("runtime protocol adapters produce non-catalog outbound plans without inlin
     credentialsRef: "vault://nodes/ams-1/trojan",
     password: "must-not-inline"
   }).ok, false);
+
+  const ikev2 = defaultProtocolRegistry.require("ikev2").planOutbound({
+    nodeId: "ams-1",
+    outboundId: "ikev2-1",
+    endpoint: { host: "vpn.example.net", port: 500, transport: "udp" },
+    bind: { address: "0.0.0.0", port: 500, protocol: "udp" },
+    credentialsRef: "vault://nodes/ams-1/ikev2",
+    security: { serverName: "vpn.example.net" }
+  });
+  assert.equal(ikev2.runtime, "strongswan");
+  assert.deepEqual(ikev2.requiredCapabilities, ["runtime.strongswan"]);
+  assert.equal(ikev2.portReservations[0].protocol, "udp");
 });

@@ -46,6 +46,7 @@ import {
   createOpenVpnShadowsocksApplyPlan,
   ensureManagedOpenVpnShadowsocksProcess
 } from "./openvpn-shadowsocks-runtime.js";
+import { applyIkev2Config, createIkev2ApplyPlan } from "./ikev2-runtime.js";
 import { applyTuicConfig, createTuicApplyPlan, ensureManagedTuicProcess } from "./tuic-runtime.js";
 import { applyWireguardConfig, createWireguardApplyPlan } from "./wireguard-runtime.js";
 import { applyNodePolicy, createNodePolicyApplyPlan } from "./policy-runtime.js";
@@ -65,6 +66,7 @@ const APPLY_FAILURE_CODES = Object.freeze({
   "naive.apply": "naive_apply_failed",
   "openvpn.apply": "openvpn_apply_failed",
   "openvpn-shadowsocks.apply": "openvpn_shadowsocks_apply_failed",
+  "ikev2.apply": "ikev2_apply_failed",
   "tuic.apply": "tuic_apply_failed",
   "wireguard.apply": "wireguard_apply_failed",
   "node-policy.apply": "node_policy_apply_failed",
@@ -81,6 +83,7 @@ const APPLY_DRY_RUN_STATUS = Object.freeze({
   "naive.apply": "naive-dry-run",
   "openvpn.apply": "openvpn-dry-run",
   "openvpn-shadowsocks.apply": "openvpn-shadowsocks-dry-run",
+  "ikev2.apply": "ikev2-dry-run",
   "tuic.apply": "tuic-dry-run",
   "wireguard.apply": "wireguard-dry-run",
   "node-policy.apply": "node-policy-dry-run",
@@ -97,6 +100,7 @@ const APPLY_PENDING_STATUS = Object.freeze({
   "naive.apply": "naive-apply-pending",
   "openvpn.apply": "openvpn-apply-pending",
   "openvpn-shadowsocks.apply": "openvpn-shadowsocks-apply-pending",
+  "ikev2.apply": "ikev2-apply-pending",
   "tuic.apply": "tuic-apply-pending",
   "wireguard.apply": "wireguard-apply-pending",
   "node-policy.apply": "node-policy-apply-pending",
@@ -365,6 +369,18 @@ function openVpnShadowsocksApplyPlanFromEnvelope(envelope) {
   });
 }
 
+function ikev2ApplyPlanFromEnvelope(envelope) {
+  if (!envelope.payload.ikev2Config) {
+    return null;
+  }
+  return createIkev2ApplyPlan({
+    id: envelope.payload.profileId ?? envelope.payload.profile_id ?? envelope.payload.outboundId ?? envelope.id,
+    ikev2Config: envelope.payload.ikev2Config,
+    configDir: envelope.payload.ikev2ConfigDir,
+    runtimeDir: envelope.payload.ikev2RuntimeDir
+  });
+}
+
 function tuicApplyPlanFromEnvelope(envelope) {
   if (!envelope.payload.tuicConfig) {
     return null;
@@ -548,6 +564,15 @@ async function applyRuntimeEffects(command, commandResult, input = {}) {
         commandResult,
         policy ? { ...openvpnShadowsocks, nodePolicy: policy } : openvpnShadowsocks
       );
+    }
+    if (commandResult.runtimeAction.type === "ikev2.apply") {
+      const ikev2 = await applyIkev2Config(commandResult.runtimeAction.plan, {
+        dryRun: input.dryRun,
+        env: input.env,
+        execFileImpl: input.execFileImpl
+      });
+      const policy = policyPlan ? await applyNodePolicy(policyPlan, input) : null;
+      return withResultOutputs(commandResult, policy ? { ...ikev2, nodePolicy: policy } : ikev2);
     }
     if (commandResult.runtimeAction.type === "tuic.apply") {
       const tuic = await applyTuicConfig(commandResult.runtimeAction.plan, {
@@ -792,6 +817,15 @@ export function applyNodeCommand(command, currentState, input = {}) {
               runtimeAction = Object.freeze({
                 type: "openvpn.apply",
                 plan: openVpnPlan
+              });
+            }
+          }
+          if (!runtimeAction) {
+            const ikev2Plan = ikev2ApplyPlanFromEnvelope(envelope);
+            if (ikev2Plan) {
+              runtimeAction = Object.freeze({
+                type: "ikev2.apply",
+                plan: ikev2Plan
               });
             }
           }

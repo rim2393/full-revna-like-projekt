@@ -1,5 +1,6 @@
 from copy import deepcopy
 from datetime import UTC, datetime, timedelta
+from ipaddress import ip_address
 from uuid import UUID
 
 from cryptography import x509
@@ -272,6 +273,12 @@ PROTOCOL_ADAPTERS = (
         "OpenVPN over Shadowsocks",
         capabilities=["openvpn", "shadowsocks", "tcp", "tls", "subscription"],
         required_credential_refs=["username", "password", "shadowsocks_password"],
+    ),
+    _adapter(
+        "ikev2-eap",
+        "IKEv2/IPsec EAP",
+        capabilities=["ikev2", "ipsec", "strongswan", "udp", "tls", "subscription"],
+        required_credential_refs=["username", "password", "server_certificate"],
     ),
     _adapter(
         "socks5",
@@ -563,6 +570,7 @@ async def create_profile(
     session.add(profile)
     await session.flush()
     _ensure_openvpn_profile_pki(profile)
+    _ensure_ikev2_profile_pki(profile)
     _mark_profile_runtime_pending(
         profile,
         reason="profile.created",
@@ -633,6 +641,7 @@ async def update_profile(
         setattr(profile, field, value)
     await session.flush()
     _ensure_openvpn_profile_pki(profile)
+    _ensure_ikev2_profile_pki(profile)
     if changed_fields:
         _mark_profile_runtime_pending(
             profile,
@@ -1957,6 +1966,7 @@ def _compact_object(value: dict[str, object]) -> dict[str, object]:
 
 _NODE_CONFIG_KEY_BY_FAMILY = {
     "hysteria2": "hysteria2Config",
+    "ikev2": "ikev2Config",
     "naive": "naiveConfig",
     "openvpn": "openvpnConfig",
     "openvpn-shadowsocks": "openvpnShadowsocksConfig",
@@ -1971,6 +1981,8 @@ _DEFAULT_NODE_TLS_KEY_PATH = "/var/lib/lumen-node/runtime/tls/live.key"
 
 
 def _adapter_family(adapter: str) -> str:
+    if adapter.startswith("ikev2") or adapter.startswith("ipsec"):
+        return "ikev2"
     if adapter == "naiveproxy":
         return "naive"
     if adapter == "openvpn-shadowsocks":
@@ -2118,6 +2130,102 @@ def _generate_openvpn_pki(*, common_name: str) -> dict[str, str]:
     }
 
 
+def _subject_alt_names(names: list[str]) -> x509.SubjectAlternativeName:
+    general_names: list[x509.GeneralName] = []
+    for raw_name in names:
+        name = str(raw_name).strip()
+        if not name:
+            continue
+        try:
+            general_names.append(x509.IPAddress(ip_address(name)))
+        except ValueError:
+            general_names.append(x509.DNSName(name))
+    if not general_names:
+        general_names.append(x509.DNSName("localhost"))
+    return x509.SubjectAlternativeName(general_names)
+
+
+def _generate_ikev2_pki(*, common_name: str, server_names: list[str]) -> dict[str, str]:
+    ca_key = rsa.generate_private_key(public_exponent=65537, key_size=3072)
+    server_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    now = datetime.now(UTC)
+    ca_subject = x509.Name(
+        [
+            x509.NameAttribute(NameOID.ORGANIZATION_NAME, "Lumen"),
+            x509.NameAttribute(NameOID.COMMON_NAME, f"Lumen IKEv2 CA {common_name}"),
+        ]
+    )
+    ca_cert = (
+        x509.CertificateBuilder()
+        .subject_name(ca_subject)
+        .issuer_name(ca_subject)
+        .public_key(ca_key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(now - timedelta(minutes=5))
+        .not_valid_after(now + timedelta(days=3650))
+        .add_extension(x509.BasicConstraints(ca=True, path_length=0), critical=True)
+        .add_extension(
+            x509.KeyUsage(
+                digital_signature=True,
+                key_cert_sign=True,
+                crl_sign=True,
+                key_encipherment=False,
+                content_commitment=False,
+                data_encipherment=False,
+                key_agreement=False,
+                encipher_only=False,
+                decipher_only=False,
+            ),
+            critical=True,
+        )
+        .sign(ca_key, hashes.SHA256())
+    )
+    server_subject = x509.Name(
+        [
+            x509.NameAttribute(NameOID.ORGANIZATION_NAME, "Lumen"),
+            x509.NameAttribute(
+                NameOID.COMMON_NAME,
+                server_names[0] if server_names else common_name,
+            ),
+        ]
+    )
+    server_cert = (
+        x509.CertificateBuilder()
+        .subject_name(server_subject)
+        .issuer_name(ca_cert.subject)
+        .public_key(server_key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(now - timedelta(minutes=5))
+        .not_valid_after(now + timedelta(days=825))
+        .add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=True)
+        .add_extension(
+            x509.KeyUsage(
+                digital_signature=True,
+                key_encipherment=True,
+                key_cert_sign=False,
+                crl_sign=False,
+                content_commitment=False,
+                data_encipherment=False,
+                key_agreement=False,
+                encipher_only=False,
+                decipher_only=False,
+            ),
+            critical=True,
+        )
+        .add_extension(
+            x509.ExtendedKeyUsage([ExtendedKeyUsageOID.SERVER_AUTH]),
+            critical=False,
+        )
+        .add_extension(_subject_alt_names(server_names), critical=False)
+        .sign(ca_key, hashes.SHA256())
+    )
+    return {
+        "ca_cert": _pem_certificate(ca_cert),
+        "server_cert": _pem_certificate(server_cert),
+        "server_key": _pem_private_key(server_key),
+    }
+
+
 def _ensure_openvpn_profile_pki(profile: ProtocolProfile) -> None:
     if not profile.adapter.startswith("openvpn"):
         return
@@ -2129,6 +2237,36 @@ def _ensure_openvpn_profile_pki(profile: ProtocolProfile) -> None:
     ):
         return
     metadata["openvpn_pki"] = _generate_openvpn_pki(common_name=str(profile.id))
+    profile.metadata_json = metadata
+
+
+def _ikev2_server_names(profile: ProtocolProfile) -> list[str]:
+    config = _profile_config_dict(profile)
+    names: list[str] = []
+    for key in ("server_id", "server_name", "hostname"):
+        value = config.get(key)
+        if isinstance(value, str) and value.strip():
+            names.append(value.strip())
+    server_names = config.get("server_names")
+    if isinstance(server_names, list):
+        names.extend(str(value).strip() for value in server_names if str(value).strip())
+    return names or [str(profile.id)]
+
+
+def _ensure_ikev2_profile_pki(profile: ProtocolProfile) -> None:
+    if not profile.adapter.startswith("ikev2") and not profile.adapter.startswith("ipsec"):
+        return
+    metadata = dict(profile.metadata_json or {})
+    pki = metadata.get("ikev2_pki") if isinstance(metadata.get("ikev2_pki"), dict) else {}
+    if all(
+        isinstance(pki.get(key), str) and pki[key]
+        for key in ("ca_cert", "server_cert", "server_key")
+    ):
+        return
+    metadata["ikev2_pki"] = _generate_ikev2_pki(
+        common_name=str(profile.id),
+        server_names=_ikev2_server_names(profile),
+    )
     profile.metadata_json = metadata
 
 
@@ -2276,6 +2414,24 @@ def _profile_openvpn_pki(profile: ProtocolProfile) -> dict[str, str]:
     return _generate_openvpn_pki(common_name=str(profile.id))
 
 
+def _profile_ikev2_pki(profile: ProtocolProfile) -> dict[str, str]:
+    metadata = profile.metadata_json if isinstance(profile.metadata_json, dict) else {}
+    pki = metadata.get("ikev2_pki") if isinstance(metadata.get("ikev2_pki"), dict) else {}
+    if all(
+        isinstance(pki.get(key), str) and pki[key]
+        for key in ("ca_cert", "server_cert", "server_key")
+    ):
+        return {
+            "ca_cert": str(pki["ca_cert"]),
+            "server_cert": str(pki["server_cert"]),
+            "server_key": str(pki["server_key"]),
+        }
+    return _generate_ikev2_pki(
+        common_name=str(profile.id),
+        server_names=_ikev2_server_names(profile),
+    )
+
+
 def _computed_openvpn_config(
     profile: ProtocolProfile,
     port: int | None,
@@ -2341,6 +2497,34 @@ def _computed_openvpn_shadowsocks_config(
         ),
         "shadowsocks": shadowsocks_config,
     }
+
+
+def _computed_ikev2_config(
+    profile: ProtocolProfile,
+    port: int | None,
+    *,
+    runtime_clients: list[dict[str, object]] | None = None,
+) -> dict[str, object]:
+    config = _profile_config_dict(profile)
+    config.setdefault("ike_port", port or 500)
+    config.setdefault("nat_port", int(config.get("nat_port") or 4500))
+    config.setdefault("server_id", config.get("server_name") or _ikev2_server_names(profile)[0])
+    config.setdefault("pool", config.get("pool") or "10.92.0.0/24")
+    config.setdefault("dns", config.get("dns") or ["1.1.1.1", "8.8.8.8"])
+    config["pki"] = _profile_ikev2_pki(profile)
+    clients = runtime_clients or []
+    if clients:
+        config["users"] = [
+            {
+                "username": str(client["public_id"]),
+                "password": str(client["password"]),
+            }
+            for client in clients
+        ]
+        config.pop("clientsRef", None)
+    else:
+        config["clientsRef"] = profile.credentials_ref
+    return config
 
 
 def _computed_sing_box_shadowsocks_config(
@@ -2459,6 +2643,12 @@ def compute_node_outbound_config(
             _first_inbound_port(inbounds),
             runtime_clients=runtime_clients,
         )
+    if family == "ikev2":
+        return _computed_ikev2_config(
+            profile,
+            _first_inbound_port(inbounds),
+            runtime_clients=runtime_clients,
+        )
     if family == "sing-box-shadowsocks":
         return _computed_sing_box_shadowsocks_config(
             profile,
@@ -2492,6 +2682,8 @@ def build_node_outbound_payload(
     family = _adapter_family(profile.adapter)
     config_key = _NODE_CONFIG_KEY_BY_FAMILY[family]
     config = compute_node_outbound_config(profile, inbounds, runtime_clients=runtime_clients)
+    if family == "ikev2" and runtime_clients is not None:
+        _ensure_ikev2_runtime_config_ready(config)
     if family == "wireguard" and runtime_clients is not None:
         _ensure_wireguard_runtime_config_ready(profile, config)
     if family == "xray" and runtime_policy is not None:
@@ -2506,6 +2698,38 @@ def build_node_outbound_payload(
     if runtime_policy is not None:
         payload["nodePolicy"] = runtime_policy
     return payload
+
+
+def _ensure_ikev2_runtime_config_ready(config: dict[str, object]) -> None:
+    pki = config.get("pki") if isinstance(config.get("pki"), dict) else {}
+    users = config.get("users") if isinstance(config.get("users"), list) else []
+    missing: list[str] = []
+    for field in ("ike_port", "nat_port"):
+        if not isinstance(config.get(field), int):
+            missing.append(field)
+    for field in ("server_id", "pool"):
+        if not isinstance(config.get(field), str) or not str(config[field]).strip():
+            missing.append(field)
+    for field in ("ca_cert", "server_cert", "server_key"):
+        if not isinstance(pki.get(field), str) or not str(pki[field]).strip():
+            missing.append(f"pki.{field}")
+    if not users:
+        missing.append("users")
+    for index, user in enumerate(users):
+        if not isinstance(user, dict):
+            missing.append(f"users[{index}]")
+            continue
+        if not isinstance(user.get("username"), str) or not user["username"].strip():
+            missing.append(f"users[{index}].username")
+        if not isinstance(user.get("password"), str) or not user["password"].strip():
+            missing.append(f"users[{index}].password")
+    if missing:
+        raise APIError(
+            code="ikev2_runtime_config_incomplete",
+            message="IKEv2 runtime config is incomplete for real node apply.",
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            details=missing,
+        )
 
 
 def _ensure_wireguard_runtime_config_ready(
@@ -2852,6 +3076,8 @@ def _inbound_tag(*, profile: ProtocolProfile, hosts: list[Host], index: int) -> 
 
 
 def _inbound_protocol(adapter: str) -> str:
+    if adapter.startswith("ikev2") or adapter.startswith("ipsec"):
+        return "ikev2"
     if adapter.startswith("vless"):
         return "vless"
     if adapter.startswith("vmess"):
@@ -2888,6 +3114,7 @@ def _inbound_transport(profile: ProtocolProfile) -> str:
     if "-ws" in profile.adapter or "websocket" in profile.adapter:
         return "ws"
     if profile.adapter in {
+        "ikev2-eap",
         "wireguard-native",
         "wireguard-amneziawg",
         "hysteria2",
@@ -2908,6 +3135,7 @@ def _inbound_security(profile: ProtocolProfile) -> str:
     if "reality" in profile.adapter:
         return "reality"
     if "tls" in profile.adapter or profile.adapter in {
+        "ikev2-eap",
         "hysteria2",
         "hysteria2-obfs",
         "tuic-v5",

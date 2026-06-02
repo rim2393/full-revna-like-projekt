@@ -155,6 +155,14 @@ export {
   createOpenVpnShadowsocksApplyPlan
 } from "./openvpn-shadowsocks-runtime.js";
 export {
+  DEFAULT_IKEV2_CONFIG_DIR,
+  DEFAULT_IKEV2_RUNTIME_DIR,
+  IKEV2_RUNTIME_MODEL_VERSION,
+  applyIkev2Config,
+  createIkev2ApplyPlan,
+  renderSwanctlConfig
+} from "./ikev2-runtime.js";
+export {
   DEFAULT_SHADOWSOCKS_PLUGIN_CONFIG_PATH,
   DEFAULT_SHADOWSOCKS_SERVER_BINARY,
   SHADOWSOCKS_PLUGIN_RUNTIME_MODEL_VERSION,

@@ -25,6 +25,7 @@ def test_protocol_adapter_catalog_contains_full_product_matrix() -> None:
         "tuic-v5",
         "naiveproxy",
         "openvpn-shadowsocks",
+        "ikev2-eap",
     ):
         assert expected_protocol in protocols
 
