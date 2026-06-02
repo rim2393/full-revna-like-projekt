@@ -33,9 +33,9 @@ evidence here is wrong or stale.
 
 | Item | Current Evidence |
 | --- | --- |
-| Latest production release | `v0.1.102` |
-| Product repo head | `2405d63 Add HApp routing crypto builder` |
-| Public installer manifest | `rim2393/lumen_vpn@b466651` |
+| Latest production release | `v0.1.103` |
+| Product repo head | `affcd4e Harden X25519 key utility UI` |
+| Public installer manifest | `rim2393/lumen_vpn@bdd13a4` |
 | Prod health | `GET /api/v1/health/ready -> {"status":"ok","dependencies":{"api":"ok"}}` |
 | Current rule | Continue from this tracker; do not restart already closed host/subscription renderer work. |
 
@@ -126,8 +126,8 @@ evidence here is wrong or stale.
 | T-003 | Fetch user IPs and node user IPs | DONE | Real session/runtime/IP-control views | `ca04d36`, `v0.1.100`, product release run `26796011040`, installer/deploy run `26796063657`, manifest `rim2393/lumen_vpn@809a713`; public subscription requests now record client IP and node id in `subscription.public.rendered` audit events; protected Tools API exposes `/api/v1/tools/user-ips` and `/api/v1/tools/node-user-ips` from real subscription audit and IP-control events; local gates passed: backend `ruff`, focused backend pytest `test_tools_reports_are_real_database_views`, web `npm run build`, focused Vitest `HWID inspector`; prod containers `lumen-api/web/subscription` on `v0.1.100` healthy; live public API smoke created temporary real user/subscription on `node-01`, rendered public manifest through the real prod domain, verified `user-ips` and `node-user-ips` evidence for the created subscription, deleted temp records and cleanup left `0` QA users. |
 | T-004 | Drop connections | DONE | Backend queues/executes real node-agent disconnect operation | `ccee679`, `v0.1.101`, product release run `26796676040` passed after rerun of transient Docker Hub timeout, installer/deploy run `26796770778`, manifest `rim2393/lumen_vpn@1752355`; local gates passed: backend `ruff`, focused backend pytest `test_tools_reports_are_real_database_views`, node-agent `node --test test\runtime-runner.test.js`, web `npm run build`, focused Vitest `HWID inspector`; prod containers `lumen-api/web/subscription` on `v0.1.101` healthy and prod node-agent on `v0.1.101`; live protected API smoke created temporary real user/license/subscription on `node-01`, queued `node.connections.drop` command `11f72276-42c6-4ee4-880e-7af7c1259c6d`, node-agent completed it as `succeeded` with `implementationStatus = connection-drop-attempted`, `dryRun = false`, and real `ss -K dst/src 203.0.113.44` attempts; temporary API key was revoked and QA users/licenses/subscriptions cleanup counts returned `0`. |
 | T-005 | Full HApp routing encryption | DONE | Utility/API/UI produce usable encrypted routing payloads | `2405d63`, `v0.1.102`, product release run `26797458139`, installer/deploy run `26797505374`, manifest `rim2393/lumen_vpn@b466651`; researched current HApp docs and Remnawave SDK behavior, then added protected `/api/v1/tools/happ-routing/build` for `happ://routing/add|onadd|off` Base64 JSON payloads plus RSA `happ://crypt3|crypt4` subscription URL encryption; backend rejects invalid subscription URLs and secret-like routing JSON, audit records only mode/sizes/method and never raw URL or generated links; local gates passed: backend `ruff`, focused backend pytest `test_tools_reports_are_real_database_views`, web `npm run build`, focused Vitest `HWID inspector`; prod containers `lumen-api/web/subscription` on `v0.1.102` healthy; live protected API smoke returned `happ://routing/onadd/`, `happ://crypt4/`, decoded routing profile `Lumen QA Routing`, RSA payload `512` bytes, `audit_has_raw_url=false`, `audit_has_crypto_link=false`, temporary API key revoked. |
-| T-006 | X25519 generation UI/API | NEXT | Generates keys without logging/storing secrets incorrectly | Not started |
-| T-007 | Torrent report management | OPEN | Real reports, truncate, filters and evidence from node events | Partial ingestion exists; UI parity open |
+| T-006 | X25519 generation UI/API | DONE | Generates keys without logging/storing secrets incorrectly | `affcd4e`, `v0.1.103`, product release run `26797674002`, installer/deploy run `26797726762`, manifest `rim2393/lumen_vpn@bdd13a4`; backend keygen already generated raw X25519 private/public values with audit `private_key_stored=false`; UI now exposes one-time security note, copy public/private, download private and clear private actions instead of leaving the private key as an unmanaged value; local gates passed: focused backend pytest `test_tools_reports_are_real_database_views`, web `npm run build`, focused Vitest `key utility`; prod containers `lumen-api/web/subscription` on `v0.1.103` healthy; live protected API smoke verified `encoding=base64url-nopad`, private/public raw bytes `32/32`, derived public matched returned public key, audit contained neither returned private nor public key and temporary API key was revoked. |
+| T-007 | Torrent report management | NEXT | Real reports, truncate, filters and evidence from node events | Partial ingestion exists; UI parity open |
 
 ## P2: OpenAPI
 
@@ -166,15 +166,15 @@ evidence here is wrong or stale.
 
 ## Next Slice
 
-`T-006`: X25519 generation UI/API.
+`T-007`: Torrent report management.
 
 Proposed implementation:
 
-1. Audit current X25519 generation endpoint/UI and all places Reality/Mihomo keys are used.
-2. Upgrade the UI from a one-button utility to a production control with copy/download, explicit private-key handling, and validation guidance.
-3. Ensure backend audit never stores private key material and expose response metadata needed by the UI.
-4. Add focused backend/frontend tests for generation, no secret audit storage, and UI actions.
-5. Release through signed manifest and verify on production that generated keys are valid and not persisted in audit.
+1. Audit existing torrent policy event ingestion and Tools report UI/API.
+2. Add real filters/search/pagination and report detail payloads from audit/node events, not synthetic rows.
+3. Keep truncate as a real maintenance action with audit evidence and add safer confirmation/empty-state UX.
+4. Add backend/frontend tests for filters, truncate and report-detail rendering.
+5. Release through signed manifest and verify production reports/truncate behavior without creating fake torrent events.
 
 ## Checkpoint Notes
 
