@@ -256,7 +256,7 @@ PY
 
 PUBLIC_ID="$("$HOST_PYTHON" -c "import json,sys; print(json.load(open(sys.argv[1]))['public_id'])" "$STATE_FILE")"
 curl -fsS --retry 2 --max-time 30 \
-  "$PANEL_PUBLIC_URL/api/v1/subscriptions/public/$PUBLIC_ID/render?target=raw-uri" \
+  "$PANEL_PUBLIC_URL/api/v1/subscriptions/public/$PUBLIC_ID/render?target=raw-uri&device_id=qa-pr004-ikev2-client" \
   -o "$SSWAN_FILE"
 
 "$HOST_PYTHON" - "$SSWAN_FILE" "$CLIENT_DIR" <<'PY'
