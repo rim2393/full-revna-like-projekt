@@ -116,7 +116,9 @@ test("proxies public rendered subscription with target negotiation", async () =>
         headers: {
           "content-type": "text/plain; charset=utf-8",
           "profile-title": "base64:THVtZW4=",
+          "set-cookie": "session=bad",
           "subscription-userinfo": "upload=0; download=0; total=0; expire=0",
+          "x-lumen-custom": "typed",
           "x-lumen-render-target": "hiddify"
         }
       });
@@ -132,6 +134,8 @@ test("proxies public rendered subscription with target negotiation", async () =>
 
     assert.equal(response.status, 200);
     assert.equal(body, "vless://example\n");
+    assert.equal(response.headers.get("set-cookie"), null);
+    assert.equal(response.headers.get("x-lumen-custom"), "typed");
     assert.equal(response.headers.get("x-lumen-render-target"), "hiddify");
     assert.equal(upstreamCalls[0].url, "http://api.internal:8000/api/v1/subscriptions/public/lumen_sub_abc1234567890xyz/render?device_id=device-1&hwid=HWID-1&target=hiddify");
     assert.equal(upstreamCalls[0].options.headers.authorization, undefined);

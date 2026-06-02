@@ -124,21 +124,42 @@ async function proxySubscriptionRender(request, response, input) {
     "content-type": upstream.headers.get("content-type") ?? "text/plain; charset=utf-8",
     "cache-control": "no-store"
   };
-  for (const name of [
-    "content-disposition",
-    "profile-title",
-    "profile-update-interval",
-    "subscription-userinfo",
-    "x-lumen-render-target"
-  ]) {
-    const value = upstream.headers.get(name);
-    if (value) {
-      headers[name] = value;
-    }
-  }
+  copySafeUpstreamHeaders(upstream.headers, headers);
   response.writeHead(upstream.status, headers);
   response.end(body);
   return true;
+}
+
+function copySafeUpstreamHeaders(source, target) {
+  const blocked = new Set([
+    "cache-control",
+    "connection",
+    "content-length",
+    "content-type",
+    "date",
+    "keep-alive",
+    "proxy-authenticate",
+    "proxy-authorization",
+    "set-cookie",
+    "te",
+    "trailer",
+    "transfer-encoding",
+    "upgrade"
+  ]);
+  for (const [name, value] of source.entries()) {
+    const normalizedName = String(name).trim().toLowerCase();
+    const normalizedValue = String(value ?? "").trim();
+    if (!normalizedName || blocked.has(normalizedName) || !normalizedValue) {
+      continue;
+    }
+    if (normalizedName.includes("\r") || normalizedName.includes("\n")) {
+      continue;
+    }
+    if (normalizedValue.includes("\r") || normalizedValue.includes("\n")) {
+      continue;
+    }
+    target[normalizedName] = normalizedValue;
+  }
 }
 
 function buildUpstreamQuery(searchParams) {
