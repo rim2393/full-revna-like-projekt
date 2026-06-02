@@ -39,7 +39,7 @@ import {
   createShadowsocksPluginApplyPlan,
   ensureManagedShadowsocksPluginProcess
 } from "./shadowsocks-plugin-runtime.js";
-import { applyNaiveConfig, createNaiveApplyPlan, ensureManagedNaiveProcess } from "./naive-runtime.js";
+import { applyNaiveConfig, createNaiveApplyPlan, ensureManagedNaiveProcess, stopNaiveRuntime } from "./naive-runtime.js";
 import { applyOpenVpnConfig, createOpenVpnApplyPlan, ensureManagedOpenVpnProcess } from "./openvpn-runtime.js";
 import {
   applyOpenVpnShadowsocksConfig,
@@ -73,7 +73,8 @@ const APPLY_FAILURE_CODES = Object.freeze({
   "node-agent.restart": "node_restart_failed",
   "node-connections.drop": "connection_drop_failed",
   "node-traffic.reset": "node_traffic_reset_failed",
-  "ikev2.stop": "ikev2_stop_failed"
+  "ikev2.stop": "ikev2_stop_failed",
+  "naive.stop": "naive_stop_failed"
 });
 
 const APPLY_DRY_RUN_STATUS = Object.freeze({
@@ -91,7 +92,8 @@ const APPLY_DRY_RUN_STATUS = Object.freeze({
   "node-agent.restart": "node-restart-dry-run",
   "node-connections.drop": "connection-drop-dry-run",
   "node-traffic.reset": "node-traffic-reset-dry-run",
-  "ikev2.stop": "ikev2-stop-dry-run"
+  "ikev2.stop": "ikev2-stop-dry-run",
+  "naive.stop": "naive-stop-dry-run"
 });
 
 const APPLY_PENDING_STATUS = Object.freeze({
@@ -109,7 +111,8 @@ const APPLY_PENDING_STATUS = Object.freeze({
   "node-agent.restart": "node-restart-pending",
   "node-connections.drop": "connection-drop-pending",
   "node-traffic.reset": "node-traffic-reset-pending",
-  "ikev2.stop": "ikev2-stop-pending"
+  "ikev2.stop": "ikev2-stop-pending",
+  "naive.stop": "naive-stop-pending"
 });
 
 function readOptionalTrimmed(path) {
@@ -496,6 +499,10 @@ async function applyRuntimeEffects(command, commandResult, input = {}) {
         runtimeDir: commandResult.runtimeAction.runtimeDir
       });
       return withResultOutputs(commandResult, ikev2);
+    }
+    if (commandResult.runtimeAction.type === "naive.stop") {
+      const naive = await stopNaiveRuntime({ env: input.env });
+      return withResultOutputs(commandResult, naive);
     }
     if (commandResult.runtimeAction.type === "xray.apply") {
       const xray = await applyXrayConfig(commandResult.runtimeAction.plan, {
@@ -893,6 +900,10 @@ export function applyNodeCommand(command, currentState, input = {}) {
             type: "ikev2.stop",
             configDir: envelope.payload.ikev2ConfigDir,
             runtimeDir: envelope.payload.ikev2RuntimeDir
+          });
+        } else if (envelope.payload.adapter === "naiveproxy") {
+          runtimeAction = Object.freeze({
+            type: "naive.stop"
           });
         } else {
           runtimeAction = Object.freeze({

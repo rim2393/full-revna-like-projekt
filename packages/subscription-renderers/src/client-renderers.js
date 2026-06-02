@@ -32,7 +32,10 @@ const LIVE_CLIENT_PROTOCOLS = new Set([
   "trojan",
   "shadowsocks",
   "wireguard",
-  "hysteria2"
+  "hysteria2",
+  "naive",
+  "socks",
+  "http"
 ]);
 
 function flattenProtocolEntries(manifest) {
@@ -64,6 +67,15 @@ function mapClientType(type) {
   }
   if (type === "shadowsocks") {
     return "ss";
+  }
+  if (type === "socks") {
+    return "socks";
+  }
+  if (type === "http") {
+    return "http";
+  }
+  if (type === "naive") {
+    return "naive";
   }
   return type;
 }
@@ -139,6 +151,10 @@ function credentialsFor(entry, options = {}) {
 
 function nodeLabel(entry) {
   return String(entry.protocol.rendererHints?.name ?? entry.node.displayName ?? entry.node.id);
+}
+
+function protocolUsername(entry) {
+  return String(entry.protocol.rendererHints?.username ?? entry.manifest.subscription.id);
 }
 
 function networkType(protocol) {
@@ -245,6 +261,29 @@ function renderSingBoxOutbound(entry, options) {
   }
   if (type === "hysteria2") {
     return compactObject({ ...base, password: credentials.hysteriaPassword, tls: renderSingBoxTls(protocol) });
+  }
+  if (type === "naive") {
+    return compactObject({
+      ...base,
+      username: protocolUsername(entry),
+      password: credentials.password,
+      tls: renderSingBoxTls({ ...protocol, security: { type: "tls", ...(protocol.security ?? {}) } })
+    });
+  }
+  if (type === "socks") {
+    return compactObject({
+      ...base,
+      version: "5",
+      username: protocolUsername(entry),
+      password: credentials.password
+    });
+  }
+  if (type === "http") {
+    return compactObject({
+      ...base,
+      username: protocolUsername(entry),
+      password: credentials.password
+    });
   }
   if (type === "wireguard") {
     return compactObject({
@@ -402,6 +441,32 @@ function renderMihomoProxy(entry, options) {
       proxy.sni = protocol.security.serverName;
     }
     return compactObject(proxy);
+  }
+  if (type === "naive") {
+    const proxy = {
+      ...base,
+      username: protocolUsername(entry),
+      password: credentials.password,
+      tls: true
+    };
+    addMihomoSecurity(proxy, { ...protocol, security: { type: "tls", ...(protocol.security ?? {}) } });
+    return compactObject(proxy);
+  }
+  if (type === "socks") {
+    return compactObject({
+      ...base,
+      type: "socks5",
+      username: protocolUsername(entry),
+      password: credentials.password,
+      udp: true
+    });
+  }
+  if (type === "http") {
+    return compactObject({
+      ...base,
+      username: protocolUsername(entry),
+      password: credentials.password
+    });
   }
   if (type === "wireguard") {
     const address = String(protocol.rendererHints?.address ?? "")

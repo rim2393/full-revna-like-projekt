@@ -1,4 +1,4 @@
-import { closeSync, existsSync, mkdirSync, openSync, readFileSync, writeFileSync } from "node:fs";
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { promisify } from "node:util";
 import { execFile as nodeExecFile, spawn } from "node:child_process";
@@ -294,5 +294,23 @@ export async function applyNaiveConfig(plan, input = {}) {
     implementationStatus: "naive-applied",
     configPath,
     reloadCommand: summarizeArgv(reloadArgv)
+  });
+}
+
+export async function stopNaiveRuntime(input = {}) {
+  const env = input.env ?? {};
+  const configPath = env.LUMEN_NAIVE_CONFIG_FILE ?? DEFAULT_NAIVE_CONFIG_PATH;
+  const logPath = env.LUMEN_NAIVE_LOG_FILE ?? DEFAULT_NAIVE_LOG_FILE;
+  const pidFile = env.LUMEN_NAIVE_PID_FILE ?? DEFAULT_NAIVE_PID_FILE;
+  const stopped = stopPid(pidFile);
+  for (const path of [configPath, logPath, pidFile]) {
+    rmSync(path, { force: true });
+  }
+  return Object.freeze({
+    implementationStatus: "naive-stopped",
+    configPath,
+    logPath,
+    pidFile,
+    stopped
   });
 }

@@ -153,6 +153,56 @@ test("renders Hysteria2, Trojan and Shadowsocks with real derived credentials", 
   assert.doesNotMatch(mihomo, /skeleton|placeholder|credentialsRef|privateKey|accessToken/i);
 });
 
+test("renders NaiveProxy, SOCKS and HTTP proxy for sing-box and Mihomo", () => {
+  const manifest = createSubscriptionManifest({
+    generatedAt: "2026-05-26T00:00:00.000Z",
+    provider: { id: "lumen", name: "Lumen VPN" },
+    subscription: { id: "sub_123", audience: "android" },
+    nodes: [
+      {
+        id: "ams-1",
+        displayName: "Amsterdam 1",
+        region: "nl-ams",
+        protocols: [
+          {
+            type: "naive",
+            endpoint: { host: "naive.example.net", port: 443 },
+            security: { type: "tls", serverName: "naive.example.net" },
+            credentialsRef: "vault://subscriptions/sub_123/naive"
+          },
+          {
+            type: "socks",
+            endpoint: { host: "socks.example.net", port: 1080 },
+            credentialsRef: "vault://subscriptions/sub_123/socks"
+          },
+          {
+            type: "http",
+            endpoint: { host: "http.example.net", port: 8080 },
+            credentialsRef: "vault://subscriptions/sub_123/http"
+          }
+        ]
+      }
+    ]
+  });
+
+  const singBox = renderSingBoxConfig(manifest, { credentialSeed: CREDENTIAL_SEED });
+  assert.equal(singBox.outbounds[0].type, "naive");
+  assert.equal(singBox.outbounds[0].username, "sub_123");
+  assert.equal(singBox.outbounds[0].tls.server_name, "naive.example.net");
+  assert.equal(singBox.outbounds[1].type, "socks");
+  assert.equal(singBox.outbounds[1].version, "5");
+  assert.equal(singBox.outbounds[2].type, "http");
+  assert.equal(singBox.outbounds[2].username, "sub_123");
+
+  const mihomo = renderMihomoYaml(manifest, { credentialSeed: CREDENTIAL_SEED });
+  assert.match(mihomo, /type: "naive"/);
+  assert.match(mihomo, /type: "socks5"/);
+  assert.match(mihomo, /type: "http"/);
+  assert.match(mihomo, /username: "sub_123"/);
+  assert.doesNotMatch(JSON.stringify(singBox), /skeleton|placeholder|credentialsRef|privateKey|accessToken/i);
+  assert.doesNotMatch(mihomo, /skeleton|placeholder|credentialsRef|privateKey|accessToken/i);
+});
+
 test("renders WireGuard for sing-box and Mihomo with derived client keys", () => {
   const manifest = createSubscriptionManifest({
     generatedAt: "2026-05-26T00:00:00.000Z",

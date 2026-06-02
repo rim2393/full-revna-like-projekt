@@ -126,6 +126,44 @@ test("creates a valid OpenVPN-over-Shadowsocks manifest entry", () => {
   assert.equal(manifest.nodes[0].protocols[0].adapter, "openvpn-shadowsocks");
 });
 
+test("creates valid NaiveProxy, SOCKS and HTTP proxy manifest entries", () => {
+  const manifest = createSubscriptionManifest({
+    generatedAt: "2026-05-26T00:00:00.000Z",
+    provider: { id: "lumen", name: "Lumen VPN" },
+    subscription: { id: "sub_123", audience: "android" },
+    nodes: [
+      {
+        id: "ams-1",
+        displayName: "Amsterdam 1",
+        region: "nl-ams",
+        protocols: [
+          {
+            type: "naive",
+            endpoint: { host: "naive.example.net", port: 443 },
+            security: { type: "tls", serverName: "naive.example.net" },
+            credentialsRef: "vault://subscriptions/sub_123/naive"
+          },
+          {
+            type: "socks",
+            endpoint: { host: "socks.example.net", port: 1080 },
+            credentialsRef: "vault://subscriptions/sub_123/socks"
+          },
+          {
+            type: "http",
+            endpoint: { host: "http.example.net", port: 8080 },
+            credentialsRef: "vault://subscriptions/sub_123/http"
+          }
+        ]
+      }
+    ]
+  });
+
+  assert.equal(validateSubscriptionManifest(manifest).ok, true);
+  assert.equal(manifest.nodes[0].protocols[0].type, "naive");
+  assert.equal(manifest.nodes[0].protocols[1].type, "socks");
+  assert.equal(manifest.nodes[0].protocols[2].type, "http");
+});
+
 test("rejects incomplete VLESS Reality and unsafe VLESS TLS manifest entries", () => {
   const missingRealityFields = validateSubscriptionManifest(createUncheckedManifest({
     type: "vless-reality",

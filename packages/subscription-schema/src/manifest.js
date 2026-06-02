@@ -27,6 +27,9 @@ export const SUPPORTED_SUBSCRIPTION_PROTOCOLS = Object.freeze([
   "wireguard",
   "wireguard-amneziawg",
   "ikev2",
+  "naive",
+  "socks",
+  "http",
   "hysteria2",
   "openvpn",
   "openvpn-shadowsocks"

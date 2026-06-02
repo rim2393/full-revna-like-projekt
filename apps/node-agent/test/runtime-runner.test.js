@@ -1569,6 +1569,82 @@ test("run once removes ikev2-eap outbound runtime via strongSwan stop", async ()
   }
 });
 
+test("run once removes naiveproxy outbound runtime through managed sing-box cleanup", async () => {
+  const stateDir = mkdtempSync(join(tmpdir(), "lumen-agent-state-"));
+  const runtimeDir = mkdtempSync(join(tmpdir(), "lumen-naive-remove-"));
+  const configPath = join(runtimeDir, "config.json");
+  const logPath = join(runtimeDir, "sing-box.log");
+  const pidFile = join(runtimeDir, "sing-box.pid");
+  const calls = [];
+  try {
+    writeFileSync(join(stateDir, "node-token"), "persisted-node-token\n", { mode: 0o600 });
+    writeFileSync(join(stateDir, "heartbeat-path"), "/api/v1/nodes/node-1/heartbeat\n", { mode: 0o600 });
+    writeFileSync(configPath, "{}\n");
+    writeFileSync(logPath, "runtime log\n");
+    writeFileSync(pidFile, "999999\n");
+
+    const result = await runNodeAgentOnce({
+      env: {
+        LUMEN_CONTROL_PLANE_URL: "https://panel.example",
+        LUMEN_NODE_NAME: "node-1",
+        LUMEN_STATE_DIR: stateDir,
+        LUMEN_DRY_RUN: "false",
+        LUMEN_NAIVE_CONFIG_FILE: configPath,
+        LUMEN_NAIVE_LOG_FILE: logPath,
+        LUMEN_NAIVE_PID_FILE: pidFile
+      },
+      fetchImpl: async (url, options) => {
+        calls.push({ url, options });
+        if (url.endsWith("/heartbeat")) {
+          return jsonResponse({
+            id: "node-1",
+            name: "node-1",
+            status: "active",
+            last_seen_at: "2026-05-27T00:00:00Z",
+            capabilities: {}
+          });
+        }
+        if (url.endsWith("/commands/next")) {
+          return jsonResponse({
+            id: "cmd-naive-remove-1",
+            node_id: "node-1",
+            command_type: COMMAND_TYPES.OUTBOUND_REMOVE,
+            status: "claimed",
+            payload_json: { adapter: "naiveproxy" },
+            created_at: "2026-05-27T00:01:00.000Z"
+          });
+        }
+        if (url.endsWith("/result")) {
+          return jsonResponse({
+            id: "cmd-naive-remove-1",
+            node_id: "node-1",
+            command_type: COMMAND_TYPES.OUTBOUND_REMOVE,
+            status: JSON.parse(options.body).status,
+            payload_json: {},
+            result_json: JSON.parse(options.body).result_json
+          });
+        }
+        return jsonResponse({
+          id: "metric-1",
+          node_id: "node-1",
+          metric_kind: "runtime",
+          values_json: JSON.parse(options.body).values_json
+        });
+      }
+    });
+
+    assert.equal(result.command.status, "succeeded");
+    const resultBody = JSON.parse(calls[2].options.body);
+    assert.equal(resultBody.result_json.outputs.implementationStatus, "naive-stopped");
+    assert.equal(existsSync(configPath), false);
+    assert.equal(existsSync(logPath), false);
+    assert.equal(existsSync(pidFile), false);
+  } finally {
+    rmSync(stateDir, { recursive: true, force: true });
+    rmSync(runtimeDir, { recursive: true, force: true });
+  }
+});
+
 test("run once executes node restart as a deferred container restart", async () => {
   const stateDir = mkdtempSync(join(tmpdir(), "lumen-agent-state-"));
   const scheduled = [];

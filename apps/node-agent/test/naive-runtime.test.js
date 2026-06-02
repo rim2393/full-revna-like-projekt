@@ -1,13 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   DEFAULT_NAIVE_RELOAD_ARGV,
   applyNaiveConfig,
   createNaiveApplyPlan,
-  renderNaiveSingBoxConfig
+  renderNaiveSingBoxConfig,
+  stopNaiveRuntime
 } from "../src/naive-runtime.js";
 
 function validConfig() {
@@ -94,6 +95,34 @@ test("applyNaiveConfig process mode validates and starts managed sing-box", asyn
     const written = JSON.parse(readFileSync(configPath, "utf-8"));
     assert.equal(written.inbounds[0].type, "naive");
     assert.equal(readFileSync(pidFile, "utf-8").trim(), "12347");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("stopNaiveRuntime removes managed process files", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "lumen-naive-stop-"));
+  const configPath = join(dir, "config.json");
+  const logPath = join(dir, "sing-box.log");
+  const pidFile = join(dir, "sing-box.pid");
+  try {
+    writeFileSync(configPath, "{}\n");
+    writeFileSync(logPath, "runtime log\n");
+    writeFileSync(pidFile, "999999\n");
+
+    const result = await stopNaiveRuntime({
+      env: {
+        LUMEN_NAIVE_CONFIG_FILE: configPath,
+        LUMEN_NAIVE_LOG_FILE: logPath,
+        LUMEN_NAIVE_PID_FILE: pidFile
+      }
+    });
+
+    assert.equal(result.implementationStatus, "naive-stopped");
+    assert.equal(result.stopped, false);
+    assert.equal(existsSync(configPath), false);
+    assert.equal(existsSync(logPath), false);
+    assert.equal(existsSync(pidFile), false);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
