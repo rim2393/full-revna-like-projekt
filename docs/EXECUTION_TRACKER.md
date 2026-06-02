@@ -34,7 +34,7 @@ evidence here is wrong or stale.
 | Item | Current Evidence |
 | --- | --- |
 | Latest production release | `v0.1.115` |
-| Product repo head | `d38de1b docs: record android wireguard live connect` |
+| Product repo head | latest pushed `main` includes the `v0.1.115` WireGuard renderer fix and Android live-connect evidence |
 | Public installer manifest | `rim2393/lumen_vpn@300db78` |
 | Prod health | `https://panel.lumentech.tel/guard/login -> 200`; `https://panel.lumentech.tel/api/v1/health/ready -> 200`; `https://sub.lumentech.tel/ -> 200`; Cloudflare DNS-only `panel/sub/panel.test/sub.test.lumentech.tel -> 89.185.85.184`; Let's Encrypt certs issued for `panel.lumentech.tel` and `sub.lumentech.tel`; prod containers `lumen-api/web/subscription` on digest-pinned `v0.1.115`; prod `lumen-node-agent` on digest-pinned `v0.1.115`; prod node has real `LUMEN_NODE_NAME=node-01` and control-plane URL `https://panel.lumentech.tel` |
 | Current rule | Continue from this tracker; do not restart already closed host/subscription renderer work. |
