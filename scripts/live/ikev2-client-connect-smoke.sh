@@ -326,8 +326,8 @@ docker run --rm --name lumen-ikev2-client-smoke \
   "$CLIENT_IMAGE" bash -lc '
     set -euo pipefail
     export DEBIAN_FRONTEND=noninteractive
-    apt-get update >/dev/null
-    apt-get install -y --no-install-recommends strongswan-swanctl strongswan-charon iproute2 ca-certificates >/dev/null
+    apt-get -o Dpkg::Use-Pty=0 update
+    apt-get -o Dpkg::Use-Pty=0 install -y --no-install-recommends strongswan-swanctl strongswan-charon iproute2 ca-certificates
     ipsec start >/dev/null
     timeout 15 bash -lc "until [ -S /var/run/charon.vici ]; do sleep 0.2; done"
     swanctl --load-all >/tmp/lumen-load.log
