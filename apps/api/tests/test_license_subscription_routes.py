@@ -560,6 +560,75 @@ async def test_subscription_manifest_route_renders_vless_profile_protocol(
         assert event.metadata_json["target"] == "manifest"
 
 
+async def test_public_wireguard_subscription_uses_linked_profile_and_host_runtime_fields(
+    route_app: RouteTestApp,
+) -> None:
+    user, license_record, node = await seed_subscription_dependencies(route_app)
+    async with route_app.sessionmaker() as session:
+        profile = ProtocolProfile(
+            name="wireguard-profile",
+            node_id=node.id,
+            adapter="wireguard-native",
+            status="active",
+            config_json={
+                "interface": {
+                    "address": "10.66.0.1/24",
+                    "public_key": "aGVsbG93b3JsZGhlbGxvd29ybGRoZWxsb3dvcmxkMDA=",
+                    "mtu": 1420,
+                    "persistent_keepalive": 25,
+                }
+            },
+            port_reservations=[
+                {"address": "0.0.0.0", "port": 51820, "protocol": "udp"},  # noqa: S104
+            ],
+            credentials_ref="vault://subscriptions/wireguard-profile/client",
+        )
+        session.add(profile)
+        await session.flush()
+        host = Host(
+            name="wireguard-host",
+            hostname="85.192.60.8",
+            node_id=node.id,
+            protocol_profile_id=profile.id,
+            port=51820,
+            status="active",
+            tags=["wireguard"],
+        )
+        session.add(host)
+        await session.commit()
+
+    create_response = await route_app.client.post(
+        "/api/v1/subscriptions",
+        json={
+            "user_id": str(user.id),
+            "license_id": str(license_record.id),
+            "node_id": str(node.id),
+            "delivery_profile": {
+                "protocol": "wireguard-native",
+                "adapter": "wireguard-native",
+                "profile_id": str(profile.id),
+                "host_id": str(host.id),
+                "profile_title": "Linked WG",
+            },
+            "config_hash": "sha256:wireguard-linked-profile",
+        },
+    )
+    assert create_response.status_code == 201
+
+    raw_response = await route_app.client.get(
+        f"/api/v1/subscriptions/public/{create_response.json()['public_id']}/render"
+        "?target=raw-uri",
+    )
+
+    assert raw_response.status_code == 200
+    assert "[Interface]" in raw_response.text
+    assert "Address = 10.66.0.2/32" in raw_response.text
+    assert "MTU = 1420" in raw_response.text
+    assert "PublicKey = aGVsbG93b3JsZGhlbGxvd29ybGRoZWxsb3dvcmxkMDA=" in raw_response.text
+    assert "Endpoint = 85.192.60.8:51820" in raw_response.text
+    assert "PersistentKeepalive = 25" in raw_response.text
+
+
 async def test_subscription_manifest_applies_host_visibility_and_client_hints(
     route_app: RouteTestApp,
 ) -> None:

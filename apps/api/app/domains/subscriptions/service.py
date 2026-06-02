@@ -1,5 +1,6 @@
 import hashlib
 from datetime import UTC, datetime
+from ipaddress import ip_network
 from uuid import UUID
 
 from fastapi import status
@@ -1286,6 +1287,7 @@ def _manifest_security(
 ) -> dict[str, object]:
     config = profile.config_json if profile is not None else {}
     security = config.get("security") if isinstance(config.get("security"), dict) else {}
+    interface = config.get("interface") if isinstance(config.get("interface"), dict) else {}
     security_type = str(
         _host_string(host, "security")
         or security.get("type")
@@ -1297,7 +1299,12 @@ def _manifest_security(
         "serverName": _host_string(host, "sni")
         or security.get("serverName")
         or delivery.get("server_name"),
-        "publicKey": security.get("publicKey") or delivery.get("public_key"),
+        "publicKey": security.get("publicKey")
+        or delivery.get("public_key")
+        or interface.get("public_key")
+        or interface.get("peer_public_key")
+        or config.get("public_key")
+        or config.get("peer_public_key"),
         "shortId": security.get("shortId") or delivery.get("short_id"),
         "fingerprint": security.get("fingerprint") or delivery.get("fingerprint"),
         "spiderX": security.get("spiderX") or delivery.get("spider_x"),
@@ -1365,6 +1372,10 @@ def _manifest_renderer_hints(
     profile: ProtocolProfile | None,
     profile_title: str,
 ) -> dict[str, object]:
+    profile_config = profile.config_json if profile is not None else {}
+    interface_config = (
+        profile_config.get("interface") if isinstance(profile_config.get("interface"), dict) else {}
+    )
     hints: dict[str, object] = {
         "liveDiagnostic": False,
         "name": profile_title,
@@ -1372,15 +1383,21 @@ def _manifest_renderer_hints(
         "plugin": delivery.get("plugin"),
         "pluginOpts": delivery.get("plugin_opts") or delivery.get("pluginOpts"),
         "obfs": delivery.get("obfs"),
-        "address": delivery.get("address"),
-        "allowedIps": delivery.get("allowed_ips"),
-        "mtu": delivery.get("mtu"),
-        "persistentKeepalive": delivery.get("persistent_keepalive"),
+        "address": delivery.get("address")
+        or interface_config.get("client_address")
+        or profile_config.get("client_address")
+        or _wireguard_client_address_from_interface(interface_config),
+        "allowedIps": delivery.get("allowed_ips")
+        or interface_config.get("allowed_ips")
+        or profile_config.get("allowed_ips"),
+        "mtu": delivery.get("mtu") or interface_config.get("mtu") or profile_config.get("mtu"),
+        "persistentKeepalive": delivery.get("persistent_keepalive")
+        or interface_config.get("persistent_keepalive")
+        or profile_config.get("persistent_keepalive"),
         "finalMask": _host_string(host, "final_mask"),
         "mihomoX25519PublicKey": _host_string(host, "mihomo_x25519_public_key"),
         "shuffleHost": host.shuffle_host if host is not None else None,
     }
-    profile_config = profile.config_json if profile is not None else {}
     profile_metadata = (
         profile.metadata_json
         if profile is not None and isinstance(profile.metadata_json, dict)
@@ -1430,15 +1447,25 @@ def _manifest_renderer_hints(
         hints["plugin"] = profile_config["plugin"]
     if hints.get("pluginOpts") is None and profile_config.get("plugin_opts") is not None:
         hints["pluginOpts"] = profile_config["plugin_opts"]
-    interface_config = (
-        profile_config.get("interface") if isinstance(profile_config.get("interface"), dict) else {}
-    )
     for key in AMNEZIA_WG_HINT_KEYS:
         if key in delivery and delivery[key] is not None:
             hints[key] = delivery[key]
         elif key in interface_config and interface_config[key] is not None:
             hints[key] = interface_config[key]
     return hints
+
+
+def _wireguard_client_address_from_interface(interface_config: dict[str, object]) -> str | None:
+    raw_address = interface_config.get("address")
+    if raw_address is None:
+        return None
+    try:
+        network = ip_network(str(raw_address).split(",", 1)[0].strip(), strict=False)
+    except ValueError:
+        return None
+    if network.version != 4 or network.num_addresses < 3:
+        return None
+    return f"{network.network_address + 2}/32"
 
 
 def _manifest_credentials(credentials, *, username: str, method: str) -> dict[str, str]:
