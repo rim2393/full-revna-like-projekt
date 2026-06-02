@@ -33,9 +33,9 @@ evidence here is wrong or stale.
 
 | Item | Current Evidence |
 | --- | --- |
-| Latest production release | `v0.1.103` |
-| Product repo head | `affcd4e Harden X25519 key utility UI` |
-| Public installer manifest | `rim2393/lumen_vpn@bdd13a4` |
+| Latest production release | `v0.1.104` |
+| Product repo head | `4d6da91 Add torrent report filters and confirmation` |
+| Public installer manifest | `rim2393/lumen_vpn@d966cd1` |
 | Prod health | `GET /api/v1/health/ready -> {"status":"ok","dependencies":{"api":"ok"}}` |
 | Current rule | Continue from this tracker; do not restart already closed host/subscription renderer work. |
 
@@ -127,7 +127,7 @@ evidence here is wrong or stale.
 | T-004 | Drop connections | DONE | Backend queues/executes real node-agent disconnect operation | `ccee679`, `v0.1.101`, product release run `26796676040` passed after rerun of transient Docker Hub timeout, installer/deploy run `26796770778`, manifest `rim2393/lumen_vpn@1752355`; local gates passed: backend `ruff`, focused backend pytest `test_tools_reports_are_real_database_views`, node-agent `node --test test\runtime-runner.test.js`, web `npm run build`, focused Vitest `HWID inspector`; prod containers `lumen-api/web/subscription` on `v0.1.101` healthy and prod node-agent on `v0.1.101`; live protected API smoke created temporary real user/license/subscription on `node-01`, queued `node.connections.drop` command `11f72276-42c6-4ee4-880e-7af7c1259c6d`, node-agent completed it as `succeeded` with `implementationStatus = connection-drop-attempted`, `dryRun = false`, and real `ss -K dst/src 203.0.113.44` attempts; temporary API key was revoked and QA users/licenses/subscriptions cleanup counts returned `0`. |
 | T-005 | Full HApp routing encryption | DONE | Utility/API/UI produce usable encrypted routing payloads | `2405d63`, `v0.1.102`, product release run `26797458139`, installer/deploy run `26797505374`, manifest `rim2393/lumen_vpn@b466651`; researched current HApp docs and Remnawave SDK behavior, then added protected `/api/v1/tools/happ-routing/build` for `happ://routing/add|onadd|off` Base64 JSON payloads plus RSA `happ://crypt3|crypt4` subscription URL encryption; backend rejects invalid subscription URLs and secret-like routing JSON, audit records only mode/sizes/method and never raw URL or generated links; local gates passed: backend `ruff`, focused backend pytest `test_tools_reports_are_real_database_views`, web `npm run build`, focused Vitest `HWID inspector`; prod containers `lumen-api/web/subscription` on `v0.1.102` healthy; live protected API smoke returned `happ://routing/onadd/`, `happ://crypt4/`, decoded routing profile `Lumen QA Routing`, RSA payload `512` bytes, `audit_has_raw_url=false`, `audit_has_crypto_link=false`, temporary API key revoked. |
 | T-006 | X25519 generation UI/API | DONE | Generates keys without logging/storing secrets incorrectly | `affcd4e`, `v0.1.103`, product release run `26797674002`, installer/deploy run `26797726762`, manifest `rim2393/lumen_vpn@bdd13a4`; backend keygen already generated raw X25519 private/public values with audit `private_key_stored=false`; UI now exposes one-time security note, copy public/private, download private and clear private actions instead of leaving the private key as an unmanaged value; local gates passed: focused backend pytest `test_tools_reports_are_real_database_views`, web `npm run build`, focused Vitest `key utility`; prod containers `lumen-api/web/subscription` on `v0.1.103` healthy; live protected API smoke verified `encoding=base64url-nopad`, private/public raw bytes `32/32`, derived public matched returned public key, audit contained neither returned private nor public key and temporary API key was revoked. |
-| T-007 | Torrent report management | NEXT | Real reports, truncate, filters and evidence from node events | Partial ingestion exists; UI parity open |
+| T-007 | Torrent report management | DONE | Real reports, truncate, filters and evidence from node events | `4d6da91`, `v0.1.104`, product release run `26797939159`, installer/deploy run `26797992909`, manifest `rim2393/lumen_vpn@d966cd1`; backend API now returns real audit-derived report rows with query/limit/total/actions metadata, filters by action/actor/resource/metadata, and truncate counts/deletes only real torrent-related audit events; UI adds lookup, total/actions evidence, resource/action details and two-step truncate confirmation; local gates passed: backend `ruff`, focused backend pytest `test_tools_reports_are_real_database_views`, web `npm run build`, focused Vitest `torrent report`; prod containers `lumen-api/web/subscription` on `v0.1.104` healthy and prod node-agent on `v0.1.104`; live protected API smoke used a temporary revoked API key and verified `GET /api/v1/tools/torrent-blocker-reports?query=definitely-no-fake-t007&limit=1` returned `200`, echoed query/limit, `total=0`, `items=0`, `actions=[]` without creating fake torrent events. Truncate was covered by backend/UI tests and was not destructively run against production reports. |
 
 ## P2: OpenAPI
 
@@ -166,15 +166,15 @@ evidence here is wrong or stale.
 
 ## Next Slice
 
-`T-007`: Torrent report management.
+`API-001`: Regenerate checked-in OpenAPI seed.
 
 Proposed implementation:
 
-1. Audit existing torrent policy event ingestion and Tools report UI/API.
-2. Add real filters/search/pagination and report detail payloads from audit/node events, not synthetic rows.
-3. Keep truncate as a real maintenance action with audit evidence and add safer confirmation/empty-state UX.
-4. Add backend/frontend tests for filters, truncate and report-detail rendering.
-5. Release through signed manifest and verify production reports/truncate behavior without creating fake torrent events.
+1. Locate the checked-in OpenAPI seed and the current runtime OpenAPI generator.
+2. Regenerate the seed from the current backend route surface after the closed admin/node/tools/subscription work.
+3. Add or tighten a drift check so CI fails when routes change but the seed is stale.
+4. Run focused backend checks and release through the signed manifest if code or docs used by runtime changed.
+5. Verify production `/openapi.json` still serves the current API surface and record evidence.
 
 ## Checkpoint Notes
 
