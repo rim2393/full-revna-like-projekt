@@ -483,6 +483,18 @@ async def test_subscription_templates_and_response_rules_are_persisted(
     )
     assert rule_response.status_code == 201
     rule_id = rule_response.json()["id"]
+    fallback_rule_response = await foundation_app.client.post(
+        "/api/v1/response-rules",
+        json={
+            "name": "Expired fallback",
+            "trigger_status": "expired",
+            "status_code": 410,
+            "body": "Expired fallback",
+            "headers": {"X-Lumen-Reason": "fallback"},
+        },
+    )
+    assert fallback_rule_response.status_code == 201
+    fallback_rule_id = fallback_rule_response.json()["id"]
 
     test_rule = await foundation_app.client.post(
         "/api/v1/response-rules/test",
@@ -493,6 +505,24 @@ async def test_subscription_templates_and_response_rules_are_persisted(
     assert test_rule.json()["status_code"] == 403
     assert test_rule.json()["headers"]["X-Lumen-Reason"] == "expired"
 
+    reorder_rules = await foundation_app.client.post(
+        "/api/v1/response-rules/actions/reorder",
+        json={"ids": [fallback_rule_id, rule_id]},
+    )
+    assert reorder_rules.status_code == 200
+    reordered_rule = await foundation_app.client.post(
+        "/api/v1/response-rules/test",
+        json={"subscription_status": "expired"},
+    )
+    assert reordered_rule.status_code == 200
+    assert reordered_rule.json()["matched"] is True
+    assert reordered_rule.json()["status_code"] == 410
+    assert reordered_rule.json()["headers"]["X-Lumen-Reason"] == "fallback"
+
+    delete_fallback_rule = await foundation_app.client.delete(
+        f"/api/v1/response-rules/{fallback_rule_id}"
+    )
+    assert delete_fallback_rule.status_code == 204
     delete_rule = await foundation_app.client.delete(f"/api/v1/response-rules/{rule_id}")
     assert delete_rule.status_code == 204
     test_rule_after_delete = await foundation_app.client.post(

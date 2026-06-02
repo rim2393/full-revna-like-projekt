@@ -4,6 +4,9 @@ import { describe, expect, it, vi } from 'vitest'
 import { createDevelopmentLumenApiClient } from '../shared/api/developmentClient'
 import type {
   LumenApiClient,
+  ResponseRuleCreateRequest,
+  ResponseRuleRecord,
+  ResponseRuleUpdateRequest,
   SettingGroupUpdateRequest,
   SettingUpdateRequest,
   SquadCreateRequest,
@@ -1285,6 +1288,129 @@ describe('Control plane resource screens', () => {
       'tpl_xray',
       'tpl_base',
     ]))
+  })
+
+  it('edits, clones, reorders, and tests response rules through real rule APIs', async () => {
+    const user = userEvent.setup()
+    const rules: ResponseRuleRecord[] = [
+      {
+        body: 'Expired',
+        enabled: true,
+        headers: { 'X-Lumen-Reason': 'expired' },
+        id: 'rule_expired',
+        name: 'Expired rule',
+        order: 0,
+        status_code: 403,
+        trigger_status: 'expired',
+      },
+      {
+        body: 'Disabled',
+        enabled: true,
+        headers: { 'X-Lumen-Reason': 'disabled' },
+        id: 'rule_disabled',
+        name: 'Disabled rule',
+        order: 1,
+        status_code: 451,
+        trigger_status: 'disabled',
+      },
+    ]
+    const listResponseRules = vi.fn(async () => ({ items: rules }))
+    const updateResponseRule = vi.fn(
+      async (
+        ruleId: string,
+        request: ResponseRuleUpdateRequest,
+      ): Promise<ResponseRuleRecord> => {
+        const current = rules.find((rule) => rule.id === ruleId)!
+        return {
+          ...current,
+          ...request,
+          order: request.order ?? current.order,
+        }
+      },
+    )
+    const createResponseRule = vi.fn(
+      async (request: ResponseRuleCreateRequest): Promise<ResponseRuleRecord> => ({
+        body: request.body ?? '',
+        enabled: request.enabled ?? true,
+        headers: request.headers ?? {},
+        id: 'rule_clone',
+        name: request.name,
+        order: rules.length,
+        status_code: request.status_code ?? 200,
+        trigger_status: request.trigger_status,
+      }),
+    )
+    const reorderResponseRules = vi.fn(async (ids: string[]) => ({ updated: ids.length }))
+    const testResponseRule = vi.fn(async (request: { subscription_status: string }) => {
+      const rule = rules.find(
+        (item) => item.enabled && item.trigger_status === request.subscription_status,
+      )
+      return {
+        body: rule?.body ?? '',
+        headers: rule?.headers ?? {},
+        matched: Boolean(rule),
+        rule: rule ?? null,
+        status_code: rule?.status_code ?? 200,
+      }
+    })
+    const apiClient: LumenApiClient = {
+      ...createDevelopmentLumenApiClient(),
+      createResponseRule,
+      listResponseRules,
+      reorderResponseRules,
+      testResponseRule,
+      updateResponseRule,
+    }
+
+    renderWithRouter('/response-rules', { apiClient, initialSession: developmentSession })
+
+    expect(await screen.findByRole('table', { name: /response rules/i })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /edit expired rule/i }))
+    await user.clear(screen.getByLabelText(/^name$/i, { selector: '#edit-rule-name' }))
+    await user.type(screen.getByLabelText(/^name$/i, { selector: '#edit-rule-name' }), 'Expired rule live')
+    await user.clear(screen.getByLabelText(/http status/i, { selector: '#edit-rule-status-code' }))
+    await user.type(screen.getByLabelText(/http status/i, { selector: '#edit-rule-status-code' }), '410')
+    fireEvent.change(screen.getByLabelText(/headers json/i, { selector: '#edit-rule-headers' }), {
+      target: { value: '{"X-Lumen-Reason":"edited"}' },
+    })
+    await user.click(screen.getByRole('button', { name: /save selected rule/i }))
+
+    await waitFor(() => expect(updateResponseRule).toHaveBeenCalledTimes(1))
+    expect(updateResponseRule).toHaveBeenCalledWith('rule_expired', {
+      body: 'Expired',
+      enabled: true,
+      headers: { 'X-Lumen-Reason': 'edited' },
+      name: 'Expired rule live',
+      status_code: 410,
+      trigger_status: 'expired',
+    })
+
+    await user.click(screen.getByRole('button', { name: /clone disabled rule/i }))
+    await waitFor(() => expect(createResponseRule).toHaveBeenCalledTimes(1))
+    expect(createResponseRule).toHaveBeenCalledWith({
+      body: 'Disabled',
+      enabled: true,
+      headers: { 'X-Lumen-Reason': 'disabled' },
+      name: 'Disabled rule copy',
+      status_code: 451,
+      trigger_status: 'disabled',
+    })
+
+    await user.click(screen.getByRole('button', { name: /move disabled rule up/i }))
+    await waitFor(() => expect(reorderResponseRules).toHaveBeenCalledWith([
+      'rule_disabled',
+      'rule_expired',
+    ]))
+
+    fireEvent.change(screen.getByLabelText(/subscription status/i), {
+      target: { value: 'disabled' },
+    })
+    await user.click(screen.getByRole('button', { name: /test rule/i }))
+    await waitFor(() => expect(testResponseRule).toHaveBeenCalledWith({
+      subscription_status: 'disabled',
+    }))
+    expect(await screen.findByText(/matched rule/i)).toBeInTheDocument()
+    expect(screen.getByText('Response status: 451')).toBeInTheDocument()
   })
 
   it('manages MFA methods and passkeys through auth security APIs', async () => {

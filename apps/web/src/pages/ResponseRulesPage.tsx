@@ -1,5 +1,5 @@
-import { useState, type FormEvent } from 'react'
-import { Trash2 } from 'lucide-react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { ArrowDown, ArrowUp, Copy, Edit3, Trash2 } from 'lucide-react'
 import {
   useCreateResponseRule,
   useDeleteResponseRule,
@@ -8,6 +8,7 @@ import {
   useTestResponseRule,
   useUpdateResponseRule,
 } from '../shared/api/resourceHooks'
+import type { ResponseRuleCreateRequest, ResponseRuleRecord, ResponseRuleUpdateRequest } from '../shared/api/types'
 import {
   FormError,
   ResourceScreen,
@@ -20,12 +21,25 @@ import { formatRecord } from '../shared/utils/resourceFormat'
 
 const rulesSpec = {
   ...sectionSpecs.subscription,
-  description: 'Control public subscription responses for expired, limited, disabled, and custom states.',
+  description:
+    'Control real public subscription responses for expired, limited, disabled, revoked and custom subscription states.',
   eyebrow: 'Response rules',
   primaryAction: 'Save rule',
   status: 'api-backed',
   title: 'Response Rules',
 }
+
+type RuleEditorState = {
+  body: string
+  enabled: boolean
+  headers: string
+  name: string
+  statusCode: string
+  triggerStatus: string
+}
+
+const defaultRuleBody = 'Subscription expired'
+const defaultRuleHeaders = '{"X-Lumen-Reason":"expired"}'
 
 export function ResponseRulesPage() {
   const query = useResponseRulesData()
@@ -38,10 +52,33 @@ export function ResponseRulesPage() {
   const [name, setName] = useState('')
   const [triggerStatus, setTriggerStatus] = useState('expired')
   const [statusCode, setStatusCode] = useState('403')
-  const [body, setBody] = useState('Subscription expired')
-  const [headers, setHeaders] = useState('{"X-Lumen-Reason":"expired"}')
+  const [body, setBody] = useState(defaultRuleBody)
+  const [headers, setHeaders] = useState(defaultRuleHeaders)
   const [testStatus, setTestStatus] = useState('expired')
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const selectedRule = useMemo(
+    () => rules.find((rule) => rule.id === selectedId) ?? rules[0],
+    [rules, selectedId],
+  )
+  const [editor, setEditor] = useState<RuleEditorState>({
+    body: '',
+    enabled: true,
+    headers: '{}',
+    name: '',
+    statusCode: '200',
+    triggerStatus: 'expired',
+  })
   const [formError, setFormError] = useState<string | null>(null)
+  const [editorError, setEditorError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!selectedRule) {
+      return
+    }
+    setSelectedId(selectedRule.id)
+    setEditor(ruleToEditor(selectedRule))
+    setTestStatus(selectedRule.trigger_status)
+  }, [selectedRule])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -61,6 +98,46 @@ export function ResponseRulesPage() {
     }
   }
 
+  async function saveSelectedRule(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!selectedRule) {
+      return
+    }
+    setEditorError(null)
+    try {
+      await updateRule.mutateAsync({
+        id: selectedRule.id,
+        request: editorToRequest(editor),
+      })
+    } catch (error) {
+      setEditorError(error instanceof Error ? error.message : 'Response rule could not be updated.')
+    }
+  }
+
+  async function cloneRule(rule: ResponseRuleRecord) {
+    const request: ResponseRuleCreateRequest = {
+      body: rule.body,
+      enabled: rule.enabled,
+      headers: rule.headers,
+      name: `${rule.name} copy`,
+      status_code: rule.status_code,
+      trigger_status: rule.trigger_status,
+    }
+    await createRule.mutateAsync(request)
+  }
+
+  async function moveRule(rule: ResponseRuleRecord, direction: -1 | 1) {
+    const index = rules.findIndex((item) => item.id === rule.id)
+    const targetIndex = index + direction
+    if (index < 0 || targetIndex < 0 || targetIndex >= rules.length) {
+      return
+    }
+    const ids = rules.map((item) => item.id)
+    const [id] = ids.splice(index, 1)
+    ids.splice(targetIndex, 0, id)
+    await reorderRules.mutateAsync(ids)
+  }
+
   return (
     <ResourceScreen
       caption="Response rules"
@@ -70,33 +147,29 @@ export function ResponseRulesPage() {
           <div>
             <p className="eyebrow">Create rule</p>
             <h2>Subscription outcome</h2>
-            <p>Persist response mapping for subscription status branches.</p>
+            <p>
+              Persist response mapping for subscription status branches. Public rendering
+              applies the first enabled matching rule by order.
+            </p>
           </div>
-          <label htmlFor="rule-name">
-            Name
-            <input id="rule-name" required value={name} onChange={(event) => setName(event.target.value)} />
-          </label>
-          <label htmlFor="rule-trigger">
-            Trigger status
-            <input id="rule-trigger" required value={triggerStatus} onChange={(event) => setTriggerStatus(event.target.value)} />
-          </label>
-          <label htmlFor="rule-status-code">
-            HTTP status
-            <input id="rule-status-code" inputMode="numeric" value={statusCode} onChange={(event) => setStatusCode(event.target.value)} />
-          </label>
-          <label htmlFor="rule-body">
-            Body
-            <textarea id="rule-body" rows={4} value={body} onChange={(event) => setBody(event.target.value)} />
-          </label>
-          <label htmlFor="rule-headers">
-            Headers JSON
-            <textarea id="rule-headers" rows={4} value={headers} onChange={(event) => setHeaders(event.target.value)} />
-          </label>
+          <RuleFields
+            body={body}
+            headers={headers}
+            name={name}
+            prefix="create"
+            statusCode={statusCode}
+            triggerStatus={triggerStatus}
+            onBodyChange={setBody}
+            onHeadersChange={setHeaders}
+            onNameChange={setName}
+            onStatusCodeChange={setStatusCode}
+            onTriggerStatusChange={setTriggerStatus}
+          />
           <FormError message={formError} />
           <SubmitButton pending={createRule.isPending}>Create rule</SubmitButton>
         </ScreenForm>
       }
-      emptyDescription="Create response rules for expired, limited, disabled, or custom subscription states."
+      emptyDescription="Create response rules for expired, limited, disabled, revoked, inactive, or custom subscription states."
       emptyTitle="No response rules"
       error={query.error}
       errorTitle="Response rules unavailable"
@@ -114,6 +187,18 @@ export function ResponseRulesPage() {
           formatRecord(rule.headers),
           <StatusBadge tone={rule.enabled ? 'good' : 'neutral'}>{rule.enabled ? 'enabled' : 'disabled'}</StatusBadge>,
           <div className="inline-actions">
+            <button type="button" className="icon-button" aria-label={`Edit ${rule.name}`} onClick={() => setSelectedId(rule.id)}>
+              <Edit3 size={16} aria-hidden="true" />
+            </button>
+            <button type="button" className="icon-button" aria-label={`Move ${rule.name} up`} onClick={() => void moveRule(rule, -1)}>
+              <ArrowUp size={16} aria-hidden="true" />
+            </button>
+            <button type="button" className="icon-button" aria-label={`Move ${rule.name} down`} onClick={() => void moveRule(rule, 1)}>
+              <ArrowDown size={16} aria-hidden="true" />
+            </button>
+            <button type="button" className="icon-button" aria-label={`Clone ${rule.name}`} onClick={() => void cloneRule(rule)}>
+              <Copy size={16} aria-hidden="true" />
+            </button>
             <button
               type="button"
               className="button button--secondary"
@@ -157,14 +242,46 @@ export function ResponseRulesPage() {
           {testRule.data ? (
             <div className="resource-list">
               <div className="resource-list__item">
-                <span>{testRule.data.matched ? testRule.data.rule?.name : 'No match'}</span>
-                <small>{testRule.data.status_code}</small>
+                <span>Matched rule: {testRule.data.matched ? testRule.data.rule?.name : 'No match'}</span>
+                <small>Response status: {testRule.data.status_code}</small>
               </div>
               <div className="resource-list__item">
                 <span>{testRule.data.body || 'Empty body'}</span>
                 <small>{formatRecord(testRule.data.headers)}</small>
               </div>
             </div>
+          ) : null}
+          {selectedRule ? (
+            <form className="screen-form" onSubmit={saveSelectedRule}>
+              <div>
+                <p className="eyebrow">Rule editor</p>
+                <h2>{selectedRule.name}</h2>
+              </div>
+              <RuleFields
+                body={editor.body}
+                headers={editor.headers}
+                name={editor.name}
+                prefix="edit"
+                statusCode={editor.statusCode}
+                triggerStatus={editor.triggerStatus}
+                onBodyChange={(value) => setEditor((current) => ({ ...current, body: value }))}
+                onHeadersChange={(value) => setEditor((current) => ({ ...current, headers: value }))}
+                onNameChange={(value) => setEditor((current) => ({ ...current, name: value }))}
+                onStatusCodeChange={(value) => setEditor((current) => ({ ...current, statusCode: value }))}
+                onTriggerStatusChange={(value) => setEditor((current) => ({ ...current, triggerStatus: value }))}
+              />
+              <label className="checkbox-row" htmlFor="edit-rule-enabled">
+                <input
+                  id="edit-rule-enabled"
+                  type="checkbox"
+                  checked={editor.enabled}
+                  onChange={(event) => setEditor((current) => ({ ...current, enabled: event.target.checked }))}
+                />
+                Enabled
+              </label>
+              <FormError message={editorError} />
+              <SubmitButton pending={updateRule.isPending}>Save selected rule</SubmitButton>
+            </form>
           ) : null}
         </article>
       }
@@ -175,10 +292,83 @@ export function ResponseRulesPage() {
   )
 }
 
+function RuleFields({
+  body,
+  headers,
+  name,
+  onBodyChange,
+  onHeadersChange,
+  onNameChange,
+  onStatusCodeChange,
+  onTriggerStatusChange,
+  prefix,
+  statusCode,
+  triggerStatus,
+}: {
+  body: string
+  headers: string
+  name: string
+  onBodyChange: (value: string) => void
+  onHeadersChange: (value: string) => void
+  onNameChange: (value: string) => void
+  onStatusCodeChange: (value: string) => void
+  onTriggerStatusChange: (value: string) => void
+  prefix: string
+  statusCode: string
+  triggerStatus: string
+}) {
+  return (
+    <>
+      <label htmlFor={`${prefix}-rule-name`}>
+        Name
+        <input id={`${prefix}-rule-name`} required value={name} onChange={(event) => onNameChange(event.target.value)} />
+      </label>
+      <label htmlFor={`${prefix}-rule-trigger`}>
+        Trigger status
+        <input id={`${prefix}-rule-trigger`} required value={triggerStatus} onChange={(event) => onTriggerStatusChange(event.target.value)} />
+      </label>
+      <label htmlFor={`${prefix}-rule-status-code`}>
+        HTTP status
+        <input id={`${prefix}-rule-status-code`} inputMode="numeric" value={statusCode} onChange={(event) => onStatusCodeChange(event.target.value)} />
+      </label>
+      <label htmlFor={`${prefix}-rule-body`}>
+        Body
+        <textarea id={`${prefix}-rule-body`} rows={4} value={body} onChange={(event) => onBodyChange(event.target.value)} />
+      </label>
+      <label htmlFor={`${prefix}-rule-headers`}>
+        Headers JSON
+        <textarea id={`${prefix}-rule-headers`} rows={4} value={headers} onChange={(event) => onHeadersChange(event.target.value)} />
+      </label>
+    </>
+  )
+}
+
+function editorToRequest(editor: RuleEditorState): ResponseRuleUpdateRequest {
+  return {
+    body: editor.body,
+    enabled: editor.enabled,
+    headers: parseHeaders(editor.headers),
+    name: editor.name.trim(),
+    status_code: Number(editor.statusCode),
+    trigger_status: editor.triggerStatus.trim(),
+  }
+}
+
 function parseHeaders(value: string): Record<string, string> {
   const parsed: unknown = JSON.parse(value || '{}')
   if (!parsed || Array.isArray(parsed) || typeof parsed !== 'object') {
     throw new Error('Headers JSON must be an object.')
   }
   return Object.fromEntries(Object.entries(parsed).map(([key, item]) => [key, String(item)]))
+}
+
+function ruleToEditor(rule: ResponseRuleRecord): RuleEditorState {
+  return {
+    body: rule.body,
+    enabled: rule.enabled,
+    headers: JSON.stringify(rule.headers, null, 2),
+    name: rule.name,
+    statusCode: String(rule.status_code),
+    triggerStatus: rule.trigger_status,
+  }
 }
