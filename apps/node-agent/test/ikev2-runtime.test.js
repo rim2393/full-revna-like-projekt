@@ -1,12 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import {
   applyIkev2Config,
   createIkev2ApplyPlan,
-  renderSwanctlConfig
+  renderSwanctlConfig,
+  stopIkev2Runtime
 } from "../src/index.js";
 
 const IKEV2_CONFIG = Object.freeze({
@@ -86,4 +87,39 @@ test("applies IKEv2 config through strongSwan swanctl default config path", asyn
     ["swanctl", ["--load-all"]],
     ["swanctl", ["--list-conns"]]
   ]);
+});
+
+test("stops IKEv2 strongSwan runtime and removes generated files", async () => {
+  const tempDir = mkdtempSync(join(tmpdir(), "lumen-ikev2-stop-"));
+  const configDir = join(tempDir, "swanctl");
+  const runtimeDir = join(tempDir, "runtime");
+  const files = [
+    join(configDir, "swanctl.conf"),
+    join(configDir, "x509", "lumen-ikev2-server.pem"),
+    join(configDir, "x509ca", "lumen-ikev2-ca.pem"),
+    join(configDir, "private", "lumen-ikev2-server-key.pem"),
+    join(runtimeDir, "state.json")
+  ];
+  try {
+    for (const file of files) {
+      mkdirSync(dirname(file), { recursive: true });
+      writeFileSync(file, "runtime");
+    }
+    const calls = [];
+    const result = await stopIkev2Runtime({
+      configDir,
+      runtimeDir,
+      execFileImpl: async (command, args) => {
+        calls.push([command, args]);
+        return { stdout: "", stderr: "" };
+      }
+    });
+    assert.deepEqual(calls, [["ipsec", ["stop"]]]);
+    assert.equal(result.implementationStatus, "ikev2-stopped");
+    for (const file of files) {
+      assert.equal(existsSync(file), false);
+    }
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
 });

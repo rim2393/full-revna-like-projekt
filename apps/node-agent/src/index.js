@@ -160,7 +160,8 @@ export {
   IKEV2_RUNTIME_MODEL_VERSION,
   applyIkev2Config,
   createIkev2ApplyPlan,
-  renderSwanctlConfig
+  renderSwanctlConfig,
+  stopIkev2Runtime
 } from "./ikev2-runtime.js";
 export {
   DEFAULT_SHADOWSOCKS_PLUGIN_CONFIG_PATH,

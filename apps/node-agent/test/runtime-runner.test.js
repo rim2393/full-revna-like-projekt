@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createConnection, createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -1477,6 +1477,92 @@ test("run once applies ikev2-eap outbound.apply via strongSwan runtime", async (
     const resultBody = JSON.parse(calls[2].options.body);
     assert.equal(resultBody.result_json.outputs.implementationStatus, "ikev2-applied");
     assert.equal(resultBody.result_json.outputs.userCount, 1);
+  } finally {
+    rmSync(stateDir, { recursive: true, force: true });
+    rmSync(swanctlDir, { recursive: true, force: true });
+  }
+});
+
+test("run once removes ikev2-eap outbound runtime via strongSwan stop", async () => {
+  const stateDir = mkdtempSync(join(tmpdir(), "lumen-agent-state-"));
+  const swanctlDir = mkdtempSync(join(tmpdir(), "lumen-swanctl-remove-"));
+  const runtimeDir = join(stateDir, "runtime", "ikev2");
+  const execCalls = [];
+  const calls = [];
+  try {
+    writeFileSync(join(stateDir, "node-token"), "persisted-node-token\n", { mode: 0o600 });
+    writeFileSync(join(stateDir, "heartbeat-path"), "/api/v1/nodes/node-1/heartbeat\n", { mode: 0o600 });
+    for (const file of [
+      join(swanctlDir, "swanctl.conf"),
+      join(swanctlDir, "x509", "lumen-ikev2-server.pem"),
+      join(swanctlDir, "x509ca", "lumen-ikev2-ca.pem"),
+      join(swanctlDir, "private", "lumen-ikev2-server-key.pem"),
+      join(runtimeDir, "state.json")
+    ]) {
+      mkdirSync(join(file, ".."), { recursive: true });
+      writeFileSync(file, "runtime");
+    }
+    const result = await runNodeAgentOnce({
+      env: {
+        LUMEN_CONTROL_PLANE_URL: "https://panel.example",
+        LUMEN_NODE_NAME: "node-1",
+        LUMEN_STATE_DIR: stateDir,
+        LUMEN_DRY_RUN: "false"
+      },
+      execFileImpl: async (command, args) => {
+        execCalls.push([command, args]);
+        return { stdout: "", stderr: "" };
+      },
+      fetchImpl: async (url, options) => {
+        calls.push({ url, options });
+        if (url.endsWith("/heartbeat")) {
+          return jsonResponse({
+            id: "node-1",
+            name: "node-1",
+            status: "active",
+            last_seen_at: "2026-05-27T00:00:00Z",
+            capabilities: {}
+          });
+        }
+        if (url.endsWith("/commands/next")) {
+          return jsonResponse({
+            id: "cmd-ikev2-remove-1",
+            node_id: "node-1",
+            command_type: COMMAND_TYPES.OUTBOUND_REMOVE,
+            status: "claimed",
+            payload_json: {
+              adapter: "ikev2-eap",
+              ikev2ConfigDir: swanctlDir,
+              ikev2RuntimeDir: runtimeDir
+            },
+            created_at: "2026-05-27T00:01:00.000Z"
+          });
+        }
+        if (url.endsWith("/result")) {
+          return jsonResponse({
+            id: "cmd-ikev2-remove-1",
+            node_id: "node-1",
+            command_type: COMMAND_TYPES.OUTBOUND_REMOVE,
+            status: JSON.parse(options.body).status,
+            payload_json: {},
+            result_json: JSON.parse(options.body).result_json
+          });
+        }
+        return jsonResponse({
+          id: "metric-1",
+          node_id: "node-1",
+          metric_kind: "runtime",
+          values_json: JSON.parse(options.body).values_json
+        });
+      }
+    });
+
+    assert.equal(result.command.status, "succeeded");
+    assert.deepEqual(execCalls, [["ipsec", ["stop"]]]);
+    const resultBody = JSON.parse(calls[2].options.body);
+    assert.equal(resultBody.result_json.outputs.implementationStatus, "ikev2-stopped");
+    assert.equal(existsSync(join(swanctlDir, "swanctl.conf")), false);
+    assert.equal(existsSync(runtimeDir), false);
   } finally {
     rmSync(stateDir, { recursive: true, force: true });
     rmSync(swanctlDir, { recursive: true, force: true });

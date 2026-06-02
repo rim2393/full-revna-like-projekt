@@ -46,7 +46,7 @@ import {
   createOpenVpnShadowsocksApplyPlan,
   ensureManagedOpenVpnShadowsocksProcess
 } from "./openvpn-shadowsocks-runtime.js";
-import { applyIkev2Config, createIkev2ApplyPlan } from "./ikev2-runtime.js";
+import { applyIkev2Config, createIkev2ApplyPlan, stopIkev2Runtime } from "./ikev2-runtime.js";
 import { applyTuicConfig, createTuicApplyPlan, ensureManagedTuicProcess } from "./tuic-runtime.js";
 import { applyWireguardConfig, createWireguardApplyPlan } from "./wireguard-runtime.js";
 import { applyNodePolicy, createNodePolicyApplyPlan } from "./policy-runtime.js";
@@ -72,7 +72,8 @@ const APPLY_FAILURE_CODES = Object.freeze({
   "node-policy.apply": "node_policy_apply_failed",
   "node-agent.restart": "node_restart_failed",
   "node-connections.drop": "connection_drop_failed",
-  "node-traffic.reset": "node_traffic_reset_failed"
+  "node-traffic.reset": "node_traffic_reset_failed",
+  "ikev2.stop": "ikev2_stop_failed"
 });
 
 const APPLY_DRY_RUN_STATUS = Object.freeze({
@@ -89,7 +90,8 @@ const APPLY_DRY_RUN_STATUS = Object.freeze({
   "node-policy.apply": "node-policy-dry-run",
   "node-agent.restart": "node-restart-dry-run",
   "node-connections.drop": "connection-drop-dry-run",
-  "node-traffic.reset": "node-traffic-reset-dry-run"
+  "node-traffic.reset": "node-traffic-reset-dry-run",
+  "ikev2.stop": "ikev2-stop-dry-run"
 });
 
 const APPLY_PENDING_STATUS = Object.freeze({
@@ -106,7 +108,8 @@ const APPLY_PENDING_STATUS = Object.freeze({
   "node-policy.apply": "node-policy-apply-pending",
   "node-agent.restart": "node-restart-pending",
   "node-connections.drop": "connection-drop-pending",
-  "node-traffic.reset": "node-traffic-reset-pending"
+  "node-traffic.reset": "node-traffic-reset-pending",
+  "ikev2.stop": "ikev2-stop-pending"
 });
 
 function readOptionalTrimmed(path) {
@@ -484,6 +487,15 @@ async function applyRuntimeEffects(command, commandResult, input = {}) {
         implementationStatus: "live-listener-stopped",
         liveListener
       });
+    }
+    if (commandResult.runtimeAction.type === "ikev2.stop") {
+      const ikev2 = await stopIkev2Runtime({
+        env: input.env,
+        execFileImpl: input.execFileImpl,
+        configDir: commandResult.runtimeAction.configDir,
+        runtimeDir: commandResult.runtimeAction.runtimeDir
+      });
+      return withResultOutputs(commandResult, ikev2);
     }
     if (commandResult.runtimeAction.type === "xray.apply") {
       const xray = await applyXrayConfig(commandResult.runtimeAction.plan, {
@@ -876,15 +888,24 @@ export function applyNodeCommand(command, currentState, input = {}) {
         nextState = transitionProvisioningState(nextState, PROVISIONING_EVENTS.REMOVE_SUCCEEDED, {
           at: finishedAt
         });
+        if (String(envelope.payload.adapter ?? "").startsWith("ikev2")) {
+          runtimeAction = Object.freeze({
+            type: "ikev2.stop",
+            configDir: envelope.payload.ikev2ConfigDir,
+            runtimeDir: envelope.payload.ikev2RuntimeDir
+          });
+        } else {
+          runtimeAction = Object.freeze({
+            type: "tcp-diagnostic.stop",
+            listenerId: envelope.payload.listenerId ?? envelope.payload.outboundId ?? envelope.id
+          });
+        }
         outputs = {
           command: envelope.command,
           dryRun: input.dryRun ?? true,
-          implementationStatus: "live-listener-stop-pending"
+          implementationStatus:
+            APPLY_PENDING_STATUS[runtimeAction.type] ?? "live-listener-stop-pending"
         };
-        runtimeAction = Object.freeze({
-          type: "tcp-diagnostic.stop",
-          listenerId: envelope.payload.listenerId ?? envelope.payload.outboundId ?? envelope.id
-        });
         break;
       case COMMAND_TYPES.CAPABILITIES_REPORT:
         nextState = transitionReportState(state, { startedAt, finishedAt });

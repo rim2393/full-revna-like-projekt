@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { promisify } from "node:util";
 import { execFile as nodeExecFile } from "node:child_process";
@@ -254,5 +254,21 @@ export async function applyIkev2Config(plan, input = {}) {
     ikePort: plan.config.ike_port,
     natPort: plan.config.nat_port,
     userCount: plan.config.users.length
+  });
+}
+
+export async function stopIkev2Runtime(input = {}) {
+  const env = input.env ?? {};
+  const configDir = input.configDir ?? env.LUMEN_IKEV2_CONFIG_DIR ?? DEFAULT_IKEV2_CONFIG_DIR;
+  const runtimeDir = input.runtimeDir ?? env.LUMEN_IKEV2_RUNTIME_DIR ?? DEFAULT_IKEV2_RUNTIME_DIR;
+  await runExecFileIgnoringFailure(input.execFileImpl, "ipsec", ["stop"]);
+  rmSync(join(configDir, "swanctl.conf"), { force: true });
+  rmSync(join(configDir, "x509", "lumen-ikev2-server.pem"), { force: true });
+  rmSync(join(configDir, "x509ca", "lumen-ikev2-ca.pem"), { force: true });
+  rmSync(join(configDir, "private", "lumen-ikev2-server-key.pem"), { force: true });
+  rmSync(runtimeDir, { recursive: true, force: true });
+  return Object.freeze({
+    implementationStatus: "ikev2-stopped",
+    configDir
   });
 }
