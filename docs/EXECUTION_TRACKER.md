@@ -33,9 +33,9 @@ evidence here is wrong or stale.
 
 | Item | Current Evidence |
 | --- | --- |
-| Latest production release | `v0.1.98` |
-| Product repo head | `28a6e9c Complete HWID inspector tools` |
-| Public installer manifest | `rim2393/lumen_vpn@e1bfc07` |
+| Latest production release | `v0.1.99` |
+| Product repo head | `601cec8 Add real top users tools report` |
+| Public installer manifest | `rim2393/lumen_vpn@1f2ac54` |
 | Prod health | `GET /api/v1/health/ready -> {"status":"ok","dependencies":{"api":"ok"}}` |
 | Current rule | Continue from this tracker; do not restart already closed host/subscription renderer work. |
 
@@ -122,8 +122,8 @@ evidence here is wrong or stale.
 | ID | Task | Status | Done Criteria | Evidence |
 | --- | --- | --- | --- | --- |
 | T-001 | HWID inspector and device delete/delete-all | DONE | Device list exists for subscription admin; full tools surface open | `28a6e9c`, `v0.1.98`, product release run `26794957822`, installer/deploy run `26795013148`, manifest `rim2393/lumen_vpn@e1bfc07`; backend `ruff`, focused backend pytest `test_tools_reports_are_real_database_views`, web `npm run build`, focused Vitest `HWID inspector` passed; prod containers `lumen-api/web/subscription` on `v0.1.98` healthy; live smoke created a temporary real user/license/subscription, public manifest registered HWID on the real user, Tools HWID lookup found `hwid`, `last_seen_at`, and `subscription_id`, delete-one removed the HWID, a second public request registered another HWID, clear-all removed every device, and cleanup left `0` QA users/licenses. |
-| T-002 | Top users | NEXT | Real database stats and UI table, no fake counters | Not started |
-| T-003 | Fetch user IPs and node user IPs | OPEN | Real session/runtime/IP-control views | Not started |
+| T-002 | Top users | DONE | Real database stats and UI table, no fake counters | `601cec8`, `v0.1.99`, product release run `26795333815`, installer/deploy run `26795381599`, manifest `rim2393/lumen_vpn@1f2ac54`; backend `ruff`, focused backend pytest `test_tools_reports_are_real_database_views`, focused Vitest `HWID inspector` with Top users tab, and web `npm run build` passed; prod containers `lumen-api/web/subscription` on `v0.1.99` healthy; live public API smoke created temporary real users `qa-t002-*` with traffic/device/expiration states, verified `/api/v1/tools/top-users` metrics `traffic_used`, `traffic_percent`, `device_count`, `expiration_risk`, verified invalid metric returns `422 top_users_metric_invalid`, deleted temp users and lookup cleanup left `0` QA users. |
+| T-003 | Fetch user IPs and node user IPs | NEXT | Real session/runtime/IP-control views | Not started |
 | T-004 | Drop connections | OPEN | Backend queues/executes real node-agent disconnect operation | Not started |
 | T-005 | Full HApp routing encryption | OPEN | Utility/API/UI produce usable encrypted routing payloads | Not started |
 | T-006 | X25519 generation UI/API | OPEN | Generates keys without logging/storing secrets incorrectly | Not started |
@@ -166,15 +166,15 @@ evidence here is wrong or stale.
 
 ## Next Slice
 
-`T-002`: Top users.
+`T-003`: Fetch user IPs and node user IPs.
 
 Proposed implementation:
 
-1. Audit existing traffic/user fields and decide the exact real ranking metrics available now.
-2. Add protected tools API for top users by traffic used, traffic percent, device count, and expiration risk.
-3. Wire Tools UI table and filters without fake counters or synthetic totals.
-4. Add backend/frontend tests with seeded real users only.
-5. Release through signed manifest and verify live API/UI smoke on production data.
+1. Audit the real IP/session data sources already present in user sessions, subscription request logs, node runtime events and node-agent command telemetry.
+2. Add protected tools API for user IPs and node user IPs sourced only from real captured events.
+3. Wire Tools UI filters and tables for user, node, IP, first seen, last seen, source and evidence count.
+4. Add backend/frontend tests with seeded real session/IP event data, not synthetic production rows.
+5. Release through signed manifest and verify live API/UI smoke on production with temporary real events and cleanup.
 
 ## Checkpoint Notes
 
