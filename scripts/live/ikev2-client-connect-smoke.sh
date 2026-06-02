@@ -12,6 +12,7 @@ PANEL_PUBLIC_URL="${LUMEN_PANEL_PUBLIC_URL:-https://panel.89-185-85-184.sslip.io
 NODE_NAME="${LUMEN_LIVE_NODE_NAME:-node-01}"
 QA_PREFIX="${LUMEN_QA_PREFIX:-qa_pr004}"
 CLIENT_IMAGE="${LUMEN_IKEV2_CLIENT_IMAGE:-ubuntu:24.04}"
+HOST_PYTHON="${LUMEN_HOST_PYTHON:-python3}"
 WORKDIR="$(mktemp -d /tmp/lumen-ikev2-smoke.XXXXXX)"
 STATE_FILE="$WORKDIR/state.json"
 SSWAN_FILE="$WORKDIR/profile.sswan.json"
@@ -253,12 +254,12 @@ async def main() -> None:
 asyncio.run(main())
 PY
 
-PUBLIC_ID="$(python -c "import json,sys; print(json.load(open(sys.argv[1]))['public_id'])" "$STATE_FILE")"
+PUBLIC_ID="$("$HOST_PYTHON" -c "import json,sys; print(json.load(open(sys.argv[1]))['public_id'])" "$STATE_FILE")"
 curl -fsS --retry 2 --max-time 30 \
   "$PANEL_PUBLIC_URL/api/v1/subscriptions/public/$PUBLIC_ID/render?target=raw-uri" \
   -o "$SSWAN_FILE"
 
-python - "$SSWAN_FILE" "$CLIENT_DIR" <<'PY'
+"$HOST_PYTHON" - "$SSWAN_FILE" "$CLIENT_DIR" <<'PY'
 import base64
 import json
 import pathlib
@@ -338,7 +339,7 @@ docker run --rm --name lumen-ikev2-client-smoke \
     printf "%s\n" "ikev2_client_connect=succeeded"
   '
 
-python - "$STATE_FILE" <<'PY'
+"$HOST_PYTHON" - "$STATE_FILE" <<'PY'
 import json
 import sys
 state = json.load(open(sys.argv[1], encoding="utf-8"))
