@@ -884,14 +884,20 @@ export type SessionInspectorResponse = {
 export type TorrentReportRow = {
   action: string
   actor_email: string | null
+  actor_subject: string
   created_at: string
   id: string
   metadata_json: Record<string, string>
+  resource_type: string
   resource_id: string | null
 }
 
 export type TorrentReportResponse = {
+  actions: string[]
   items: TorrentReportRow[]
+  limit: number
+  query: string | null
+  total: number
 }
 
 export type HappRoutingRow = {
@@ -1410,7 +1416,7 @@ export type LumenApiClient = {
   dropConnections: (request: DropConnectionsRequest) => Promise<DropConnectionsResponse>
   inspectSrh: () => Promise<SrhInspectorResponse>
   inspectSessions: () => Promise<SessionInspectorResponse>
-  inspectTorrentReports: () => Promise<TorrentReportResponse>
+  inspectTorrentReports: (query?: string, limit?: number) => Promise<TorrentReportResponse>
   inspectHappRouting: () => Promise<HappRoutingResponse>
   buildHappRouting: (request: HappRoutingBuildRequest) => Promise<HappRoutingBuildResponse>
   truncateTorrentReports: () => Promise<TorrentReportResponse>

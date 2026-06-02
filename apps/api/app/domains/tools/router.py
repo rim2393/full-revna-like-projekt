@@ -142,8 +142,13 @@ async def revoke_session_from_inspector(
 
 
 @router.get("/torrent-blocker-reports", response_model=TorrentReportResponse)
-async def read_torrent_reports(_: ToolManager, session: DatabaseSession) -> TorrentReportResponse:
-    return await inspect_torrent_reports(session)
+async def read_torrent_reports(
+    _: ToolManager,
+    session: DatabaseSession,
+    query: str | None = Query(default=None, min_length=1, max_length=160),
+    limit: int = Query(default=200, ge=1, le=1000),
+) -> TorrentReportResponse:
+    return await inspect_torrent_reports(session, query=query, limit=limit)
 
 
 @router.delete("/torrent-blocker-reports", response_model=TorrentReportResponse)

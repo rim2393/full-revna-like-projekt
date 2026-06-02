@@ -962,12 +962,13 @@ export function useRevokeToolSession() {
   })
 }
 
-export function useTorrentReportsData() {
+export function useTorrentReportsData(query: string, limit = 200) {
   const apiClient = useApiClient()
+  const normalizedQuery = query.trim() || undefined
 
   return useQuery({
-    queryFn: apiClient.inspectTorrentReports,
-    queryKey: resourceQueryKeys.toolTorrentReports,
+    queryFn: () => apiClient.inspectTorrentReports(normalizedQuery, limit),
+    queryKey: [...resourceQueryKeys.toolTorrentReports, normalizedQuery, limit],
   })
 }
 

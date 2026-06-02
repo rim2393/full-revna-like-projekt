@@ -243,7 +243,12 @@ async def revoke_inspected_session(
     )
 
 
-async def inspect_torrent_reports(session: AsyncSession) -> TorrentReportResponse:
+async def inspect_torrent_reports(
+    session: AsyncSession,
+    *,
+    query: str | None = None,
+    limit: int = 200,
+) -> TorrentReportResponse:
     result = await session.execute(
         select(AuditEvent)
         .where(
@@ -253,20 +258,32 @@ async def inspect_torrent_reports(session: AsyncSession) -> TorrentReportRespons
             )
         )
         .order_by(AuditEvent.created_at.desc())
-        .limit(200)
+        .limit(2000)
     )
+    needle = query.strip().lower() if query else None
+    events = [
+        event
+        for event in result.scalars().all()
+        if needle is None or _torrent_report_matches(event, needle)
+    ]
     return TorrentReportResponse(
         items=[
             TorrentReportRow(
                 id=event.id,
                 action=event.action,
+                actor_subject=event.actor_subject,
                 actor_email=event.actor_email,
+                resource_type=event.resource_type,
                 resource_id=event.resource_id,
                 metadata_json=event.metadata_json,
                 created_at=event.created_at,
             )
-            for event in result.scalars().all()
-        ]
+            for event in events[:limit]
+        ],
+        total=len(events),
+        query=query,
+        limit=limit,
+        actions=sorted({event.action for event in events}),
     )
 
 
@@ -275,7 +292,7 @@ async def truncate_torrent_reports(
     *,
     principal: Principal,
 ) -> TorrentReportResponse:
-    existing = await inspect_torrent_reports(session)
+    existing = await inspect_torrent_reports(session, limit=2000)
     if existing.items:
         await session.execute(
             delete(AuditEvent).where(
@@ -1230,6 +1247,19 @@ def _optional_str(value: object) -> str | None:
     if value is None:
         return None
     return str(value)
+
+
+def _torrent_report_matches(event: AuditEvent, needle: str) -> bool:
+    fields = [
+        event.action,
+        event.actor_subject,
+        event.actor_email,
+        event.resource_type,
+        event.resource_id,
+        *event.metadata_json.keys(),
+        *event.metadata_json.values(),
+    ]
+    return any(needle in str(value).lower() for value in fields if value is not None)
 
 
 def _reject_secret_like_json(value: object, *, path: str) -> None:

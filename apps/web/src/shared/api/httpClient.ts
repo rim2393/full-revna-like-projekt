@@ -275,7 +275,10 @@ export function createHttpLumenApiClient({
       request('/api/v1/tools/drop-connections', { body: payload, method: 'POST' }),
     inspectSrh: () => request('/api/v1/tools/srh-inspector'),
     inspectSessions: () => request('/api/v1/tools/sessions'),
-    inspectTorrentReports: () => request('/api/v1/tools/torrent-blocker-reports'),
+    inspectTorrentReports: (query?: string, limit = 200) =>
+      request(
+        `/api/v1/tools/torrent-blocker-reports?limit=${encodeURIComponent(String(limit))}${query ? `&query=${encodeURIComponent(query)}` : ''}`,
+      ),
     inspectHappRouting: () => request('/api/v1/tools/happ-routing'),
     buildHappRouting: (payload: HappRoutingBuildRequest) =>
       request('/api/v1/tools/happ-routing/build', { body: payload, method: 'POST' }),

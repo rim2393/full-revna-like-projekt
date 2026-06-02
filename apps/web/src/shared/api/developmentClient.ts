@@ -1332,8 +1332,48 @@ export function createDevelopmentLumenApiClient(): LumenApiClient {
         user_id: user.id,
       })),
     }),
-    inspectTorrentReports: async (): Promise<TorrentReportResponse> => ({ items: [] }),
-    truncateTorrentReports: async (): Promise<TorrentReportResponse> => ({ items: [] }),
+    inspectTorrentReports: async (query?: string, limit = 200): Promise<TorrentReportResponse> => {
+      const rows = [
+        {
+          action: 'torrent.blocked',
+          actor_email: 'operator@lumen.local',
+          actor_subject: developmentSession.userId,
+          created_at: generatedAt,
+          id: 'torrent-event-development',
+          metadata_json: { host: 'example.test', source: 'development' },
+          resource_id: 'btih:development',
+          resource_type: 'torrent',
+        },
+      ]
+      const normalizedQuery = query?.trim().toLowerCase()
+      const filtered = normalizedQuery
+        ? rows.filter((row) =>
+            [
+              row.action,
+              row.actor_email,
+              row.actor_subject,
+              row.resource_id,
+              row.resource_type,
+              ...Object.keys(row.metadata_json),
+              ...Object.values(row.metadata_json),
+            ].some((field) => field && String(field).toLowerCase().includes(normalizedQuery)),
+          )
+        : rows
+      return {
+        actions: [...new Set(filtered.map((row) => row.action))],
+        items: filtered.slice(0, limit),
+        limit,
+        query: query ?? null,
+        total: filtered.length,
+      }
+    },
+    truncateTorrentReports: async (): Promise<TorrentReportResponse> => ({
+      actions: [],
+      items: [],
+      limit: 200,
+      query: null,
+      total: 0,
+    }),
     generateX25519Keypair: async () => ({
       encoding: 'base64url-nopad',
       private_key: 'development-private-key-not-for-production-use',

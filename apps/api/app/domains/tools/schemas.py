@@ -68,7 +68,9 @@ class SessionInspectorResponse(BaseModel):
 class TorrentReportRow(BaseModel):
     id: UUID
     action: str
+    actor_subject: str
     actor_email: str | None
+    resource_type: str
     resource_id: str | None
     metadata_json: dict[str, str]
     created_at: datetime
@@ -76,6 +78,10 @@ class TorrentReportRow(BaseModel):
 
 class TorrentReportResponse(BaseModel):
     items: list[TorrentReportRow]
+    total: int
+    query: str | None = None
+    limit: int
+    actions: list[str] = Field(default_factory=list)
 
 
 class HappRoutingRow(BaseModel):

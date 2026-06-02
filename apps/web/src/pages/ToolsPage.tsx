@@ -104,6 +104,8 @@ export function ToolsPage() {
   })
   const [hwidFilter, setHwidFilter] = useState('')
   const [ipFilter, setIpFilter] = useState('')
+  const [torrentFilter, setTorrentFilter] = useState('')
+  const [torrentTruncateArmed, setTorrentTruncateArmed] = useState(false)
   const [topUsersMetric, setTopUsersMetric] = useState('traffic_used')
   const [latestDropCommand, setLatestDropCommand] = useState<NodeCommandRecord | null>(null)
   const [happBuildError, setHappBuildError] = useState<string | null>(null)
@@ -129,7 +131,7 @@ export function ToolsPage() {
   const nodeUserIpsQuery = useNodeUserIpsData(ipFilter, 200)
   const srhQuery = useSrhInspectorData()
   const sessionsQuery = useSessionInspectorData()
-  const torrentQuery = useTorrentReportsData()
+  const torrentQuery = useTorrentReportsData(torrentFilter, 200)
   const happQuery = useHappRoutingData()
   const snippetsQuery = useToolSnippetsData()
   const buildHappRouting = useBuildHappRouting()
@@ -371,8 +373,8 @@ export function ToolsPage() {
         rows: (torrentQuery.data?.items ?? []).map((item) => ({
           cells: [
             item.action,
-            item.actor_email ?? '-',
-            item.resource_id ?? '-',
+            item.actor_email ?? item.actor_subject,
+            `${item.resource_type}${item.resource_id ? ` / ${item.resource_id}` : ''}`,
             formatRecord(item.metadata_json),
             formatDateTime(item.created_at),
           ],
@@ -521,9 +523,15 @@ export function ToolsPage() {
                     truncateTorrentReports.isPending ||
                     (torrentQuery.data?.items.length ?? 0) === 0
                   }
-                  onClick={() => void truncateTorrentReports.mutateAsync()}
+                  onClick={() => {
+                    if (!torrentTruncateArmed) {
+                      setTorrentTruncateArmed(true)
+                      return
+                    }
+                    void truncateTorrentReports.mutateAsync().then(() => setTorrentTruncateArmed(false))
+                  }}
                 >
-                  Truncate
+                  {torrentTruncateArmed ? 'Confirm truncate' : 'Truncate'}
                 </button>
               ) : null}
               {activeTool === 'utilities' ? (
@@ -586,6 +594,26 @@ export function ToolsPage() {
                     <option value="expiration_risk">Expiration risk</option>
                   </select>
                 </label>
+              </div>
+            ) : null}
+            {activeTool === 'torrent' ? (
+              <div className="toolbar">
+                <label htmlFor="torrent-filter" className="field field--inline">
+                  <span>Lookup torrent report</span>
+                  <input
+                    id="torrent-filter"
+                    type="search"
+                    placeholder="action, actor, resource, metadata"
+                    value={torrentFilter}
+                    onChange={(event) => {
+                      setTorrentFilter(event.target.value)
+                      setTorrentTruncateArmed(false)
+                    }}
+                  />
+                </label>
+                <StatusBadge tone="neutral">
+                  {`${torrentQuery.data?.total ?? 0} reports`}
+                </StatusBadge>
               </div>
             ) : null}
             {activeTool === 'user-ips' ? (

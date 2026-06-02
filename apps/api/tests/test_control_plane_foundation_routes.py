@@ -1855,6 +1855,17 @@ async def test_tools_reports_are_real_database_views(foundation_app: FoundationR
     torrent_response = await foundation_app.client.get("/api/v1/tools/torrent-blocker-reports")
     assert torrent_response.status_code == 200
     assert torrent_response.json()["items"][0]["action"] == "torrent.blocked"
+    assert torrent_response.json()["items"][0]["resource_type"] == "torrent"
+    assert torrent_response.json()["total"] == 1
+    assert torrent_response.json()["actions"] == ["torrent.blocked"]
+
+    filtered_torrent_response = await foundation_app.client.get(
+        "/api/v1/tools/torrent-blocker-reports?query=example.test&limit=1"
+    )
+    assert filtered_torrent_response.status_code == 200
+    assert filtered_torrent_response.json()["total"] == 1
+    assert filtered_torrent_response.json()["limit"] == 1
+    assert filtered_torrent_response.json()["items"][0]["metadata_json"]["host"] == "example.test"
 
     truncate_torrent_response = await foundation_app.client.delete(
         "/api/v1/tools/torrent-blocker-reports"

@@ -692,28 +692,48 @@ describe('Control plane resource screens', () => {
 
   it('wires torrent report truncation to backend requests', async () => {
     const user = userEvent.setup()
-    const truncateTorrentReports = vi.fn(async () => ({ items: [] }))
+    const truncateTorrentReports = vi.fn(async () => ({
+      actions: [],
+      items: [],
+      limit: 200,
+      query: null,
+      total: 0,
+    }))
+    const inspectTorrentReports = vi.fn(async (_query?: string, limit = 200) => ({
+      actions: ['torrent.blocked'],
+      items: [
+        {
+          action: 'torrent.blocked',
+          actor_email: 'operator@lumen.local',
+          actor_subject: 'usr_operator',
+          created_at: '2026-05-28T00:00:00.000Z',
+          id: 'torrent-event-1',
+          metadata_json: { host: 'example.test' },
+          resource_id: 'btih:test',
+          resource_type: 'torrent',
+        },
+      ],
+      limit,
+      query: _query ?? null,
+      total: 1,
+    }))
     const apiClient: LumenApiClient = {
       ...createDevelopmentLumenApiClient(),
-      inspectTorrentReports: async () => ({
-        items: [
-          {
-            action: 'torrent.blocked',
-            actor_email: 'operator@lumen.local',
-            created_at: '2026-05-28T00:00:00.000Z',
-            id: 'torrent-event-1',
-            metadata_json: { host: 'example.test' },
-            resource_id: 'usr_operator',
-          },
-        ],
-      }),
+      inspectTorrentReports,
       truncateTorrentReports,
     }
 
     renderWithRouter('/tools', { apiClient, initialSession: developmentSession })
 
     await user.click(await screen.findByRole('button', { name: /torrent blocker reports/i }))
+    fireEvent.change(screen.getByLabelText(/lookup torrent report/i), {
+      target: { value: 'example.test' },
+    })
+    await waitFor(() => expect(inspectTorrentReports).toHaveBeenCalledWith('example.test', 200))
+    expect(await screen.findByText('torrent / btih:test')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: /^truncate$/i }))
+    expect(truncateTorrentReports).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: /^confirm truncate$/i }))
     await waitFor(() => expect(truncateTorrentReports).toHaveBeenCalledTimes(1))
   })
 
