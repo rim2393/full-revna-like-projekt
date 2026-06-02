@@ -9,6 +9,9 @@ import type {
   SquadCreateRequest,
   SquadDetailResponse,
   SquadUpdateRequest,
+  SubscriptionTemplateCreateRequest,
+  SubscriptionTemplateRecord,
+  SubscriptionTemplateUpdateRequest,
   UserRecord,
 } from '../shared/api/types'
 import { developmentSession } from '../shared/data/developmentFixtures'
@@ -1187,6 +1190,101 @@ describe('Control plane resource screens', () => {
         update_interval_hours: 8,
       }),
     })
+  })
+
+  it('edits, clones, and reorders subscription templates through real template APIs', async () => {
+    const user = userEvent.setup()
+    const templates: SubscriptionTemplateRecord[] = [
+      {
+        content_json: { prepend: '# base\n', headers: { 'X-Lumen-Template': 'base' } },
+        format: 'mihomo',
+        id: 'tpl_base',
+        name: 'Base Mihomo',
+        order: 0,
+        status: 'active',
+      },
+      {
+        content_json: { merge: { routing: { domainStrategy: 'AsIs' } } },
+        format: 'xray_json',
+        id: 'tpl_xray',
+        name: 'Xray JSON',
+        order: 1,
+        status: 'active',
+      },
+    ]
+    const listSubscriptionTemplates = vi.fn(async () => ({ items: templates }))
+    const updateSubscriptionTemplate = vi.fn(
+      async (
+        templateId: string,
+        request: SubscriptionTemplateUpdateRequest,
+      ): Promise<SubscriptionTemplateRecord> => {
+        const current = templates.find((template) => template.id === templateId)!
+        return {
+          ...current,
+          ...request,
+          order: request.order ?? current.order,
+        }
+      },
+    )
+    const createSubscriptionTemplate = vi.fn(
+      async (request: SubscriptionTemplateCreateRequest): Promise<SubscriptionTemplateRecord> => ({
+        content_json: request.content_json ?? {},
+        format: request.format,
+        id: 'tpl_clone',
+        name: request.name,
+        order: templates.length,
+        status: request.status ?? 'active',
+      }),
+    )
+    const reorderSubscriptionTemplates = vi.fn(async (ids: string[]) => ({
+      updated: ids.length,
+    }))
+    const apiClient: LumenApiClient = {
+      ...createDevelopmentLumenApiClient(),
+      createSubscriptionTemplate,
+      listSubscriptionTemplates,
+      reorderSubscriptionTemplates,
+      updateSubscriptionTemplate,
+    }
+
+    renderWithRouter('/templates', { apiClient, initialSession: developmentSession })
+
+    expect(await screen.findByRole('table', { name: /subscription templates/i })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /edit base mihomo/i }))
+    await user.clear(screen.getByLabelText(/^name$/i, { selector: '#edit-template-name' }))
+    await user.type(screen.getByLabelText(/^name$/i, { selector: '#edit-template-name' }), 'Base Mihomo Live')
+    fireEvent.change(screen.getByLabelText(/content json/i, { selector: '#edit-template-content' }), {
+      target: {
+        value: '{"prepend":"# edited\\\\n","headers":{"X-Lumen-Template":"edited"}}',
+      },
+    })
+    await user.click(screen.getByRole('button', { name: /save selected template/i }))
+
+    await waitFor(() => expect(updateSubscriptionTemplate).toHaveBeenCalledTimes(1))
+    expect(updateSubscriptionTemplate).toHaveBeenCalledWith('tpl_base', {
+      content_json: {
+        headers: { 'X-Lumen-Template': 'edited' },
+        prepend: '# edited\\n',
+      },
+      format: 'mihomo',
+      name: 'Base Mihomo Live',
+      status: 'active',
+    })
+
+    await user.click(screen.getByRole('button', { name: /clone xray json/i }))
+    await waitFor(() => expect(createSubscriptionTemplate).toHaveBeenCalledTimes(1))
+    expect(createSubscriptionTemplate).toHaveBeenCalledWith({
+      content_json: { merge: { routing: { domainStrategy: 'AsIs' } } },
+      format: 'xray_json',
+      name: 'Xray JSON copy',
+      status: 'active',
+    })
+
+    await user.click(screen.getByRole('button', { name: /move xray json up/i }))
+    await waitFor(() => expect(reorderSubscriptionTemplates).toHaveBeenCalledWith([
+      'tpl_xray',
+      'tpl_base',
+    ]))
   })
 
   it('manages MFA methods and passkeys through auth security APIs', async () => {

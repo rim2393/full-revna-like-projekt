@@ -904,15 +904,97 @@ async def test_public_subscription_renderers_emit_client_compatible_formats(
         mihomo_response.text
     )
 
+    second_mihomo_template_response = await route_app.client.post(
+        "/api/v1/subscription-templates",
+        json={
+            "name": "Mihomo reordered template",
+            "format": "mihomo",
+            "content_json": {
+                "prepend": "# Reordered Mihomo profile\n",
+                "headers": {"X-Lumen-Template": "mihomo-reordered"},
+            },
+        },
+    )
+    assert second_mihomo_template_response.status_code == 201
+    second_mihomo_template_id = second_mihomo_template_response.json()["id"]
+    reorder_response = await route_app.client.post(
+        "/api/v1/subscription-templates/actions/reorder",
+        json={"ids": [second_mihomo_template_id, template_id]},
+    )
+    assert reorder_response.status_code == 200
+    reordered_mihomo_response = await route_app.client.get(
+        f"/api/v1/subscriptions/public/{public_id}/render?target=mihomo",
+    )
+    assert reordered_mihomo_response.status_code == 200
+    assert reordered_mihomo_response.headers["x-lumen-template-id"] == second_mihomo_template_id
+    assert reordered_mihomo_response.headers["x-lumen-template"] == "mihomo-reordered"
+    assert reordered_mihomo_response.text.startswith("# Reordered Mihomo profile\n")
+
+    stash_template_response = await route_app.client.post(
+        "/api/v1/subscription-templates",
+        json={
+            "name": "Stash production template",
+            "format": "stash",
+            "content_json": {
+                "append": "# stash end\n",
+                "headers": {"X-Lumen-Stash": "active"},
+            },
+        },
+    )
+    assert stash_template_response.status_code == 201
+    stash_response = await route_app.client.get(
+        f"/api/v1/subscriptions/public/{public_id}/render?target=stash",
+    )
+    assert stash_response.status_code == 200
+    assert stash_response.headers["x-lumen-stash"] == "active"
+    assert stash_response.text.endswith("# stash end\n")
+
+    clash_template_response = await route_app.client.post(
+        "/api/v1/subscription-templates",
+        json={
+            "name": "Clash production template",
+            "format": "clash",
+            "content_json": {
+                "prepend": "# clash profile\n",
+                "headers": {"X-Lumen-Clash": "active"},
+            },
+        },
+    )
+    assert clash_template_response.status_code == 201
+    clash_response = await route_app.client.get(
+        f"/api/v1/subscriptions/public/{public_id}/render?target=clash",
+    )
+    assert clash_response.status_code == 200
+    assert clash_response.headers["x-lumen-clash"] == "active"
+    assert clash_response.text.startswith("# clash profile\n")
+
+    sing_box_template_response = await route_app.client.post(
+        "/api/v1/subscription-templates",
+        json={
+            "name": "sing-box production template",
+            "format": "sing_box",
+            "content_json": {
+                "merge": {
+                    "experimental": {"cache_file": {"enabled": True}},
+                    "route": {"auto_detect_interface": False},
+                },
+                "headers": {"X-Lumen-Template": "sing-box-production"},
+            },
+        },
+    )
+    assert sing_box_template_response.status_code == 201
     sing_box_response = await route_app.client.get(
         f"/api/v1/subscriptions/public/{public_id}/render?target=sing-box",
     )
     assert sing_box_response.status_code == 200
+    assert sing_box_response.headers["x-lumen-template"] == "sing-box-production"
     sing_box = sing_box_response.json()
     assert sing_box["outbounds"][0]["type"] == "vless"
     assert sing_box["outbounds"][0]["tls"]["reality"]["public_key"] == (
         "F1E2D3C4B5A69788776655443322110abcdEFGH_-"
     )
+    assert sing_box["experimental"]["cache_file"]["enabled"] is True
+    assert sing_box["route"]["auto_detect_interface"] is False
 
     xray_template_response = await route_app.client.post(
         "/api/v1/subscription-templates",
@@ -924,6 +1006,7 @@ async def test_public_subscription_renderers_emit_client_compatible_formats(
                 "append": "# invalid for json\n",
                 "filename": "lumen-xray-managed.json",
                 "headers": {"X-Lumen-Template": "xray-production"},
+                "merge": {"routing": {"domainStrategy": "IPIfNonMatch"}},
             },
         },
     )
@@ -940,6 +1023,7 @@ async def test_public_subscription_renderers_emit_client_compatible_formats(
     xray = xray_response.json()
     assert xray["outbounds"][0]["protocol"] == "vless"
     assert xray["outbounds"][0]["streamSettings"]["security"] == "reality"
+    assert xray["routing"]["domainStrategy"] == "IPIfNonMatch"
 
 
 async def test_subscription_delivery_setting_feeds_manifest_and_renderer_headers(

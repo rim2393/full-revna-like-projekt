@@ -460,6 +460,17 @@ async def test_subscription_templates_and_response_rules_are_persisted(
         first_template_id,
     ]
 
+    invalid_template = await foundation_app.client.post(
+        "/api/v1/subscription-templates",
+        json={
+            "name": "Unsafe inline secret",
+            "format": "sing_box",
+            "content_json": {"merge": {"experimental": {"secret_token": "bad"}}},
+        },
+    )
+    assert invalid_template.status_code == 422
+    assert invalid_template.json()["error"]["code"] == "subscription_template_secret_like_key"
+
     rule_response = await foundation_app.client.post(
         "/api/v1/response-rules",
         json={

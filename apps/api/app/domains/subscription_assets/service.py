@@ -34,6 +34,7 @@ async def create_template(
     principal: Principal,
 ) -> SubscriptionTemplateResponse:
     items = await _setting_items(session, TEMPLATES_KEY)
+    _ensure_no_secret_like_keys(request.content_json, path=("content_json",))
     item = {
         "id": f"tpl_{uuid4().hex[:16]}",
         "name": request.name,
@@ -57,6 +58,8 @@ async def update_template(
     items = await _setting_items(session, TEMPLATES_KEY)
     item = _find_item(items, item_id=template_id, code="template_not_found")
     data = request.model_dump(exclude_unset=True)
+    if "content_json" in data:
+        _ensure_no_secret_like_keys(data["content_json"], path=("content_json",))
     item.update(data)
     await _save_setting_items(session, key=TEMPLATES_KEY, items=items, principal=principal)
     return _template_response(item)
@@ -280,3 +283,28 @@ def _template_response(item: dict[str, object]) -> SubscriptionTemplateResponse:
 
 def _rule_response(item: dict[str, object]) -> ResponseRuleResponse:
     return ResponseRuleResponse.model_validate(item)
+
+
+def _ensure_no_secret_like_keys(
+    value: object,
+    *,
+    path: tuple[str, ...] = (),
+) -> None:
+    forbidden = ("secret", "token", "password", "privatekey", "private_key", "clientsecret")
+    if isinstance(value, list):
+        for index, item in enumerate(value):
+            _ensure_no_secret_like_keys(item, path=(*path, str(index)))
+        return
+    if not isinstance(value, dict):
+        return
+    for key, item in value.items():
+        normalized = str(key).replace("-", "").replace("_", "").lower()
+        if any(fragment.replace("_", "") in normalized for fragment in forbidden):
+            detail = ".".join((*path, str(key)))
+            raise APIError(
+                code="subscription_template_secret_like_key",
+                message="Subscription templates must not contain inline secret-like keys.",
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                details=[detail],
+            )
+        _ensure_no_secret_like_keys(item, path=(*path, str(key)))

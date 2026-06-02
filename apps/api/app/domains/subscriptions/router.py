@@ -1,3 +1,4 @@
+import json
 from typing import Annotated
 from uuid import UUID
 
@@ -432,6 +433,8 @@ async def _apply_subscription_template(
     prepend = content.get("prepend")
     append = content.get("append")
     allow_body_wrapping = not _is_json_content_type(rendered.content_type)
+    if not allow_body_wrapping:
+        body = _apply_json_template_merge(body, content)
     if allow_body_wrapping and isinstance(prepend, str) and prepend:
         body = f"{prepend}{body}"
     if allow_body_wrapping and isinstance(append, str) and append:
@@ -466,6 +469,31 @@ async def _apply_subscription_template(
         filename=filename,
         headers=headers,
     )
+
+
+def _apply_json_template_merge(body: str, content: dict[str, object]) -> str:
+    merge = content.get("merge")
+    if not isinstance(merge, dict) or not merge:
+        return body
+    parsed = json.loads(body)
+    if not isinstance(parsed, dict):
+        return body
+    merged = _deep_merge_json(parsed, merge)
+    return f"{json.dumps(merged, indent=2, ensure_ascii=False)}\n"
+
+
+def _deep_merge_json(
+    base: dict[str, object],
+    patch: dict[str, object],
+) -> dict[str, object]:
+    merged = dict(base)
+    for key, value in patch.items():
+        existing = merged.get(key)
+        if isinstance(existing, dict) and isinstance(value, dict):
+            merged[key] = _deep_merge_json(existing, value)
+        else:
+            merged[key] = value
+    return merged
 
 
 def _is_json_content_type(content_type: str) -> bool:
