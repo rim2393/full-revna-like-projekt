@@ -1025,6 +1025,79 @@ async def test_public_subscription_renderers_emit_client_compatible_formats(
     assert xray["outbounds"][0]["streamSettings"]["security"] == "reality"
     assert xray["routing"]["domainStrategy"] == "IPIfNonMatch"
 
+    target_contracts = {
+        "raw-uri": ("text/plain", "raw"),
+        "v2ray": ("text/plain", "raw"),
+        "v2ray-base64": ("text/plain", "base64"),
+        "v2rayn": ("text/plain", "raw"),
+        "v2rayng": ("text/plain", "raw"),
+        "streisand": ("text/plain", "raw"),
+        "shadowrocket": ("text/plain", "raw"),
+        "hiddify": ("text/plain", "raw"),
+        "happ": ("text/plain", "raw"),
+        "mihomo": ("application/yaml", "mihomo"),
+        "clash-meta": ("application/yaml", "mihomo"),
+        "clash": ("application/yaml", "mihomo"),
+        "flclash": ("application/yaml", "mihomo"),
+        "stash": ("application/yaml", "mihomo"),
+        "koala-clash": ("application/yaml", "mihomo"),
+        "sing-box": ("application/json", "sing-box"),
+        "nekobox": ("application/json", "sing-box"),
+        "nekoray": ("application/json", "sing-box"),
+        "xray-json": ("application/json", "xray"),
+        "amnezia": ("application/json", "xray"),
+        "lumen-json": ("application/json", "lumen"),
+    }
+    forbidden_markers = (
+        "skeleton",
+        "placeholder",
+        "credentialsref",
+        "privatekey",
+        "access_token",
+    )
+    for target, (content_type, family) in target_contracts.items():
+        response = await route_app.client.get(
+            f"/api/v1/subscriptions/public/{public_id}/render?target={target}",
+        )
+        assert response.status_code == 200, target
+        assert response.headers["x-lumen-render-target"] == target
+        assert response.headers["content-type"].startswith(content_type)
+        assert response.headers["profile-title"].startswith("base64:")
+        assert "subscription-userinfo" in response.headers
+        body = response.text
+        markers = forbidden_markers
+        if family == "lumen":
+            markers = ("skeleton",)
+        assert not any(marker in body.lower() for marker in markers), target
+
+        if family == "raw":
+            assert body.startswith("vless://"), target
+            assert "security=reality" in body
+            assert "pbk=F1E2D3C4B5A69788776655443322110abcdEFGH_-" in body
+        elif family == "base64":
+            decoded = base64.b64decode(body.strip()).decode("utf-8")
+            assert decoded.startswith("vless://")
+            assert "security=reality" in decoded
+        elif family == "mihomo":
+            assert "proxies:" in body
+            assert "proxy-groups:" in body
+            assert 'type: "vless"' in body
+            assert "reality-opts:" in body
+        elif family == "sing-box":
+            parsed = response.json()
+            assert parsed["outbounds"][0]["type"] == "vless"
+            assert parsed["outbounds"][0]["tls"]["reality"]["public_key"] == (
+                "F1E2D3C4B5A69788776655443322110abcdEFGH_-"
+            )
+        elif family == "xray":
+            parsed = response.json()
+            assert parsed["outbounds"][0]["protocol"] == "vless"
+            assert parsed["outbounds"][0]["streamSettings"]["security"] == "reality"
+        else:
+            parsed = response.json()
+            assert parsed["schemaVersion"] == "lumen.subscription-manifest.v1"
+            assert parsed["nodes"][0]["protocols"][0]["adapter"] == "vless-reality"
+
 
 async def test_subscription_delivery_setting_feeds_manifest_and_renderer_headers(
     route_app: RouteTestApp,

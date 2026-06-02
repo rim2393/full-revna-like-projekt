@@ -65,9 +65,16 @@ test("renders runnable sing-box and Mihomo configs with derived credentials", ()
 
 test("dispatches renderer formats and rejects unknown formats", () => {
   const manifest = fixtureManifest();
-  assert.match(renderClientSubscription(manifest, "clash-meta", { credentialSeed: CREDENTIAL_SEED }), /proxies:/);
-  assert.match(renderClientSubscription(manifest, "mihomo", { credentialSeed: CREDENTIAL_SEED }), /proxies:/);
-  assert.match(renderClientSubscription(manifest, "sing-box", { credentialSeed: CREDENTIAL_SEED }), /"outbounds":/);
+  for (const format of ["clash-meta", "mihomo", "clash", "flclash", "stash", "koala-clash"]) {
+    const rendered = renderClientSubscription(manifest, format, { credentialSeed: CREDENTIAL_SEED });
+    assert.match(rendered, /proxies:/);
+    assert.match(rendered, /proxy-groups:/);
+  }
+  for (const format of ["sing-box", "nekobox", "nekoray"]) {
+    const rendered = renderClientSubscription(manifest, format, { credentialSeed: CREDENTIAL_SEED });
+    assert.match(rendered, /"outbounds":/);
+    assert.match(rendered, /"type": "vless"/);
+  }
   assert.throws(() => renderClientSubscription(manifest, "raw-url"), /Unsupported/);
   assert.throws(() => renderClientSubscription(manifest, "sing-box"), /credentialSeed/);
 });

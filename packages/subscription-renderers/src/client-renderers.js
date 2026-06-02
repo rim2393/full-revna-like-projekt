@@ -5,9 +5,17 @@ import { renderJsonManifest } from "./json-renderer.js";
 export const SUPPORTED_RENDER_FORMATS = Object.freeze([
   "lumen-json",
   "sing-box",
+  "nekobox",
+  "nekoray",
   "clash-meta",
-  "mihomo"
+  "mihomo",
+  "clash",
+  "flclash",
+  "stash",
+  "koala-clash"
 ]);
+const SING_BOX_FORMATS = new Set(["sing-box", "nekobox", "nekoray"]);
+const MIHOMO_FORMATS = new Set(["clash-meta", "mihomo", "clash", "flclash", "stash", "koala-clash"]);
 const LIVE_CLIENT_PROTOCOLS = new Set([
   "vless-ws",
   "vless-ws-tls",
@@ -530,9 +538,12 @@ export function renderClientSubscription(manifest, format, options = {}) {
     return renderJsonManifest(manifest, options);
   }
 
-  if (format === "sing-box") {
+  if (SING_BOX_FORMATS.has(format)) {
     return `${JSON.stringify(renderSingBoxConfig(manifest, options), null, options.space ?? 2)}\n`;
   }
 
+  if (!MIHOMO_FORMATS.has(format)) {
+    throw new Error(`Unsupported subscription render format: ${format}`);
+  }
   return renderMihomoYaml(manifest, options);
 }

@@ -784,13 +784,15 @@ def _subscription_render_formats(delivery_profile: dict[str, str]) -> list[str]:
                     if alias not in formats:
                         formats.append(alias)
                 continue
-            if normalized in {"mihomo", "clash", "clash-meta"}:
-                if "mihomo" not in formats:
-                    formats.append("mihomo")
+            if normalized in {"mihomo", "clash", "clash-meta", "flclash", "stash", "koala-clash"}:
+                for alias in ("mihomo", "clash-meta", "clash", "flclash", "stash", "koala-clash"):
+                    if alias not in formats:
+                        formats.append(alias)
                 continue
-            if normalized in {"sing-box", "singbox", "nekobox"}:
-                if "sing-box" not in formats:
-                    formats.append("sing-box")
+            if normalized in {"sing-box", "singbox", "nekobox", "nekoray"}:
+                for alias in ("sing-box", "nekobox", "nekoray"):
+                    if alias not in formats:
+                        formats.append(alias)
                 continue
             if normalized in {"amnezia", "xray-json"}:
                 if "amnezia" not in formats:
