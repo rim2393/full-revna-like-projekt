@@ -17,6 +17,7 @@ from app.db.session import create_engine
 from app.domains.licenses.models import License
 from app.domains.licenses.service import hash_license_key
 from app.domains.nodes.models import Node
+from app.domains.protocols.models import Host, ProtocolProfile
 from app.domains.subscriptions.models import Subscription
 from app.domains.subscriptions.service import create_subscription_public_id
 from app.domains.users.models import User
@@ -31,7 +32,32 @@ def _write_state(path: Path, payload: dict[str, Any]) -> None:
     path.chmod(0o600)
 
 
-async def create_fixture(state_path: Path, panel_public_url: str) -> None:
+async def _select_live_profile_and_host(
+    session,
+    *,
+    node_id,
+    adapter: str,
+) -> tuple[ProtocolProfile | None, Host | None]:
+    if not adapter:
+        return None, None
+    result = await session.execute(
+        select(ProtocolProfile, Host)
+        .join(Host, Host.protocol_profile_id == ProtocolProfile.id)
+        .where(ProtocolProfile.node_id == node_id)
+        .where(ProtocolProfile.status == "active")
+        .where(ProtocolProfile.adapter == adapter)
+        .where(Host.status == "active")
+        .where(Host.hidden.is_(False))
+        .where(Host.subscription_excluded.is_(False))
+        .order_by(ProtocolProfile.created_at.asc(), Host.created_at.asc())
+    )
+    row = result.first()
+    if row is None:
+        raise RuntimeError(f"No active renderable host found for adapter {adapter!r}")
+    return row[0], row[1]
+
+
+async def create_fixture(state_path: Path, panel_public_url: str, adapter: str) -> None:
     run_id = f"{QA_PREFIX}-{secrets.token_hex(6)}"
     settings = get_settings()
     engine = create_engine(settings)
@@ -73,14 +99,23 @@ async def create_fixture(state_path: Path, panel_public_url: str) -> None:
             session.add(license_record)
             await session.flush()
 
-            public_id = await create_subscription_public_id(session)
-            subscription = Subscription(
-                public_id=public_id,
-                user_id=user.id,
-                license_id=license_record.id,
+            profile, host = await _select_live_profile_and_host(
+                session,
                 node_id=node.id,
-                status="active",
-                delivery_profile={
+                adapter=adapter,
+            )
+            if profile is not None and host is not None:
+                delivery_profile = {
+                    "protocol": profile.adapter,
+                    "adapter": profile.adapter,
+                    "profile_id": str(profile.id),
+                    "host_id": str(host.id),
+                    "profile_title": f"Lumen Android Live {profile.adapter}",
+                    "client": "happ",
+                }
+                config_hash = f"sha256:{run_id}:{profile.adapter}"
+            else:
+                delivery_profile = {
                     "protocol": "vless-reality",
                     "adapter": "vless-reality",
                     "profile_title": "Lumen Android Live Import",
@@ -92,8 +127,18 @@ async def create_fixture(state_path: Path, panel_public_url: str) -> None:
                     "flow": "xtls-rprx-vision",
                     "traffic_limit_gb": "500",
                     "client": "happ",
-                },
-                config_hash=f"sha256:{run_id}",
+                }
+                config_hash = f"sha256:{run_id}"
+
+            public_id = await create_subscription_public_id(session)
+            subscription = Subscription(
+                public_id=public_id,
+                user_id=user.id,
+                license_id=license_record.id,
+                node_id=node.id,
+                status="active",
+                delivery_profile=delivery_profile,
+                config_hash=config_hash,
                 expires_at=datetime.now(UTC) + timedelta(hours=6),
             )
             session.add(subscription)
@@ -110,6 +155,7 @@ async def create_fixture(state_path: Path, panel_public_url: str) -> None:
                     "subscription_id": str(subscription.id),
                     "license_id": str(license_record.id),
                     "user_id": str(user.id),
+                    "adapter": adapter or "fixture-vless-reality",
                 },
             )
         print(json.dumps({"ok": True, "fixture": "created"}, ensure_ascii=False))
@@ -159,10 +205,11 @@ async def main() -> None:
     parser.add_argument("action", choices=("create", "cleanup"))
     parser.add_argument("--state", default="/tmp/lumen-android-import-fixture.json")
     parser.add_argument("--panel-public-url", default=os.environ.get("PANEL_PUBLIC_URL", "https://panel.lumentech.tel"))
+    parser.add_argument("--adapter", default="")
     args = parser.parse_args()
     state_path = Path(args.state)
     if args.action == "create":
-        await create_fixture(state_path, args.panel_public_url)
+        await create_fixture(state_path, args.panel_public_url, args.adapter.strip())
     else:
         await cleanup_fixture(state_path)
 
