@@ -188,6 +188,15 @@ export function ToolsPage() {
     void navigator.clipboard.writeText(value)
   }
 
+  const downloadText = (filename: string, value: string) => {
+    const url = URL.createObjectURL(new Blob([value], { type: 'text/plain;charset=utf-8' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = filename
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
   const activeTable = useMemo(() => {
     if (activeTool === 'hwid') {
       return {
@@ -801,6 +810,41 @@ export function ToolsPage() {
             {activeTool === 'utilities' && generateX25519Keypair.data ? (
               <div className="details-card">
                 <h3>X25519 keypair</h3>
+                <p className="security-note">
+                  Private key is returned once in this browser session and is not stored by the API.
+                </p>
+                <div className="inline-actions">
+                  <button
+                    type="button"
+                    className="button button--secondary"
+                    onClick={() => copyText(generateX25519Keypair.data.public_key)}
+                  >
+                    Copy public
+                  </button>
+                  <button
+                    type="button"
+                    className="button button--secondary"
+                    onClick={() => copyText(generateX25519Keypair.data.private_key)}
+                  >
+                    Copy private
+                  </button>
+                  <button
+                    type="button"
+                    className="button button--secondary"
+                    onClick={() =>
+                      downloadText('lumen-x25519-private-key.txt', generateX25519Keypair.data.private_key)
+                    }
+                  >
+                    Download private
+                  </button>
+                  <button
+                    type="button"
+                    className="button button--secondary"
+                    onClick={() => generateX25519Keypair.reset()}
+                  >
+                    Clear private
+                  </button>
+                </div>
                 <dl className="detail-list">
                   <div>
                     <dt>Public key</dt>

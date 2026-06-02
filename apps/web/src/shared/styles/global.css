@@ -1220,6 +1220,13 @@ h2 {
   font-weight: 700;
 }
 
+.security-note {
+  margin-top: var(--space-3);
+  color: var(--color-warning);
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
 .detail-list {
   display: grid;
   gap: var(--space-3);
