@@ -873,12 +873,13 @@ export function useToolSummaryData() {
   })
 }
 
-export function useHwidInspectorData() {
+export function useHwidInspectorData(query?: string) {
   const apiClient = useApiClient()
+  const normalizedQuery = query?.trim() ?? ''
 
   return useQuery({
-    queryFn: apiClient.inspectHwid,
-    queryKey: resourceQueryKeys.toolHwid,
+    queryFn: () => apiClient.inspectHwid(normalizedQuery || undefined),
+    queryKey: [...resourceQueryKeys.toolHwid, normalizedQuery],
   })
 }
 

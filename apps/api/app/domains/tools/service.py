@@ -51,11 +51,21 @@ SECRET_LIKE_PATTERN = re.compile(
 )
 
 
-async def inspect_hwid(session: AsyncSession) -> HwidInspectorResponse:
+async def inspect_hwid(session: AsyncSession, *, query: str | None = None) -> HwidInspectorResponse:
     result = await session.execute(select(User).order_by(User.email))
+    needle = query.strip().lower() if query else None
     rows = []
     for user in result.scalars().all():
         device_records = _device_records(user.metadata_json)
+        subscription_ids = sorted(
+            {
+                device.subscription_id
+                for device in device_records
+                if device.subscription_id is not None
+            }
+        )
+        if needle and not _hwid_row_matches(user, device_records, subscription_ids, needle):
+            continue
         device_count = len(device_records)
         if user.device_limit is not None and device_count > user.device_limit:
             status = "over_limit"
@@ -73,6 +83,7 @@ async def inspect_hwid(session: AsyncSession) -> HwidInspectorResponse:
                 status=status,
                 devices=[device.label for device in device_records],
                 device_records=device_records,
+                subscription_ids=subscription_ids,
             )
         )
     return HwidInspectorResponse(items=rows)
@@ -602,11 +613,45 @@ def _device_records(metadata: dict[str, object]):
                 id=str(device_id),
                 label=str(label),
                 hwid=_optional_str(raw_device.get("hwid")),
+                last_seen_at=_optional_str(raw_device.get("last_seen_at")),
                 platform=_optional_str(raw_device.get("platform")),
                 status=str(raw_device.get("status") or "active"),
+                subscription_id=_optional_str(raw_device.get("subscription_id")),
             )
         )
     return devices
+
+
+def _hwid_row_matches(
+    user: User,
+    devices: list[HwidDeviceRecord],
+    subscription_ids: list[str],
+    needle: str,
+) -> bool:
+    user_fields = [
+        str(user.id),
+        user.email,
+        user.username,
+        user.display_name,
+        user.telegram_id,
+        *user.tags,
+        *subscription_ids,
+    ]
+    if any(needle in str(value).lower() for value in user_fields if value is not None):
+        return True
+    for device in devices:
+        fields = [
+            device.id,
+            device.label,
+            device.hwid,
+            device.platform,
+            device.status,
+            device.last_seen_at,
+            device.subscription_id,
+        ]
+        if any(needle in str(value).lower() for value in fields if value is not None):
+            return True
+    return False
 
 
 def _optional_str(value: object) -> str | None:

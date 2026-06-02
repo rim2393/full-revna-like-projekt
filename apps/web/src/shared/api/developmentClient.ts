@@ -1096,7 +1096,7 @@ export function createDevelopmentLumenApiClient(): LumenApiClient {
       sessions_active: 1,
       torrent_events: 0,
     }),
-    inspectHwid: async (): Promise<HwidInspectorResponse> => ({
+    inspectHwid: async (query?: string): Promise<HwidInspectorResponse> => ({
       items: users.map((user) => {
         const deviceRecords = Array.isArray(user.metadata_json.devices)
           ? (user.metadata_json.devices as Record<string, unknown>[]).map((device, index) => {
@@ -1105,11 +1105,18 @@ export function createDevelopmentLumenApiClient(): LumenApiClient {
                 hwid: device.hwid === undefined ? null : String(device.hwid),
                 id,
                 label: String(device.label ?? device.hwid ?? id),
+                last_seen_at:
+                  device.last_seen_at === undefined ? null : String(device.last_seen_at),
                 platform: device.platform === undefined ? null : String(device.platform),
                 status: String(device.status ?? 'active'),
+                subscription_id:
+                  device.subscription_id === undefined ? null : String(device.subscription_id),
               }
             })
           : []
+        const subscriptionIds = Array.from(
+          new Set(deviceRecords.map((device) => device.subscription_id).filter(Boolean)),
+        ) as string[]
         return {
           device_count: deviceRecords.length,
           device_limit: user.device_limit,
@@ -1120,9 +1127,31 @@ export function createDevelopmentLumenApiClient(): LumenApiClient {
             user.device_limit !== null && deviceRecords.length > user.device_limit
               ? 'over_limit'
               : 'ok',
+          subscription_ids: subscriptionIds,
           user_id: user.id,
           username: user.username,
         }
+      }).filter((item) => {
+        const normalizedQuery = query?.trim().toLowerCase()
+        if (!normalizedQuery) {
+          return true
+        }
+        const fields = [
+          item.email,
+          item.username,
+          item.user_id,
+          ...item.subscription_ids,
+          ...item.device_records.flatMap((device) => [
+            device.hwid,
+            device.id,
+            device.label,
+            device.last_seen_at,
+            device.platform,
+            device.status,
+            device.subscription_id,
+          ]),
+        ]
+        return fields.some((field) => field && String(field).toLowerCase().includes(normalizedQuery))
       }),
     }),
     inspectSrh: async (): Promise<SrhInspectorResponse> => ({

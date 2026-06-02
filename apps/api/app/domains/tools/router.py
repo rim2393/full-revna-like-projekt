@@ -1,7 +1,7 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings, get_settings
@@ -52,8 +52,12 @@ async def read_tools_summary(_: ToolManager, session: DatabaseSession) -> ToolSu
 
 
 @router.get("/hwid-inspector", response_model=HwidInspectorResponse)
-async def read_hwid_inspector(_: ToolManager, session: DatabaseSession) -> HwidInspectorResponse:
-    return await inspect_hwid(session)
+async def read_hwid_inspector(
+    _: ToolManager,
+    session: DatabaseSession,
+    query: str | None = Query(default=None, min_length=1, max_length=160),
+) -> HwidInspectorResponse:
+    return await inspect_hwid(session, query=query)
 
 
 @router.get("/srh-inspector", response_model=SrhInspectorResponse)

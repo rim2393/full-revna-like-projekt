@@ -1580,7 +1580,13 @@ async def test_tools_reports_are_real_database_views(foundation_app: FoundationR
             traffic_used_gb=3.5,
             metadata_json={
                 "devices": [
-                    {"id": "phone", "hwid": "HWID-1"},
+                    {
+                        "id": "phone",
+                        "hwid": "HWID-1",
+                        "last_seen_at": "2026-05-28T10:00:00Z",
+                        "platform": "android",
+                        "subscription_id": "lumen_sub_tools",
+                    },
                     {"id": "tablet", "hwid": "HWID-2"},
                 ]
             },
@@ -1644,6 +1650,22 @@ async def test_tools_reports_are_real_database_views(foundation_app: FoundationR
     assert hwid_row["device_count"] == 2
     assert hwid_row["device_records"][0]["id"] == "phone"
     assert hwid_row["device_records"][0]["hwid"] == "HWID-1"
+    assert hwid_row["device_records"][0]["last_seen_at"] == "2026-05-28T10:00:00Z"
+    assert hwid_row["device_records"][0]["platform"] == "android"
+    assert hwid_row["device_records"][0]["subscription_id"] == "lumen_sub_tools"
+    assert hwid_row["subscription_ids"] == ["lumen_sub_tools"]
+    hwid_filter_response = await foundation_app.client.get(
+        "/api/v1/tools/hwid-inspector?query=HWID-1"
+    )
+    assert hwid_filter_response.status_code == 200
+    assert [item["email"] for item in hwid_filter_response.json()["items"]] == [
+        "tools-user@example.com"
+    ]
+    empty_hwid_filter_response = await foundation_app.client.get(
+        "/api/v1/tools/hwid-inspector?query=not-present"
+    )
+    assert empty_hwid_filter_response.status_code == 200
+    assert empty_hwid_filter_response.json()["items"] == []
 
     srh_response = await foundation_app.client.get("/api/v1/tools/srh-inspector")
     assert srh_response.status_code == 200

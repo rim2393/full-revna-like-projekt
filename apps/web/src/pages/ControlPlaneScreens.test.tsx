@@ -468,39 +468,47 @@ describe('Control plane resource screens', () => {
       subscriptions: [],
       user: owner,
     }))
+    const inspectHwid = vi.fn(async (_query?: string) => ({
+      items: [
+        {
+          device_count: 1,
+          device_limit: 2,
+          device_records: [
+            {
+              hwid: 'HWID-1',
+              id: 'phone',
+              label: 'Phone',
+              last_seen_at: '2026-05-28T10:00:00Z',
+              platform: 'android',
+              status: 'active',
+              subscription_id: 'sub-live',
+            },
+          ],
+          devices: ['Phone'],
+          email: 'device-owner@lumen.local',
+          status: 'ok',
+          subscription_ids: ['sub-live'],
+          user_id: 'usr_hwid_tools',
+          username: 'device-owner',
+        },
+      ],
+    }))
     const apiClient: LumenApiClient = {
       ...createDevelopmentLumenApiClient(),
       clearUserDevices,
       deleteUserDevice,
-      inspectHwid: async () => ({
-        items: [
-          {
-            device_count: 1,
-            device_limit: 2,
-            device_records: [
-              {
-                hwid: 'HWID-1',
-                id: 'phone',
-                label: 'Phone',
-                platform: 'android',
-                status: 'active',
-              },
-            ],
-            devices: ['Phone'],
-            email: 'device-owner@lumen.local',
-            status: 'ok',
-            user_id: 'usr_hwid_tools',
-            username: 'device-owner',
-          },
-        ],
-      }),
+      inspectHwid,
     }
 
     renderWithRouter('/tools', { apiClient, initialSession: developmentSession })
 
     expect(await screen.findByRole('table', { name: /operational tools/i })).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText(/lookup hwid/i), { target: { value: 'HWID-1' } })
+    await waitFor(() => expect(inspectHwid).toHaveBeenCalledWith('HWID-1'))
     await user.click(
-      screen.getByRole('button', { name: /delete device phone for device-owner@lumen.local/i }),
+      await screen.findByRole('button', {
+        name: /delete device phone for device-owner@lumen.local/i,
+      }),
     )
     await waitFor(() =>
       expect(deleteUserDevice).toHaveBeenCalledWith('usr_hwid_tools', 'phone'),

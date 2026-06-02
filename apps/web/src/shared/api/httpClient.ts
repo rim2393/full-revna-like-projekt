@@ -255,7 +255,8 @@ export function createHttpLumenApiClient({
     listResponseRules: () => request('/api/v1/response-rules'),
     listSubscriptionPageConfigs: () => request('/api/v1/subscription-page-configs'),
     readToolSummary: () => request('/api/v1/tools/summary'),
-    inspectHwid: () => request('/api/v1/tools/hwid-inspector'),
+    inspectHwid: (query?: string) =>
+      request(`/api/v1/tools/hwid-inspector${query ? `?query=${encodeURIComponent(query)}` : ''}`),
     inspectSrh: () => request('/api/v1/tools/srh-inspector'),
     inspectSessions: () => request('/api/v1/tools/sessions'),
     inspectTorrentReports: () => request('/api/v1/tools/torrent-blocker-reports'),

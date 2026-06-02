@@ -832,12 +832,15 @@ export type HwidInspectorRow = {
     hwid: string | null
     id: string
     label: string
+    last_seen_at: string | null
     platform: string | null
     status: string
+    subscription_id: string | null
   }>
   devices: string[]
   email: string
   status: string
+  subscription_ids: string[]
   user_id: string
   username: string | null
 }
@@ -1311,7 +1314,7 @@ export type LumenApiClient = {
   listResponseRules: () => Promise<ResponseRuleListResponse>
   listSubscriptionPageConfigs: () => Promise<SubscriptionPageConfigListResponse>
   readToolSummary: () => Promise<ToolSummaryResponse>
-  inspectHwid: () => Promise<HwidInspectorResponse>
+  inspectHwid: (query?: string) => Promise<HwidInspectorResponse>
   inspectSrh: () => Promise<SrhInspectorResponse>
   inspectSessions: () => Promise<SessionInspectorResponse>
   inspectTorrentReports: () => Promise<TorrentReportResponse>

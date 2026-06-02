@@ -84,8 +84,9 @@ export function ToolsPage() {
     language: 'shell',
     name: 'Xray status',
   })
+  const [hwidFilter, setHwidFilter] = useState('')
   const summaryQuery = useToolSummaryData()
-  const hwidQuery = useHwidInspectorData()
+  const hwidQuery = useHwidInspectorData(hwidFilter)
   const srhQuery = useSrhInspectorData()
   const sessionsQuery = useSessionInspectorData()
   const torrentQuery = useTorrentReportsData()
@@ -115,7 +116,7 @@ export function ToolsPage() {
   const activeTable = useMemo(() => {
     if (activeTool === 'hwid') {
       return {
-        columns: ['User', 'Devices', 'Limit', 'Status', 'HWIDs', 'Actions'],
+        columns: ['User', 'Devices', 'Limit', 'Status', 'Device registry', 'Actions'],
         empty: 'No HWID records yet.',
         rows: (hwidQuery.data?.items ?? []).map((item) => ({
           cells: [
@@ -125,7 +126,15 @@ export function ToolsPage() {
             <StatusBadge tone={item.status === 'over_limit' ? 'danger' : 'good'}>
               {item.status}
             </StatusBadge>,
-            item.devices.join(', ') || '-',
+            item.device_records.length > 0 ? (
+              <div className="stacked-list">
+                {item.device_records.map((device) => (
+                  <span key={device.id}>
+                    {device.label} · {device.hwid ?? device.id} · {device.platform ?? 'unknown'} · {device.last_seen_at ? formatDateTime(device.last_seen_at) : 'not seen'} · {device.subscription_id ?? 'no subscription'}
+                  </span>
+                ))}
+              </div>
+            ) : '-',
             <div className="inline-actions">
               {item.device_records.map((device) => (
                 <button
@@ -319,6 +328,7 @@ export function ToolsPage() {
     deleteSnippet,
     happQuery.data,
     hwidQuery.data,
+    hwidFilter,
     generateX25519Keypair,
     generateNodeKey.data,
     revokeToolSession,
@@ -399,6 +409,20 @@ export function ToolsPage() {
                 </button>
               ) : null}
             </div>
+            {activeTool === 'hwid' ? (
+              <div className="toolbar">
+                <label htmlFor="hwid-filter" className="field field--inline">
+                  <span>Lookup HWID</span>
+                  <input
+                    id="hwid-filter"
+                    type="search"
+                    placeholder="email, username, HWID, device, subscription"
+                    value={hwidFilter}
+                    onChange={(event) => setHwidFilter(event.target.value)}
+                  />
+                </label>
+              </div>
+            ) : null}
             <div className="toolbar">
               {tools.map((tool) => {
                 const Icon = tool.icon

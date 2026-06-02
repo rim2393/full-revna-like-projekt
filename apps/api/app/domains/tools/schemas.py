@@ -10,6 +10,8 @@ class HwidDeviceRecord(BaseModel):
     hwid: str | None = None
     platform: str | None = None
     status: str = "active"
+    last_seen_at: str | None = None
+    subscription_id: str | None = None
 
 
 class HwidInspectorRow(BaseModel):
@@ -21,6 +23,7 @@ class HwidInspectorRow(BaseModel):
     status: str
     devices: list[str] = Field(default_factory=list)
     device_records: list[HwidDeviceRecord] = Field(default_factory=list)
+    subscription_ids: list[str] = Field(default_factory=list)
 
 
 class HwidInspectorResponse(BaseModel):
