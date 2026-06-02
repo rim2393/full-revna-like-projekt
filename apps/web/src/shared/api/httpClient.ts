@@ -228,6 +228,7 @@ export function createHttpLumenApiClient({
       }
     },
     listHosts: () => request('/api/v1/hosts'),
+    listLicenses: () => request('/api/v1/licenses'),
     listNodes: () => request('/api/v1/nodes'),
     getNodeOverview: (nodeId: string) => request(`/api/v1/nodes/${nodeId}/overview`),
     listNodeCommands: (nodeId: string) => request(`/api/v1/nodes/${nodeId}/commands`),

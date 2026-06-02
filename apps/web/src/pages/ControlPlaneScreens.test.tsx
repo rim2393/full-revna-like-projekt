@@ -73,6 +73,33 @@ describe('Control plane resource screens', () => {
     cleanup()
   })
 
+  it('creates subscriptions with a real listed license and backend public render metadata', async () => {
+    const user = userEvent.setup()
+    const baseClient = createDevelopmentLumenApiClient()
+    const createSubscription = vi.fn(baseClient.createSubscription)
+    const apiClient: LumenApiClient = {
+      ...baseClient,
+      createSubscription,
+    }
+
+    renderWithRouter('/subscription', { apiClient, initialSession: developmentSession })
+
+    expect(await screen.findByRole('table', { name: /subscription inventory/i })).toBeInTheDocument()
+    expect(await screen.findByLabelText(/^(license|лицензия)$/i)).toHaveDisplayValue(/lumen-production-instance/i)
+    expect(screen.getByText(/happ, hiddify/i)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /^(create subscription|создать подписку)$/i }))
+
+    await waitFor(() => expect(createSubscription).toHaveBeenCalledTimes(1))
+    expect(createSubscription).toHaveBeenCalledWith(
+      expect.objectContaining({
+        license_id: 'license_business',
+        node_id: 'node_mow_02',
+        user_id: 'usr_mira',
+      }),
+    )
+  })
+
   it('renders dashboard traffic and user risks from the real user API shape', async () => {
     const users: UserRecord[] = [
       {

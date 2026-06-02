@@ -47,6 +47,7 @@ export const resourceQueryKeys = {
   apiKeys: ['resource', 'api-keys'] as const,
   hosts: ['resource', 'hosts'] as const,
   license: ['resource', 'license'] as const,
+  licenses: ['resource', 'licenses'] as const,
   nodes: ['resource', 'nodes'] as const,
   nodeCommands: (nodeId: string) => ['resource', 'nodes', nodeId, 'commands'] as const,
   nodeMetrics: (nodeId: string) => ['resource', 'nodes', nodeId, 'metrics'] as const,
@@ -133,6 +134,15 @@ export function useLicensePageData() {
   return useQuery({
     queryFn: apiClient.readLicense,
     queryKey: resourceQueryKeys.license,
+  })
+}
+
+export function useLicensesPageData() {
+  const apiClient = useApiClient()
+
+  return useQuery({
+    queryFn: apiClient.listLicenses,
+    queryKey: resourceQueryKeys.licenses,
   })
 }
 

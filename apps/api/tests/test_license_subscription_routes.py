@@ -185,7 +185,11 @@ async def test_subscription_routes_create_list_and_get(route_app: RouteTestApp) 
             "user_id": str(user.id),
             "license_id": str(license_record.id),
             "node_id": str(node.id),
-            "delivery_profile": {"protocol": "vless"},
+            "delivery_profile": {
+                "format": "happ",
+                "profile_page_url": "https://profiles.example.test/sub",
+                "protocol": "vless",
+            },
             "config_hash": "sha256:route-config",
         },
     )
@@ -194,15 +198,34 @@ async def test_subscription_routes_create_list_and_get(route_app: RouteTestApp) 
     assert created["public_id"].startswith("lumen_sub_")
     assert created["status"] == "active"
     assert created["config_hash"] == "sha256:route-config"
-    assert created["delivery_profile"] == {"protocol": "vless"}
+    assert created["delivery_profile"]["protocol"] == "vless"
+    assert created["public_page_url"] == f"/sub/{created['public_id']}"
+    assert created["public_manifest_url"] == (
+        f"/api/v1/subscriptions/public/{created['public_id']}/manifest"
+    )
+    assert created["public_render_url"] == (
+        f"/api/v1/subscriptions/public/{created['public_id']}/render"
+    )
+    assert created["public_render_urls"]["happ"] == (
+        f"/api/v1/subscriptions/public/{created['public_id']}/render?target=happ"
+    )
+    assert created["public_render_urls"]["hiddify"] == (
+        f"/api/v1/subscriptions/public/{created['public_id']}/render?target=hiddify"
+    )
+    assert created["render_formats"] == ["happ", "hiddify"]
+    assert created["created_at"]
+    assert created["updated_at"]
 
     list_response = await route_app.client.get("/api/v1/subscriptions")
     assert list_response.status_code == 200
-    assert [item["id"] for item in list_response.json()["items"]] == [created["id"]]
+    listed = list_response.json()["items"]
+    assert [item["id"] for item in listed] == [created["id"]]
+    assert listed[0]["public_render_urls"] == created["public_render_urls"]
 
     get_response = await route_app.client.get(f"/api/v1/subscriptions/{created['id']}")
     assert get_response.status_code == 200
     assert get_response.json()["public_id"] == created["public_id"]
+    assert get_response.json()["render_formats"] == ["happ", "hiddify"]
 
 
 async def test_subscription_create_requires_node_and_renderable_protocol(

@@ -36,6 +36,13 @@ class SubscriptionResponse(BaseModel):
     config_hash: str | None
     expires_at: datetime | None
     revoked_at: datetime | None
+    public_page_url: str
+    public_manifest_url: str
+    public_render_url: str
+    public_render_urls: dict[str, str]
+    render_formats: list[str]
+    created_at: datetime
+    updated_at: datetime
 
 
 class SubscriptionListResponse(BaseModel):

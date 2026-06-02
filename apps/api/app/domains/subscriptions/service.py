@@ -711,6 +711,7 @@ async def list_subscription_devices(
 
 
 def subscription_to_response(subscription: Subscription) -> SubscriptionResponse:
+    render_formats = _subscription_render_formats(subscription.delivery_profile)
     return SubscriptionResponse(
         id=subscription.id,
         public_id=subscription.public_id,
@@ -722,7 +723,54 @@ def subscription_to_response(subscription: Subscription) -> SubscriptionResponse
         config_hash=subscription.config_hash,
         expires_at=subscription.expires_at,
         revoked_at=subscription.revoked_at,
+        public_page_url=f"/sub/{subscription.public_id}",
+        public_manifest_url=f"/api/v1/subscriptions/public/{subscription.public_id}/manifest",
+        public_render_url=f"/api/v1/subscriptions/public/{subscription.public_id}/render",
+        public_render_urls={
+            render_format: (
+                f"/api/v1/subscriptions/public/{subscription.public_id}/render"
+                f"?target={render_format}"
+            )
+            for render_format in render_formats
+        },
+        render_formats=render_formats,
+        created_at=subscription.created_at,
+        updated_at=subscription.updated_at,
     )
+
+
+def _subscription_render_formats(delivery_profile: dict[str, str]) -> list[str]:
+    values = (
+        delivery_profile.get("format"),
+        delivery_profile.get("client"),
+        delivery_profile.get("adapter"),
+    )
+    formats: list[str] = []
+    for value in values:
+        for item in str(value or "").replace("/", ",").replace(" ", ",").split(","):
+            normalized = item.strip().lower()
+            if not normalized:
+                continue
+            if normalized in {"happ", "hiddify"}:
+                for alias in ("happ", "hiddify"):
+                    if alias not in formats:
+                        formats.append(alias)
+                continue
+            if normalized in {"mihomo", "clash", "clash-meta"}:
+                if "mihomo" not in formats:
+                    formats.append("mihomo")
+                continue
+            if normalized in {"sing-box", "singbox", "nekobox"}:
+                if "sing-box" not in formats:
+                    formats.append("sing-box")
+                continue
+            if normalized in {"amnezia", "xray-json"}:
+                if "amnezia" not in formats:
+                    formats.append("amnezia")
+                continue
+            if normalized in {"v2ray", "v2ray-base64", "raw-uri"} and normalized not in formats:
+                formats.append(normalized)
+    return formats or ["lumen-json"]
 
 
 def _optional_str(value: object) -> str | None:

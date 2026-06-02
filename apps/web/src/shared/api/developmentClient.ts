@@ -1,6 +1,7 @@
 import {
   apiKeyRecords,
   hostRecords,
+  licenseRecords,
   licenseSummary,
   developmentSession,
   nodeRecords,
@@ -26,6 +27,7 @@ import type {
   InfraBillingRecordRecord,
   InfraProviderCreateRequest,
   InfraProviderRecord,
+  LicenseListResponse,
   LumenApiClient,
   MfaMethod,
   NodeBulkActionRequest,
@@ -121,6 +123,50 @@ function asNodeListResponse(): NodeListResponse {
   return {
     items: nodeRecords.map(asNodeResponse),
   }
+}
+
+function subscriptionPublicFields(publicId: string, deliveryProfile: Record<string, string>) {
+  const renderFormats = readSubscriptionRenderFormats(deliveryProfile)
+  return {
+    public_manifest_url: `/api/v1/subscriptions/public/${publicId}/manifest`,
+    public_page_url: `/sub/${publicId}`,
+    public_render_url: `/api/v1/subscriptions/public/${publicId}/render`,
+    public_render_urls: Object.fromEntries(
+      renderFormats.map((format) => [
+        format,
+        `/api/v1/subscriptions/public/${publicId}/render?target=${encodeURIComponent(format)}`,
+      ]),
+    ),
+    render_formats: renderFormats,
+  }
+}
+
+function readSubscriptionRenderFormats(deliveryProfile: Record<string, string>) {
+  const formats = [
+    deliveryProfile.format,
+    deliveryProfile.client,
+    deliveryProfile.adapter,
+  ].flatMap((value) => String(value ?? '').split(/[,\s/]+/))
+  const normalized = new Set<string>()
+  for (const format of formats) {
+    const value = format.trim().toLowerCase()
+    if (!value) {
+      continue
+    }
+    if (value === 'happ' || value === 'hiddify') {
+      normalized.add('happ')
+      normalized.add('hiddify')
+    } else if (value === 'clash' || value === 'clash-meta' || value === 'mihomo') {
+      normalized.add('mihomo')
+    } else if (value === 'singbox' || value === 'sing-box' || value === 'nekobox') {
+      normalized.add('sing-box')
+    } else if (value === 'amnezia' || value === 'xray-json') {
+      normalized.add('amnezia')
+    } else if (['raw-uri', 'v2ray', 'v2ray-base64'].includes(value)) {
+      normalized.add(value)
+    }
+  }
+  return Array.from(normalized.size > 0 ? normalized : new Set(['lumen-json']))
 }
 
 function buildDevelopmentProfileInbounds(
@@ -666,16 +712,22 @@ export function createDevelopmentLumenApiClient(): LumenApiClient {
       return squad
     },
     createSubscription: async (request: SubscriptionCreateRequest): Promise<SubscriptionRecord> => {
+      const deliveryProfile = request.delivery_profile ?? {}
+      const publicId = `sub_pub_${request.user_id}`
+      const now = new Date().toISOString()
       const subscription: SubscriptionRecord = {
         config_hash: request.config_hash ?? null,
-        delivery_profile: request.delivery_profile ?? {},
+        created_at: now,
+        delivery_profile: deliveryProfile,
         expires_at: request.expires_at ?? null,
         id: `sub_${request.user_id}_${Date.now()}`,
         license_id: request.license_id,
         node_id: request.node_id ?? null,
-        public_id: `sub_pub_${request.user_id}`,
+        public_id: publicId,
+        ...subscriptionPublicFields(publicId, deliveryProfile),
         revoked_at: null,
         status: 'active',
+        updated_at: now,
         user_id: request.user_id,
       }
       subscriptions.unshift(subscription)
@@ -686,12 +738,17 @@ export function createDevelopmentLumenApiClient(): LumenApiClient {
       if (!source) {
         throw new Error('Subscription not found')
       }
+      const publicId = `sub_pub_clone_${Date.now()}`
+      const now = new Date().toISOString()
       const clone: SubscriptionRecord = {
         ...source,
+        created_at: now,
         id: `sub_clone_${Date.now()}`,
-        public_id: `sub_pub_clone_${Date.now()}`,
+        public_id: publicId,
+        ...subscriptionPublicFields(publicId, source.delivery_profile),
         revoked_at: null,
         status: 'active',
+        updated_at: now,
       }
       subscriptions.unshift(clone)
       return clone
@@ -930,6 +987,7 @@ export function createDevelopmentLumenApiClient(): LumenApiClient {
     getSession: async () => developmentSession,
     listApiKeys: async () => asListResponse(apiKeys),
     listHosts: async (): Promise<HostListResponse> => ({ items: hosts }),
+    listLicenses: async (): Promise<LicenseListResponse> => ({ items: licenseRecords }),
     listNodes: async () => asNodeListResponse(),
     getNodeOverview: async (nodeId: string) => buildDevelopmentNodeOverview(nodeId),
     listNodeCommands: async (nodeId: string) => ({

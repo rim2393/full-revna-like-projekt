@@ -111,6 +111,20 @@ export type LicenseSummary = {
   status: LicenseStatus
 }
 
+export type LicenseRecord = {
+  customer_ref: string | null
+  expires_at: string | null
+  id: string
+  max_devices: number
+  metadata_json: Record<string, string>
+  starts_at: string | null
+  status: string
+}
+
+export type LicenseListResponse = {
+  items: LicenseRecord[]
+}
+
 export type UserStatus = 'active' | 'limited' | 'disabled'
 
 export type AdminUserRecord = {
@@ -662,14 +676,21 @@ export type ProfileApplyToNodeResponse = {
 
 export type SubscriptionRecord = {
   config_hash: string | null
+  created_at: string
   delivery_profile: Record<string, string>
   expires_at: string | null
   id: string
   license_id: string
   node_id: string | null
   public_id: string
+  public_manifest_url: string
+  public_page_url: string
+  public_render_url: string
+  public_render_urls: Record<string, string>
+  render_formats: string[]
   revoked_at: string | null
   status: string
+  updated_at: string
   user_id: string
 }
 
@@ -1242,6 +1263,7 @@ export type LumenApiClient = {
   listGlobalProfileInbounds: () => Promise<ProfileInboundListResponse>
   listApiKeys: () => Promise<ResourceListResponse<ApiKeyRecord>>
   listHosts: () => Promise<HostListResponse>
+  listLicenses: () => Promise<LicenseListResponse>
   listNodes: () => Promise<NodeListResponse>
   getNodeOverview: (nodeId: string) => Promise<NodeOverviewResponse>
   listNodeCommands: (nodeId: string) => Promise<NodeCommandListResponse>

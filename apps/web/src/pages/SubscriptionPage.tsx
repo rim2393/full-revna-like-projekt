@@ -1,10 +1,11 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Copy, ExternalLink, KeyRound, RefreshCw, Rss, Save, Search, ShieldX, Smartphone, Trash2 } from 'lucide-react'
 import {
   useCloneSubscription,
   useCreateSubscription,
   useDeleteSubscription,
   useHostsPageData,
+  useLicensesPageData,
   useLookupSubscriptions,
   useNodesPageData,
   useProfilesPageData,
@@ -14,7 +15,7 @@ import {
   useUpdateSubscription,
   useUsersPageData,
 } from '../shared/api/resourceHooks'
-import type { HostRecord, ProtocolProfileRecord, SubscriptionCreateRequest, SubscriptionRecord } from '../shared/api/types'
+import type { HostRecord, LicenseRecord, ProtocolProfileRecord, SubscriptionCreateRequest, SubscriptionRecord } from '../shared/api/types'
 import { OperatorGuide } from '../shared/components/OperatorGuide'
 import {
   FormError,
@@ -31,6 +32,7 @@ export function SubscriptionPage() {
   const { t } = useI18n()
   const query = useSubscriptionsPageData()
   const usersQuery = useUsersPageData()
+  const licensesQuery = useLicensesPageData()
   const nodesQuery = useNodesPageData()
   const profilesQuery = useProfilesPageData()
   const hostsQuery = useHostsPageData()
@@ -46,12 +48,13 @@ export function SubscriptionPage() {
   const deviceQuery = useSubscriptionDevices(selectedDeviceSubscriptionId)
   const subscriptions = query.data?.items ?? []
   const users = usersQuery.data?.items ?? []
+  const licenses = licensesQuery.data?.items ?? []
   const nodes = nodesQuery.data?.items ?? []
   const activeSubscription = subscriptions.find((subscription) => subscription.status === 'active') ?? subscriptions[0]
   const activeRenderability = activeSubscription ? getSubscriptionRenderability(activeSubscription) : null
   const subscriptionBaseUrl =
     activeSubscription && activeRenderability?.canOpenBasePage
-      ? buildSubscriptionUrl(activeSubscription.public_id)
+      ? buildPublicUrl(activeSubscription.public_page_url)
       : null
 
   return (
@@ -92,7 +95,12 @@ export function SubscriptionPage() {
                 {t('Open subscription page')}
               </a>
               {activeRenderability?.formats.includes('happ') ? (
-                <a className="button button--secondary" href={`${subscriptionBaseUrl}/happ`} target="_blank" rel="noreferrer">
+                <a
+                  className="button button--secondary"
+                  href={buildPublicUrl(activeSubscription.public_render_urls.happ ?? `${activeSubscription.public_page_url}/happ`)}
+                  target="_blank"
+                  rel="noreferrer"
+                >
                   <Smartphone size={18} aria-hidden="true" />
                   Happ
                 </a>
@@ -111,7 +119,7 @@ export function SubscriptionPage() {
           </button>
         </div>
       }
-      columns={['Public ID', 'User', 'Node', 'Delivery profile', 'Expires', 'Config hash', 'Status', 'Actions']}
+      columns={['Public ID', 'User', 'Node', 'Delivery profile', 'Formats', 'Expires', 'Config hash', 'Status', 'Actions']}
       emptyDescription="Subscription records will appear after user/license/node bindings are created."
       emptyTitle="No subscriptions"
       error={query.error}
@@ -129,6 +137,7 @@ export function SubscriptionPage() {
             subscription.user_id,
           nodes.find((node) => node.id === subscription.node_id)?.name ?? subscription.node_id ?? t('All nodes'),
           formatRecord(subscription.delivery_profile),
+          subscription.render_formats.join(', ') || t('Not declared'),
           subscription.expires_at ? formatDateTime(subscription.expires_at) : t('Not set'),
           subscription.config_hash ?? t('Not generated'),
           <StatusBadge tone={toneForStatus(subscription.status)}>{subscription.status}</StatusBadge>,
@@ -164,8 +173,9 @@ export function SubscriptionPage() {
       }
       createForm={
         <SubscriptionCreateForm
-          defaultLicenseId={subscriptions[0]?.license_id ?? ''}
+          defaultLicenseId={licenses[0]?.id ?? subscriptions[0]?.license_id ?? ''}
           hosts={hostsQuery.data?.items ?? []}
+          licenses={licenses}
           nodes={nodes}
           onCreate={async (request) => {
             await createSubscription.mutateAsync(request)
@@ -199,7 +209,7 @@ function SubscriptionActions({
   subscription: SubscriptionRecord
 }) {
   const { t } = useI18n()
-  const baseUrl = buildSubscriptionUrl(subscription.public_id)
+  const baseUrl = buildPublicUrl(subscription.public_page_url)
   const renderability = getSubscriptionRenderability(subscription)
 
   return (
@@ -232,12 +242,12 @@ function SubscriptionActions({
         <StatusBadge tone="watch">{t(renderability.reason)}</StatusBadge>
       )}
       {renderability.formats.includes('happ') ? (
-        <a className="text-link" href={`${baseUrl}/happ`} target="_blank" rel="noreferrer">
+        <a className="text-link" href={buildPublicUrl(subscription.public_render_urls.happ ?? `${subscription.public_page_url}/happ`)} target="_blank" rel="noreferrer">
           Happ
         </a>
       ) : null}
       {renderability.formats.includes('mihomo') ? (
-        <a className="text-link" href={`${baseUrl}/mihomo`} target="_blank" rel="noreferrer">
+        <a className="text-link" href={buildPublicUrl(subscription.public_render_urls.mihomo ?? `${subscription.public_page_url}/mihomo`)} target="_blank" rel="noreferrer">
           Mihomo
         </a>
       ) : null}
@@ -251,6 +261,7 @@ function SubscriptionActions({
 function SubscriptionCreateForm({
   defaultLicenseId,
   hosts,
+  licenses,
   nodes,
   onCreate,
   pending,
@@ -259,6 +270,7 @@ function SubscriptionCreateForm({
 }: {
   defaultLicenseId: string
   hosts: HostRecord[]
+  licenses: LicenseRecord[]
   nodes: Array<{ id: string; name: string; public_address: string }>
   onCreate: (request: SubscriptionCreateRequest) => Promise<void>
   pending: boolean
@@ -288,6 +300,25 @@ function SubscriptionCreateForm({
   const [formError, setFormError] = useState<string | null>(null)
   const profilesForNode = profiles.filter((profile) => !nodeId || profile.node_id === nodeId)
   const hostsForNode = hosts.filter((host) => !nodeId || host.node_id === nodeId)
+
+  useEffect(() => {
+    if (!userId && users[0]?.id) {
+      setUserId(users[0].id)
+    }
+  }, [userId, users])
+
+  useEffect(() => {
+    const fallbackLicenseId = licenses[0]?.id ?? defaultLicenseId
+    if (fallbackLicenseId && (!licenseId || !licenses.some((license) => license.id === licenseId))) {
+      setLicenseId(fallbackLicenseId)
+    }
+  }, [defaultLicenseId, licenseId, licenses])
+
+  useEffect(() => {
+    if (!nodeId && nodes[0]?.id) {
+      setNodeId(nodes[0].id)
+    }
+  }, [nodeId, nodes])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -345,8 +376,15 @@ function SubscriptionCreateForm({
         </select>
       </label>
       <label htmlFor="subscription-license">
-        {t('License ID')}
-        <input id="subscription-license" required value={licenseId} onChange={(event) => setLicenseId(event.target.value)} />
+        {t('License')}
+        <select id="subscription-license" required value={licenseId} onChange={(event) => setLicenseId(event.target.value)}>
+          <option value="">{t('Select license')}</option>
+          {licenses.map((license) => (
+            <option key={license.id} value={license.id}>
+              {formatLicenseOption(license)}
+            </option>
+          ))}
+        </select>
       </label>
       <label htmlFor="subscription-node">
         {t('Node')}
@@ -434,7 +472,7 @@ function SubscriptionCreateForm({
 
 function parseDeliveryProfile(value: string): Record<string, string> {
   return value
-    .split(',')
+    .split(/,\s*(?=[A-Za-z0-9_.-]+=)/)
     .map((entry) => entry.trim())
     .filter(Boolean)
     .reduce<Record<string, string>>((profile, entry) => {
@@ -450,6 +488,12 @@ function parseDeliveryProfile(value: string): Record<string, string> {
       profile[key] = parsedValue
       return profile
     }, {})
+}
+
+function formatLicenseOption(license: LicenseRecord) {
+  const customer = license.customer_ref ?? license.id
+  const expiry = license.expires_at ? `expires ${formatDateTime(license.expires_at)}` : 'no expiry'
+  return `${customer} · ${license.status} · ${license.max_devices} devices · ${expiry}`
 }
 
 function SubscriptionSidePanel({
@@ -492,7 +536,7 @@ function SubscriptionSidePanel({
           {lookupResults.length > 0 ? (
             <div className="client-link-grid">
               {lookupResults.map((item) => (
-                <a key={item.id} className="client-link" href={buildSubscriptionUrl(item.public_id)} target="_blank" rel="noreferrer">
+                <a key={item.id} className="client-link" href={buildPublicUrl(item.public_page_url)} target="_blank" rel="noreferrer">
                   <span>{item.public_id}</span>
                   <StatusBadge tone={toneForStatus(item.status)}>{item.status}</StatusBadge>
                 </a>
@@ -540,7 +584,7 @@ function SubscriptionSidePanel({
 function SubscriptionGuide({ subscription }: { subscription: SubscriptionRecord | undefined }) {
   const { t } = useI18n()
   const renderability = subscription ? getSubscriptionRenderability(subscription) : null
-  const baseUrl = subscription && renderability?.canOpenBasePage ? buildSubscriptionUrl(subscription.public_id) : null
+  const baseUrl = subscription && renderability?.canOpenBasePage ? buildPublicUrl(subscription.public_page_url) : null
 
   return (
     <>
@@ -563,10 +607,10 @@ function SubscriptionGuide({ subscription }: { subscription: SubscriptionRecord 
           </div>
           <ExternalLink size={20} aria-hidden="true" />
         </div>
-        {baseUrl && renderability ? (
+        {subscription && baseUrl && renderability ? (
           <div className="client-link-grid">
             <StatusBadge tone="good">{t('Renderable')}</StatusBadge>
-            {buildRenderableLinks(baseUrl, renderability.formats).map(([label, href]) => (
+            {buildRenderableLinks(subscription, baseUrl, renderability.formats).map(([label, href]) => (
               <a key={href} className="client-link" href={href} target="_blank" rel="noreferrer">
                 <span>{t(label)}</span>
                 <ExternalLink size={15} aria-hidden="true" />
@@ -583,22 +627,22 @@ function SubscriptionGuide({ subscription }: { subscription: SubscriptionRecord 
   )
 }
 
-function buildRenderableLinks(baseUrl: string, formats: string[]): Array<[string, string]> {
+function buildRenderableLinks(subscription: SubscriptionRecord, baseUrl: string, formats: string[]): Array<[string, string]> {
   const links: Array<[string, string]> = [['Page', baseUrl]]
   if (formats.includes('happ')) {
-    links.push(['Happ', `${baseUrl}/happ`])
+    links.push(['Happ', buildPublicUrl(subscription.public_render_urls.happ ?? `${subscription.public_page_url}/happ`)])
   }
   if (formats.includes('hiddify')) {
-    links.push(['Hiddify', `${baseUrl}/hiddify`])
+    links.push(['Hiddify', buildPublicUrl(subscription.public_render_urls.hiddify ?? `${subscription.public_page_url}/hiddify`)])
   }
   if (formats.includes('mihomo')) {
-    links.push(['Mihomo', `${baseUrl}/mihomo`])
+    links.push(['Mihomo', buildPublicUrl(subscription.public_render_urls.mihomo ?? `${subscription.public_page_url}/mihomo`)])
   }
   if (formats.includes('sing-box')) {
-    links.push(['Sing-box', `${baseUrl}/sing-box`])
+    links.push(['Sing-box', buildPublicUrl(subscription.public_render_urls['sing-box'] ?? `${subscription.public_page_url}/sing-box`)])
   }
   if (formats.includes('amnezia')) {
-    links.push(['Amnezia', `${baseUrl}/amnezia`])
+    links.push(['Amnezia', buildPublicUrl(subscription.public_render_urls.amnezia ?? `${subscription.public_page_url}/amnezia`)])
   }
   return links
 }
@@ -612,7 +656,7 @@ function getSubscriptionRenderability(subscription: SubscriptionRecord) {
   }
   return {
     canOpenBasePage: true,
-    formats: readDeclaredFormats(subscription),
+    formats: subscription.render_formats.length > 0 ? subscription.render_formats : readDeclaredFormats(subscription),
     reason: 'Base endpoint inferred from active subscription',
   }
 }
@@ -629,12 +673,15 @@ function readDeclaredFormats(subscription: SubscriptionRecord): string[] {
   return Array.from(new Set(declared))
 }
 
-function buildSubscriptionUrl(publicId: string) {
+function buildPublicUrl(pathOrUrl: string) {
+  if (/^https?:\/\//i.test(pathOrUrl)) {
+    return pathOrUrl
+  }
   if (typeof window === 'undefined') {
-    return `/sub/${publicId}`
+    return pathOrUrl
   }
   const host = window.location.host.replace(/^panel\./, 'sub.')
-  return `${window.location.protocol}//${host}/sub/${publicId}`
+  return `${window.location.protocol}//${host}${pathOrUrl.startsWith('/') ? pathOrUrl : `/${pathOrUrl}`}`
 }
 
 function buildAdminRenderUrl(subscriptionId: string, target: string) {

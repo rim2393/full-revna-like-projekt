@@ -2,6 +2,7 @@ import type {
   ApiKeyRecord,
   AuthSession,
   HostRecord,
+  LicenseRecord,
   LicenseSummary,
   NodeRecord,
   ProtocolAdapterRecord,
@@ -59,6 +60,18 @@ export const licenseSummary: LicenseSummary = {
   seatsUsed: 18420,
   status: 'valid',
 }
+
+export const licenseRecords: LicenseRecord[] = [
+  {
+    customer_ref: 'lumen-production-instance',
+    expires_at: '2026-09-30T00:00:00Z',
+    id: 'license_business',
+    max_devices: 25000,
+    metadata_json: { tier: 'business' },
+    starts_at: '2026-05-01T00:00:00Z',
+    status: 'active',
+  },
+]
 
 export const userRecords: UserRecord[] = [
   {
@@ -280,6 +293,7 @@ export const hostRecords: HostRecord[] = [
 export const subscriptionRecords: SubscriptionRecord[] = [
   {
     config_hash: 'sha256:subscription-fixture',
+    created_at: '2026-05-27T00:00:00Z',
     delivery_profile: {
       client: 'happ',
       hwid_limit: '5',
@@ -290,8 +304,17 @@ export const subscriptionRecords: SubscriptionRecord[] = [
     license_id: 'license_business',
     node_id: 'node_mow_02',
     public_id: 'sub_pub_default',
+    public_manifest_url: '/api/v1/subscriptions/public/sub_pub_default/manifest',
+    public_page_url: '/sub/sub_pub_default',
+    public_render_url: '/api/v1/subscriptions/public/sub_pub_default/render',
+    public_render_urls: {
+      happ: '/api/v1/subscriptions/public/sub_pub_default/render?target=happ',
+      hiddify: '/api/v1/subscriptions/public/sub_pub_default/render?target=hiddify',
+    },
+    render_formats: ['happ', 'hiddify'],
     revoked_at: null,
     status: 'active',
+    updated_at: '2026-05-27T00:00:00Z',
     user_id: 'usr_mira',
   },
 ]
