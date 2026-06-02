@@ -2121,10 +2121,10 @@ async def test_active_profile_rejects_catalog_only_adapter(
     assert active_legacy_response.status_code == 422
     assert active_legacy_response.json()["error"]["code"] == "protocol_adapter_not_live"
 
-    unsupported_reality_transport_response = await foundation_app.client.post(
+    active_reality_httpupgrade_response = await foundation_app.client.post(
         "/api/v1/profiles",
         json={
-            "name": "Unsupported Reality HTTPUpgrade active",
+            "name": "Reality HTTPUpgrade active",
             "node_id": node_id,
             "adapter": "vless-reality-httpupgrade",
             "status": "active",
@@ -2134,11 +2134,8 @@ async def test_active_profile_rejects_catalog_only_adapter(
             ],
         },
     )
-    assert unsupported_reality_transport_response.status_code == 422
-    assert (
-        unsupported_reality_transport_response.json()["error"]["code"]
-        == "protocol_adapter_not_live"
-    )
+    assert active_reality_httpupgrade_response.status_code == 201
+    assert active_reality_httpupgrade_response.json()["status"] == "active"
 
 
 async def test_node_command_queue_and_metrics(foundation_app: FoundationRouteApp) -> None:

@@ -93,7 +93,7 @@ PROTOCOL_ADAPTERS = (
     _adapter(
         "vless-reality-httpupgrade",
         "VLESS Reality HTTPUpgrade",
-        status="legacy",
+        status="experimental",
         capabilities=["xray", "vless", "reality", "httpupgrade", "subscription"],
         required_credential_refs=["client_uuid", "reality_private_key"],
     ),
@@ -2819,6 +2819,7 @@ def _inbound_transport(profile: ProtocolProfile) -> str:
         "wireguard-native",
         "wireguard-amneziawg",
         "hysteria2",
+        "hysteria2-obfs",
         "tuic-v5",
         "openvpn-udp",
     }:
@@ -2836,6 +2837,7 @@ def _inbound_security(profile: ProtocolProfile) -> str:
         return "reality"
     if "tls" in profile.adapter or profile.adapter in {
         "hysteria2",
+        "hysteria2-obfs",
         "tuic-v5",
         "naiveproxy",
         "openvpn-udp",
