@@ -8,7 +8,7 @@ set -euo pipefail
 # then removes all temporary records. It must not print subscription credentials.
 
 API_CONTAINER="${LUMEN_API_CONTAINER:-lumen-api-1}"
-PANEL_PUBLIC_URL="${LUMEN_PANEL_PUBLIC_URL:-https://panel.89-185-85-184.sslip.io}"
+PANEL_PUBLIC_URL="${LUMEN_PANEL_PUBLIC_URL:-https://panel.lumentech.tel}"
 NODE_NAME="${LUMEN_LIVE_NODE_NAME:-node-01}"
 QA_PREFIX="${LUMEN_QA_PREFIX:-qa_pr004}"
 CLIENT_IMAGE="${LUMEN_IKEV2_CLIENT_IMAGE:-ubuntu:24.04}"

@@ -26,7 +26,7 @@ from app.domains.users.models import User
 
 PANEL_PUBLIC_URL = os.environ.get(
     "PANEL_PUBLIC_URL",
-    "https://panel.89-185-85-184.sslip.io",
+    "https://panel.lumentech.tel",
 ).rstrip("/")
 
 TARGET_CONTRACTS: dict[str, tuple[str, str]] = {
