@@ -67,6 +67,7 @@ AMNEZIA_WG_KEYS = (
     "I4",
     "I5",
 )
+AMNEZIA_WG_POSITIVE_INT_KEYS = frozenset({"Jc", "Jmin", "Jmax", "S1", "S2", "S3", "S4"})
 
 
 @dataclass(frozen=True)
@@ -488,8 +489,9 @@ def render_wireguard_conf(entry: dict[str, Any], *, credentials: ClientCredentia
     if hints.get("mtu"):
         lines.append(f"MTU = {hints['mtu']}")
     for key in AMNEZIA_WG_KEYS:
-        if hints.get(key) is not None:
-            lines.append(f"{key} = {hints[key]}")
+        value = hints.get(key)
+        if value is not None and is_valid_amneziawg_hint_value(key, value):
+            lines.append(f"{key} = {value}")
     lines.extend(
         [
             "",
@@ -502,6 +504,15 @@ def render_wireguard_conf(entry: dict[str, Any], *, credentials: ClientCredentia
     if hints.get("persistentKeepalive"):
         lines.append(f"PersistentKeepalive = {hints['persistentKeepalive']}")
     return "\n".join(lines)
+
+
+def is_valid_amneziawg_hint_value(key: str, value: object) -> bool:
+    if key not in AMNEZIA_WG_POSITIVE_INT_KEYS:
+        return str(value).strip() != ""
+    try:
+        return int(str(value).strip()) > 0
+    except ValueError:
+        return False
 
 
 def render_ikev2_sswan(entry: dict[str, Any], *, credentials: ClientCredential) -> str | None:

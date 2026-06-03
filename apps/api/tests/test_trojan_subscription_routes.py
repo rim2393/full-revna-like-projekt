@@ -761,6 +761,53 @@ async def test_amneziawg_subscription_preserves_obfuscation_in_native_manifest_a
     assert "H1 = 123456789" in raw.text
 
 
+async def test_amneziawg_subscription_omits_nonpositive_integer_obfuscation_values(
+    route_app: RouteTestApp,
+) -> None:
+    user, license_record, node = await _seed(route_app)
+    create = await route_app.client.post(
+        "/api/v1/subscriptions",
+        json={
+            "user_id": str(user.id),
+            "license_id": str(license_record.id),
+            "node_id": str(node.id),
+            "delivery_profile": {
+                "protocol": "wireguard-amneziawg",
+                "adapter": "wireguard-amneziawg",
+                "profile_title": "Lumen AWG",
+                "public_key": "aGVsbG93b3JsZGhlbGxvd29ybGRoZWxsb3dvcmxkMDA=",
+                "address": "10.77.0.2/32",
+                "allowed_ips": "0.0.0.0/0",
+                "port": "51821",
+                "Jc": "4",
+                "Jmin": "0",
+                "Jmax": "-1",
+                "S1": "60",
+            },
+            "config_hash": "sha256:awg-nonpositive",
+        },
+    )
+    assert create.status_code == 201, create.text
+    public_id = create.json()["public_id"]
+
+    manifest = await route_app.client.get(f"/api/v1/subscriptions/public/{public_id}/manifest")
+    assert manifest.status_code == 200
+    hints = manifest.json()["nodes"][0]["protocols"][0]["rendererHints"]
+    assert hints["Jc"] == "4"
+    assert hints["S1"] == "60"
+    assert "Jmin" not in hints
+    assert "Jmax" not in hints
+
+    raw = await route_app.client.get(
+        f"/api/v1/subscriptions/public/{public_id}/render?target=raw-uri",
+    )
+    assert raw.status_code == 200
+    assert "Jc = 4" in raw.text
+    assert "S1 = 60" in raw.text
+    assert "Jmin =" not in raw.text
+    assert "Jmax =" not in raw.text
+
+
 @pytest.mark.parametrize(
     ("protocol", "adapter", "port", "raw_prefix", "sing_box_type", "xray_protocol", "mihomo_type"),
     [

@@ -80,6 +80,7 @@ AMNEZIA_WG_HINT_KEYS = (
     "I4",
     "I5",
 )
+AMNEZIA_WG_POSITIVE_INT_HINT_KEYS = frozenset({"Jc", "Jmin", "Jmax", "S1", "S2", "S3", "S4"})
 
 
 def utc_now() -> datetime:
@@ -1449,10 +1450,21 @@ def _manifest_renderer_hints(
         hints["pluginOpts"] = profile_config["plugin_opts"]
     for key in AMNEZIA_WG_HINT_KEYS:
         if key in delivery and delivery[key] is not None:
-            hints[key] = delivery[key]
+            if _is_valid_amneziawg_hint_value(key, delivery[key]):
+                hints[key] = delivery[key]
         elif key in interface_config and interface_config[key] is not None:
-            hints[key] = interface_config[key]
+            if _is_valid_amneziawg_hint_value(key, interface_config[key]):
+                hints[key] = interface_config[key]
     return hints
+
+
+def _is_valid_amneziawg_hint_value(key: str, value: object) -> bool:
+    if key not in AMNEZIA_WG_POSITIVE_INT_HINT_KEYS:
+        return str(value).strip() != ""
+    try:
+        return int(str(value).strip()) > 0
+    except ValueError:
+        return False
 
 
 def _wireguard_client_address_from_interface(interface_config: dict[str, object]) -> str | None:
