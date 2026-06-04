@@ -5,7 +5,8 @@ set -euo pipefail
 # Runs on the panel host. It creates temporary real control-plane records,
 # applies IKEv2 to the real node-agent, fetches the public raw .sswan renderer,
 # imports it into an isolated strongSwan client container, initiates one IKE SA,
-# then removes all temporary records. It must not print subscription credentials.
+# sends dataplane traffic through the assigned virtual IP, then removes all
+# temporary records. It must not print subscription credentials.
 
 API_CONTAINER="${LUMEN_API_CONTAINER:-lumen-api-1}"
 PANEL_PUBLIC_URL="${LUMEN_PANEL_PUBLIC_URL:-https://panel.lumentech.tel}"
@@ -13,6 +14,9 @@ NODE_NAME="${LUMEN_LIVE_NODE_NAME:-node-01}"
 QA_PREFIX="${LUMEN_QA_PREFIX:-qa_pr004}"
 CLIENT_IMAGE="${LUMEN_IKEV2_CLIENT_IMAGE:-ubuntu:24.04}"
 HOST_PYTHON="${LUMEN_HOST_PYTHON:-python3}"
+DATAPLANE_PING_COUNT="${LUMEN_IKEV2_DATAPLANE_PING_COUNT:-5}"
+HOLD_BEFORE_DATAPLANE_SECONDS="${LUMEN_IKEV2_HOLD_BEFORE_DATAPLANE_SECONDS:-0}"
+HOLD_AFTER_DATAPLANE_SECONDS="${LUMEN_IKEV2_HOLD_AFTER_DATAPLANE_SECONDS:-0}"
 WORKDIR="$(mktemp -d /tmp/lumen-ikev2-smoke.XXXXXX)"
 STATE_FILE="$WORKDIR/state.json"
 SSWAN_FILE="$WORKDIR/profile.sswan.json"
@@ -322,12 +326,15 @@ PY
 docker run --rm --name lumen-ikev2-client-smoke \
   --cap-add NET_ADMIN --cap-add NET_RAW \
   --device /dev/net/tun:/dev/net/tun \
+  -e LUMEN_IKEV2_DATAPLANE_PING_COUNT="$DATAPLANE_PING_COUNT" \
+  -e LUMEN_IKEV2_HOLD_BEFORE_DATAPLANE_SECONDS="$HOLD_BEFORE_DATAPLANE_SECONDS" \
+  -e LUMEN_IKEV2_HOLD_AFTER_DATAPLANE_SECONDS="$HOLD_AFTER_DATAPLANE_SECONDS" \
   -v "$CLIENT_DIR:/lumen-swanctl:ro" \
   "$CLIENT_IMAGE" bash -lc '
     set -euo pipefail
     export DEBIAN_FRONTEND=noninteractive
     apt-get -o Dpkg::Use-Pty=0 update
-    apt-get -o Dpkg::Use-Pty=0 install -y --no-install-recommends strongswan-starter strongswan-swanctl strongswan-charon libstrongswan-standard-plugins libcharon-extra-plugins libcharon-extauth-plugins iproute2 ca-certificates
+    apt-get -o Dpkg::Use-Pty=0 install -y --no-install-recommends strongswan-starter strongswan-swanctl strongswan-charon libstrongswan-standard-plugins libcharon-extra-plugins libcharon-extauth-plugins iproute2 iputils-ping ca-certificates
     cp -a /lumen-swanctl/. /etc/swanctl/
     ipsec start >/dev/null
     timeout 15 bash -lc "until [ -S /var/run/charon.vici ]; do sleep 0.2; done"
@@ -341,6 +348,32 @@ docker run --rm --name lumen-ikev2-client-smoke \
     fi
     swanctl --list-sas >/tmp/lumen-sas.log
     grep -q "ESTABLISHED" /tmp/lumen-sas.log
+    swanctl --list-sas --raw >/tmp/lumen-sas-raw-before.log
+    vip="$(sed -n "s/.*local-vips=\\[\\([^]]*\\)\\].*/\\1/p; s/.*remote-vips=\\[\\([^]]*\\)\\].*/\\1/p" /tmp/lumen-sas-raw-before.log | tr "," "\n" | head -n 1 | tr -d " ")"
+    if [ -z "$vip" ]; then
+      cat /tmp/lumen-sas-raw-before.log >&2 || true
+      echo "IKEv2 virtual IP was not assigned" >&2
+      exit 1
+    fi
+    ip addr add "$vip/32" dev lo 2>/dev/null || true
+    printf "%s\n" "ikev2_client_dataplane_ready"
+    sleep "${LUMEN_IKEV2_HOLD_BEFORE_DATAPLANE_SECONDS:-0}"
+    for i in $(seq 1 "${LUMEN_IKEV2_DATAPLANE_PING_COUNT:-5}"); do
+      ping -I "$vip" -c 1 -W 2 1.1.1.1 >/tmp/lumen-dataplane-ping.log 2>&1 && break || sleep 1
+    done
+    printf "%s\n" "ikev2_client_dataplane_done"
+    sleep "${LUMEN_IKEV2_HOLD_AFTER_DATAPLANE_SECONDS:-0}"
+    swanctl --list-sas --raw >/tmp/lumen-sas-raw-after.log
+    in_bytes="$(grep -oE "bytes-in=[0-9]+" /tmp/lumen-sas-raw-after.log | cut -d= -f2 | awk "{s+=\$1} END {print s+0}")"
+    out_bytes="$(grep -oE "bytes-out=[0-9]+" /tmp/lumen-sas-raw-after.log | cut -d= -f2 | awk "{s+=\$1} END {print s+0}")"
+    if [ "$((in_bytes + out_bytes))" -le 0 ]; then
+      cat /tmp/lumen-dataplane-ping.log >&2 || true
+      cat /tmp/lumen-sas-raw-after.log >&2 || true
+      echo "IKEv2 CHILD_SA stayed established but dataplane byte counters remained zero" >&2
+      exit 1
+    fi
+    printf "ikev2_dataplane_bytes_in=%s\n" "$in_bytes"
+    printf "ikev2_dataplane_bytes_out=%s\n" "$out_bytes"
     swanctl --terminate --ike lumen-smoke >/dev/null 2>&1 || true
     ipsec stop >/dev/null 2>&1 || true
     printf "%s\n" "ikev2_client_connect=succeeded"
