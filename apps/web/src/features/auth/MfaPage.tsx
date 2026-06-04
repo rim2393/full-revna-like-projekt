@@ -3,19 +3,21 @@ import type { FormEvent } from 'react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useApiClient } from '../../shared/api/apiClientContext'
+import { useI18n } from '../../shared/i18n/I18nProvider'
 import { useAuthSession } from './authSession'
 
 export function MfaPage() {
   const apiClient = useApiClient()
   const navigate = useNavigate()
   const { mfaChallenge, setMfaChallenge, setSession } = useAuthSession()
+  const { t } = useI18n()
   const [status, setStatus] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!mfaChallenge) {
-      setStatus('Start with username and password before entering an MFA code.')
+      setStatus(t('Start with username and password before entering an MFA code.'))
       return
     }
     setIsSubmitting(true)
@@ -28,10 +30,10 @@ export function MfaPage() {
       })
       setSession(session)
       setMfaChallenge(null)
-      setStatus('Challenge accepted. Portal session can begin.')
+      setStatus(t('Challenge accepted. Portal session can begin.'))
       navigate('/dashboard')
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'MFA verification failed.')
+      setStatus(error instanceof Error ? error.message : t('MFA verification failed.'))
     } finally {
       setIsSubmitting(false)
     }
@@ -43,12 +45,12 @@ export function MfaPage() {
         <ShieldCheck size={24} />
       </div>
       <div>
-        <p className="eyebrow">Step 2 of 2</p>
-        <h2>Verify MFA</h2>
-        <p>Confirm the one-time code from the authenticator app registered on this account.</p>
+        <p className="eyebrow">{t('Step 2 of 2')}</p>
+        <h2>{t('Verify MFA')}</h2>
+        <p>{t('Confirm the one-time code from the authenticator app registered on this account.')}</p>
       </div>
       <label>
-        One-time code
+        {t('One-time code')}
         <input
           name="code"
           inputMode="numeric"
@@ -58,11 +60,11 @@ export function MfaPage() {
         />
       </label>
       <button type="submit" className="button button--primary" disabled={isSubmitting}>
-        {isSubmitting ? 'Verifying...' : 'Open portal'}
+        {isSubmitting ? t('Verifying...') : t('Open portal')}
         <ArrowRight size={18} aria-hidden="true" />
       </button>
       <p className="auth-card__note" aria-live="polite">
-        {status || 'MFA is enforced for accounts that have an active TOTP method.'}
+        {status || t('MFA is enforced for accounts that have an active TOTP method.')}
       </p>
     </form>
   )

@@ -5,6 +5,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { useApiClient } from '../../shared/api/apiClientContext'
 import { usePanelIdentityData } from '../../shared/api/resourceHooks'
 import type { LoginMethod, TelegramLoginPayload } from '../../shared/api/types'
+import { useI18n } from '../../shared/i18n/I18nProvider'
 import { useAuthSession } from './authSession'
 import { isPasskeySupported, performPasskeyAuthentication } from './webauthn'
 
@@ -16,6 +17,7 @@ export function LoginPage() {
   const apiClient = useApiClient()
   const identity = usePanelIdentityData()
   const { setMfaChallenge, setSession } = useAuthSession()
+  const { t } = useI18n()
   const [status, setStatus] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [methods, setMethods] = useState<LoginMethod[]>([])
@@ -52,7 +54,7 @@ export function LoginPage() {
       if ('challengeToken' in result) {
         setSession(null)
         setMfaChallenge(result)
-        setStatus('Credentials accepted. MFA challenge prepared.')
+        setStatus(t('Credentials accepted. MFA challenge prepared.'))
         navigate('/guard/mfa')
         return
       }
@@ -61,7 +63,7 @@ export function LoginPage() {
       setStatus(successMessage)
       navigate(redirectTo)
     },
-    [apiClient, navigate, redirectTo, setMfaChallenge, setSession],
+    [apiClient, navigate, redirectTo, setMfaChallenge, setSession, t],
   )
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -74,9 +76,9 @@ export function LoginPage() {
         email: String(form.get('email') ?? ''),
         password: String(form.get('password') ?? ''),
       })
-      completeLogin(authResult, 'Credentials accepted. Portal session can begin.')
+      completeLogin(authResult, t('Credentials accepted. Portal session can begin.'))
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'Sign in failed.')
+      setStatus(error instanceof Error ? error.message : t('Sign in failed.'))
     } finally {
       setIsSubmitting(false)
     }
@@ -89,14 +91,14 @@ export function LoginPage() {
       const { authorization_url } = await apiClient.startOAuth(provider, redirectTo)
       window.location.assign(authorization_url)
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'Could not start the sign-in flow.')
+      setStatus(error instanceof Error ? error.message : t('Could not start the sign-in flow.'))
       setBusyProvider(null)
     }
   }
 
   async function handlePasskey() {
     if (!isPasskeySupported()) {
-      setStatus('This browser does not support passkeys.')
+      setStatus(t('This browser does not support passkeys.'))
       return
     }
     setBusyProvider('webauthn')
@@ -105,9 +107,9 @@ export function LoginPage() {
       const options = await apiClient.webauthnAuthenticateOptions()
       const assertion = await performPasskeyAuthentication(options.options)
       const result = await apiClient.webauthnAuthenticateVerify(options.challenge_id, assertion)
-      completeLogin(result, 'Passkey accepted. Portal session can begin.')
+      completeLogin(result, t('Passkey accepted. Portal session can begin.'))
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'Passkey sign-in failed.')
+      setStatus(error instanceof Error ? error.message : t('Passkey sign-in failed.'))
     } finally {
       setBusyProvider(null)
     }
@@ -119,14 +121,14 @@ export function LoginPage() {
       setStatus('')
       try {
         const result = await apiClient.telegramLogin(payload)
-        completeLogin(result, 'Telegram account accepted. Portal session can begin.')
+        completeLogin(result, t('Telegram account accepted. Portal session can begin.'))
       } catch (error) {
-        setStatus(error instanceof Error ? error.message : 'Telegram sign-in failed.')
+        setStatus(error instanceof Error ? error.message : t('Telegram sign-in failed.'))
       } finally {
         setBusyProvider(null)
       }
     },
-    [apiClient, completeLogin],
+    [apiClient, completeLogin, t],
   )
 
   const oauthMethods = methods.filter((method) => OAUTH_KINDS.has(method.kind))
@@ -146,26 +148,26 @@ export function LoginPage() {
       </div>
       <div>
         <p className="eyebrow">{productName}</p>
-        <h2>Sign in</h2>
-        <p>Use an operator account. Credentials are sent to the auth API and are not stored.</p>
+        <h2>{t('Sign in')}</h2>
+        <p>{t('Operator credential copy')}</p>
       </div>
       <label>
-        Email
+        {t('Email')}
         <input name="email" type="email" autoComplete="email" required />
       </label>
       <label>
-        Password
+        {t('Password')}
         <input name="password" type="password" autoComplete="current-password" required />
       </label>
       <button type="submit" className="button button--primary" disabled={isSubmitting}>
-        {isSubmitting ? 'Checking...' : 'Continue'}
+        {isSubmitting ? t('Checking...') : t('Continue')}
         <ArrowRight size={18} aria-hidden="true" />
       </button>
 
       {hasAlternativeMethods ? (
         <div className="auth-card__alternatives">
           <div className="auth-card__divider" aria-hidden="true">
-            <span>or</span>
+            <span>{t('or')}</span>
           </div>
 
           {passkeyMethod ? (
@@ -176,7 +178,7 @@ export function LoginPage() {
               disabled={busyProvider !== null}
             >
               <Fingerprint size={18} aria-hidden="true" />
-              {busyProvider === 'webauthn' ? 'Waiting for passkey...' : 'Sign in with a passkey'}
+              {busyProvider === 'webauthn' ? t('Waiting for passkey...') : t('Sign in with a passkey')}
             </button>
           ) : null}
 
@@ -190,8 +192,8 @@ export function LoginPage() {
             >
               <KeyRound size={18} aria-hidden="true" />
               {busyProvider === method.provider
-                ? `Redirecting to ${method.display_name}...`
-                : `Continue with ${method.display_name}`}
+                ? t('Redirecting to {provider}...', { provider: method.display_name })
+                : t('Continue with {provider}', { provider: method.display_name })}
             </button>
           ))}
 
@@ -205,7 +207,7 @@ export function LoginPage() {
       ) : null}
 
       <p className="auth-card__note" aria-live="polite">
-        {status || 'Submit to continue to MFA.'}
+        {status || t('Submit to continue to MFA.')}
       </p>
     </form>
   )
