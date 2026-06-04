@@ -72,7 +72,7 @@ evidence here is wrong or stale.
 
 | ID | Task | Status | Done Criteria | Evidence |
 | --- | --- | --- | --- | --- |
-| U-001 | User lifecycle base controls | PARTIAL | Existing endpoints/UI manage basic lifecycle | Existing audit says wired; full evidence incomplete |
+| U-001 | User lifecycle base controls | DONE | Existing endpoints/UI manage basic lifecycle | Backend routes cover create/update/list, username/email/telegram/short UUID/numeric/tag/combined lookup, tags, per-user enable/disable/revoke/reset traffic, bulk reset/tag/extend/traffic/squad-add/squad-remove/revoke/delete, audit events, detail view subscriptions/devices/accessible nodes/request history, and device delete/clear. 2026-06-04 gates passed after updating stale assertions for the real RU UI and expanded audit metadata: `python -m pytest tests/test_control_plane_foundation_routes.py -k "users or user_detail"` (`1 passed, 29 deselected`), `python -m ruff check app/domains/users tests/test_control_plane_foundation_routes.py`, `npm --prefix apps/web test -- --run src/pages/ControlPlaneScreens.test.tsx -t "user"` (`4 passed, 23 skipped`), and `npm exec -- tsc -b --noEmit` from `apps/web`. |
 | U-002 | Lookup by UUID, username, short UUID, email, numeric id, Telegram id, tag | DONE | Backend lookup endpoint and UI search support all identifiers with tests | `0e03b24`, `v0.1.72`, release run `26781436509`, installer/deploy run `26781533403`, manifest `rim2393/lumen_vpn@bb4e2d1`; web `tsc` passed; `ruff` passed; focused backend pytest passed; prod health OK and live `/users` shows unified lookup UI with UUID/Telegram/tag guidance. |
 | U-003 | User detail: nodes, subscriptions, request history, metadata, devices/HWID | DONE | Detail screen uses real DB/API state only | `28cec34` added user detail metadata UI; `e574916` fixed prod `/users` regression from existing service `.local` accounts; `v0.1.74`, release run `26782220964`, installer/deploy run `26782304076`, manifest `rim2393/lumen_vpn@b5177aa`; web `tsc` passed; `ruff` passed; focused backend pytest passed; prod health OK; live `/users` shows real users without error and live `/users/440ca348-6ed2-427c-ab05-48e552c7845b` shows metadata/devices/request history. |
 | U-004 | User actions: enable, disable, revoke, reset traffic | DONE | Actions mutate real state and queue node/runtime work where required | `b217a7d`, `v0.1.75`, release run `26782682790`, installer/deploy run `26782766079`, manifest `rim2393/lumen_vpn@63de6ad`; added explicit `/enable`, `/disable`, `/revoke`, `/reset-traffic` action API plus audit events and UI hooks; `ruff`, focused backend pytest, web `tsc`, focused Vitest passed; prod health OK; live UI smoke created temporary user `qa-u004-1780348946748@example.com`, ran disable/reset/revoke/delete, and verified no page error and no leftover temp row. |
@@ -151,9 +151,51 @@ evidence here is wrong or stale.
 | ID | Task | Status | Done Criteria | Evidence |
 | --- | --- | --- | --- | --- |
 | C-001 | Android real production subscription import | DONE | App imports real prod URL without logging secrets | Android resolver/parser/manifest supports prod-compatible client import schemes and bodies; `LumenHttpSecurity` allows HWID on `panel/sub.lumentech.tel` while retaining old `sslip.io` compatibility; focused unit gate `:app:testDebugUnitTest --tests tel.lumentech.vpn.SubscriptionSourceResolverTest` passed with `76` test tasks; `:app:assembleDebug` passed; live emulator `emulator-5554` imported a temporary real `https://panel.lumentech.tel` HApp subscription through `scripts/android-live-import-qa.ps1`, persisted `1` subscription, `1` server and `1` ready server, confirmed raw URL was not visible in UI, and fixture cleanup returned `0` subscriptions/licenses/users. |
-| C-002 | Android connect per live protocol | PARTIAL | Emulator/device evidence per protocol | Existing evidence covers VLESS, Shadowsocks, SOCKS, HTTP proxy, Trojan, VMess, Hysteria2, TUIC, NaiveProxy and WireGuard-native slices. 2026-06-03 AmneziaWG slice: `bf09169` aligned node runtime WireGuard client addresses with profile interface networks; `3d8e6e7` aligned subscription renderer addresses with the same active-client ordering. Focused backend gates passed: `test_public_wireguard_subscription_uses_linked_profile_and_host_runtime_fields`, WireGuard/AWG apply route tests and AWG node outbound test (`4 passed`). GitHub Actions were blocked before job start by account billing/spending, so API-only hotfix images `v0.1.118` and `v0.1.119` were manually built on the prod panel VPS, pushed to GHCR, deployed by pinned digest with `/opt/lumen/backups/upgrade-state/...` records, and health checked. Live prod evidence: real `node-01` AWG profile `wireguard-amneziawg` applied to real node port `18461`; Android `emulator-5554` imported a temporary real HApp subscription from `https://panel.lumentech.tel`, persisted `1` subscription, `1` server and `1` ready server with raw URL hidden, started native AmneziaWG, received handshake response, and the node `awg show` reported one peer `10.77.0.2/32` with latest handshake and transfer. Remaining: continue live Android connect one adapter family at a time and later run full matrix cleanup/release evidence. |
+| C-002 | Android connect per live protocol | PARTIAL | Emulator/device evidence per protocol | Existing evidence covers VLESS, Shadowsocks, SOCKS, HTTP proxy, Trojan, VMess, Hysteria2, TUIC, NaiveProxy, WireGuard-native, AmneziaWG and OpenVPN UDP slices. 2026-06-03 AmneziaWG slice: `bf09169` aligned node runtime WireGuard client addresses with profile interface networks; `3d8e6e7` aligned subscription renderer addresses with the same active-client ordering. Focused backend gates passed: `test_public_wireguard_subscription_uses_linked_profile_and_host_runtime_fields`, WireGuard/AWG apply route tests and AWG node outbound test (`4 passed`). GitHub Actions were blocked before job start by account billing/spending, so API-only hotfix images `v0.1.118` and `v0.1.119` were manually built on the prod panel VPS, pushed to GHCR, deployed by pinned digest with `/opt/lumen/backups/upgrade-state/...` records, and health checked. Live prod AWG evidence: real `node-01` AWG profile `wireguard-amneziawg` applied to real node port `18461`; Android `emulator-5554` imported a temporary real HApp subscription from `https://panel.lumentech.tel`, persisted `1` subscription, `1` server and `1` ready server with raw URL hidden, started native AmneziaWG, received handshake response, and the node `awg show` reported one peer `10.77.0.2/32` with latest handshake and transfer. 2026-06-04 OpenVPN UDP Android slice: added x86/x86_64 OpenVPN native libs from official Amnezia `4.8.15.4` Android release assets, fixed `LibraryLoader` empty/wrong-ABI fallback, and set OpenVPN3 `disableClientCert=true` for no-client-cert profiles. `:app:assembleDebug` passed. Live prod evidence: real `openvpn-udp` profile on `node-01` port `24103` rendered a real HApp subscription; Android `emulator-5554` imported `1` subscription, `1` server and `1` ready server with raw URL hidden; OpenVPN3 loaded `x86_64` libs, completed TLS 1.3, established Android VPN `tun0` with `10.90.3.2/24`, and node OpenVPN status showed the redacted subscription client connected with bytes transferred and AES-256-GCM data channel. Remaining: continue live Android connect one adapter family at a time and later run full matrix cleanup/release evidence. |
 | C-003 | Android portrait-only verification | PARTIAL | Project rule exists; needs final release QA evidence | Wiki/project rule |
 | C-004 | Windows client | OPEN | Same real protocol set, no mocks | Not started |
+
+### C-002 Latest Evidence
+
+- 2026-06-04 OpenVPN over Shadowsocks Android live slice: fixed native Android
+  runtime path end-to-end for the real prod `openvpn-shadowsocks` profile on
+  real `node-01`. Backend/subscription hotfixes keep the profile-level
+  Shadowsocks bridge password stable, expose matching OpenVPN
+  username/password in the native Lumen manifest, and route Lumen Android
+  imports to `lumen-json` instead of app wrapper HTML for trusted Lumen
+  subscription URLs.
+- Android fixes: OpenVPN3 now receives provided username/password credentials,
+  unsupported `socks-proxy` directives are stripped before the local TCP bridge
+  config is passed to OpenVPN3, loopback routes/exclusions are filtered before
+  Android `VpnService.Builder.establish()`, the live QA script grants optional
+  Android notification permission after `pm clear`, and OpenVPN health-checks
+  accept the system validated VPN network before HTTP/DNS fallback probes.
+- Gates passed: `:app:assembleDebug`; focused Android resolver/parser tests;
+  API `ruff` on touched protocol/subscription services; subscription edge
+  tests for Lumen user-agent fallback. Follow-up core regression gates on
+  2026-06-04 passed: `python -m pytest tests/test_node_outbound_config.py -k
+  "openvpn_shadowsocks" tests/test_trojan_subscription_routes.py -k
+  "openvpn_shadowsocks"` (`3 passed, 74 deselected`), `python -m ruff check
+  app/domains/protocols/service.py app/domains/subscriptions/service.py
+  tests/test_node_outbound_config.py tests/test_trojan_subscription_routes.py`,
+  `npm --prefix apps/lumen-edge test` (`14 passed`), and `npm --prefix
+  packages/subscription-renderers test` (`11 passed`). These regressions prove
+  the real profile-level Shadowsocks bridge password is preserved in node
+  runtime payloads and Lumen native subscription manifests while OpenVPN
+  username/password remain per-subscription.
+- Live evidence: Android `emulator-5554` imported the real temporary prod
+  subscription with raw URL hidden, persisted `1` subscription, `1` server and
+  `1` ready server, started OpenVPN over the Shadowsocks bridge to real node
+  endpoint `85.192.60.8:28443`, logged `Connected via tun` and
+  `OpenVpn event: CONNECTED`, and UI showed `ПОДКЛЮЧЕНО` with `ОТКЛЮЧИТЬ`.
+  Android `dumpsys connectivity` showed `VPN CONNECTED`, `InterfaceName: tun0`,
+  address `10.91.0.2/24`, DNS `1.1.1.1`, `VALIDATED`, owner UID of the app and
+  all UIDs routed through the VPN. Node `status.log` showed a redacted active
+  OpenVPN client, virtual address `10.91.0.2`, bytes received/sent, TLS
+  username/password auth success and AES-256-GCM data channel.
+- Remaining C-002 work: continue the same live Android connect loop one adapter
+  family at a time; then package/sign a release artifact and run the full
+  cleanup/release evidence pass.
 
 ## P3: License Server And Commercial Portal
 

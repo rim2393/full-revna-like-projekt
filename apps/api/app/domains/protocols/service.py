@@ -2509,10 +2509,11 @@ def _computed_openvpn_shadowsocks_config(
     shadowsocks_config.setdefault("listen_port", port or config.get("listen_port") or 8388)
     shadowsocks_config.setdefault("method", config.get("method") or "aes-256-gcm")
     clients = runtime_clients or []
-    if clients:
+    if clients and not shadowsocks_config.get("password"):
         shadowsocks_config["password"] = str(clients[0]["shadowsocks_password"])
     else:
-        shadowsocks_config["clientsRef"] = profile.credentials_ref
+        if not shadowsocks_config.get("password"):
+            shadowsocks_config["clientsRef"] = profile.credentials_ref
     return {
         "openvpn": _computed_openvpn_config(
             bridge_profile,

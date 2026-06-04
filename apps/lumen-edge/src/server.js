@@ -189,6 +189,9 @@ function buildSubscriptionProxyHeaders(request, accept) {
 
 function inferTargetFromUserAgent(userAgent = "") {
   const value = String(userAgent).toLowerCase();
+  if (value.includes("lumenvpn") || value.includes("lumen vpn")) {
+    return "lumen-json";
+  }
   if (value.includes("hiddify")) {
     return "hiddify";
   }

@@ -1085,6 +1085,9 @@ async def test_openvpn_shadowsocks_subscription_renders_bridge_ovpn_and_blocks_w
                 "network": "10.89.0.0/24",
                 "method": "aes-256-gcm",
                 "openvpn": {"listen_port": 24194},
+                "shadowsocks": {
+                    "password": "profile-bridge-password",
+                },
             },
             port_reservations=[
                 {
@@ -1142,7 +1145,7 @@ async def test_openvpn_shadowsocks_subscription_renders_bridge_ovpn_and_blocks_w
     protocol = native.json()["nodes"][0]["protocols"][0]
     assert protocol["adapter"] == "openvpn-shadowsocks"
     assert protocol["endpoint"]["transport"] == "tcp"
-    assert protocol["credentials"]["shadowsocksPassword"]
+    assert protocol["credentials"]["shadowsocksPassword"] == "profile-bridge-password"
     assert protocol["rendererHints"]["method"] == "aes-256-gcm"
 
     sing_box = await route_app.client.get(

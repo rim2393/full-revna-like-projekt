@@ -145,6 +145,38 @@ test("proxies public rendered subscription with target negotiation", async () =>
   }
 });
 
+test("infers Lumen native manifest target for LumenVPN user agent", async () => {
+  const upstreamCalls = [];
+  const server = createLumenEdgeServer({
+    env: { API_INTERNAL_URL: "http://api.internal:8000" },
+    fetchImpl: async (url, options) => {
+      upstreamCalls.push({ url, options });
+      return new Response(JSON.stringify({ schemaVersion: "lumen.subscription-manifest.v1", nodes: [] }), {
+        status: 200,
+        headers: {
+          "content-type": "application/json; charset=utf-8",
+          "x-lumen-render-target": "lumen-json"
+        }
+      });
+    },
+    randomUUID: () => "req_test"
+  });
+  const port = await listen(server);
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/sub/lumen_sub_abc1234567890xyz?hwid=HWID-1`, {
+      headers: { "user-agent": "LumenVPN/1.0 Android" }
+    });
+    const body = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(body.schemaVersion, "lumen.subscription-manifest.v1");
+    assert.equal(response.headers.get("x-lumen-render-target"), "lumen-json");
+    assert.equal(upstreamCalls[0].url, "http://api.internal:8000/api/v1/subscriptions/public/lumen_sub_abc1234567890xyz/render?hwid=HWID-1&target=lumen-json");
+  } finally {
+    await close(server);
+  }
+});
+
 test("renders browser subscription portal while preserving client render endpoints", async () => {
   const upstreamCalls = [];
   const server = createLumenEdgeServer({

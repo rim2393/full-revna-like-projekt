@@ -1436,13 +1436,14 @@ async def test_user_detail_returns_subscriptions_devices_nodes_and_history(
     render_event = detail["request_history"][0]
     assert render_event["resource_type"] == "user"
     assert render_event["resource_id"] == user_id
-    assert render_event["metadata_json"] == {
+    assert render_event["metadata_json"] | {
         "public_id": subscription["public_id"],
         "subscription_id": subscription["id"],
         "target": "happ",
         "device_id": "AABBCC",
         "device_status": "known",
-    }
+    } == render_event["metadata_json"]
+    assert render_event["metadata_json"]["node_id"] == node_id
 
     delete_device_response = await foundation_app.client.delete(
         f"/api/v1/users/{user_id}/devices/hwid-1",

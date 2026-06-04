@@ -425,6 +425,7 @@ async def build_subscription_manifest(
                                 or _profile_config_string(profile, "method")
                                 or "2022-blake3-aes-128-gcm"
                             ),
+                            shadowsocks_password_override=_openvpn_shadowsocks_password(profile),
                         ),
                         "capabilities": _manifest_capabilities(protocol_type),
                         "rendererHints": renderer_hints,
@@ -1561,12 +1562,35 @@ def _wireguard_client_address_from_interface(interface_config: dict[str, object]
     return f"{network.network_address + 2}/32"
 
 
-def _manifest_credentials(credentials, *, username: str, method: str) -> dict[str, str]:
+def _openvpn_shadowsocks_password(profile: ProtocolProfile | None) -> str | None:
+    if profile is None or profile.adapter != "openvpn-shadowsocks":
+        return None
+    shadowsocks_config = profile.config_json.get("shadowsocks")
+    if not isinstance(shadowsocks_config, dict):
+        return None
+    password = shadowsocks_config.get("password")
+    if password is None:
+        return None
+    normalized = str(password).strip()
+    return normalized or None
+
+
+def _manifest_credentials(
+    credentials,
+    *,
+    username: str,
+    method: str,
+    shadowsocks_password_override: str | None = None,
+) -> dict[str, str]:
+    shadowsocks_password = (
+        shadowsocks_password_override
+        or shadowsocks_password_for_method(credentials, method)
+    )
     return {
         "username": username,
         "uuid": credentials.uuid,
         "password": credentials.password,
-        "shadowsocksPassword": shadowsocks_password_for_method(credentials, method),
+        "shadowsocksPassword": shadowsocks_password,
         "hysteriaPassword": credentials.hysteria_password,
         "hysteriaObfsPassword": credentials.hysteria_obfs_password,
         "wireguardPrivateKey": credentials.wireguard_private_key,

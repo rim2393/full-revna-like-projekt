@@ -143,6 +143,36 @@ def test_openvpn_shadowsocks_profile_builds_real_bridge_payload():
     assert "clientsRef" not in config["shadowsocks"]
 
 
+def test_openvpn_shadowsocks_profile_keeps_static_bridge_password():
+    payload = build_node_outbound_payload(
+        _profile(
+            "openvpn-shadowsocks",
+            {
+                "network": "10.89.0.0/24",
+                "openvpn": {"listen_port": 24194},
+                "shadowsocks": {
+                    "method": "aes-256-gcm",
+                    "password": "profile-bridge-password",
+                },
+            },
+        ),
+        _inbounds(28443, protocol="openvpn", transport="tcp"),
+        runtime_clients=[
+            {
+                "public_id": "lumen_sub_live",
+                "password": "openvpn-live-password",
+                "shadowsocks_password": "per-user-ss-password",
+            }
+        ],
+    )
+
+    config = payload["openvpnShadowsocksConfig"]
+    assert config["shadowsocks"]["password"] == "profile-bridge-password"  # noqa: S105
+    assert config["openvpn"]["users"] == [
+        {"username": "lumen_sub_live", "password": "openvpn-live-password"}
+    ]
+
+
 def test_ikev2_profile_builds_real_strongswan_payload_with_users_and_pki():
     payload = build_node_outbound_payload(
         _profile("ikev2-eap", {"server_id": "vpn.example.test", "pool": "10.92.0.0/24"}),

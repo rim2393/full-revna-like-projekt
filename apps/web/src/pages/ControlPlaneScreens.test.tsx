@@ -139,7 +139,7 @@ describe('Control plane resource screens', () => {
 
     expect(await screen.findByRole('heading', { name: /command dashboard/i })).toBeInTheDocument()
     expect(await screen.findByText('12 GiB')).toBeInTheDocument()
-    expect(screen.getByText(/users limited or in grace/i)).toBeInTheDocument()
+    expect(screen.getByText(/(users limited or in grace|пользователи с лимитом или grace)/i)).toBeInTheDocument()
   })
 
   it('saves profile config and metadata JSON through the real profile update contract', async () => {
@@ -285,9 +285,9 @@ describe('Control plane resource screens', () => {
     renderWithRouter('/users', { apiClient, initialSession: developmentSession })
 
     expect(await screen.findByText('Lifecycle User')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: /toggle status lifecycle user/i }))
-    await user.click(screen.getByRole('button', { name: /reset traffic lifecycle user/i }))
-    await user.click(screen.getByRole('button', { name: /revoke lifecycle user/i }))
+    await user.click(screen.getByRole('button', { name: /(toggle status|переключить статус) lifecycle user/i }))
+    await user.click(screen.getByRole('button', { name: /(reset traffic|сбросить трафик) lifecycle user/i }))
+    await user.click(screen.getByRole('button', { name: /(revoke|отозвать) lifecycle user/i }))
 
     await waitFor(() => expect(disableUser).toHaveBeenCalledWith('usr_lifecycle'))
     await waitFor(() => expect(resetUserTraffic).toHaveBeenCalledWith('usr_lifecycle'))
@@ -339,14 +339,14 @@ describe('Control plane resource screens', () => {
     renderWithRouter('/users', { apiClient, initialSession: developmentSession })
 
     expect(await screen.findByText('Bulk User')).toBeInTheDocument()
-    await user.click(screen.getByRole('checkbox', { name: /select bulk user/i }))
-    await user.type(screen.getByLabelText(/tags/i), 'vip, trial')
-    await user.click(screen.getByRole('button', { name: /apply tags/i }))
-    await user.type(screen.getByLabelText(/traffic delta gb/i), '5')
-    await user.click(screen.getByRole('button', { name: /apply traffic delta/i }))
-    await user.selectOptions(screen.getByLabelText(/^squad$/i), 'squad_bulk')
-    await user.click(screen.getByRole('button', { name: /add to squad/i }))
-    await user.click(screen.getByRole('button', { name: /revoke selected/i }))
+    await user.click(screen.getByRole('checkbox', { name: /(select|выбрать) bulk user/i }))
+    await user.type(screen.getByLabelText(/(tags|теги)/i), 'vip, trial')
+    await user.click(screen.getByRole('button', { name: /(apply tags|применить теги)/i }))
+    await user.type(screen.getByLabelText(/(traffic delta gb|изменение трафика)/i), '5')
+    await user.click(screen.getByRole('button', { name: /(apply traffic delta|применить изменение трафика)/i }))
+    await user.selectOptions(screen.getByLabelText(/^(squad|сквад)$/i), 'squad_bulk')
+    await user.click(screen.getByRole('button', { name: /(add to squad|добавить в сквад)/i }))
+    await user.click(screen.getByRole('button', { name: /(revoke selected|отозвать выбранных)/i }))
 
     await waitFor(() => expect(bulkUsers).toHaveBeenCalledTimes(4))
     expect(bulkUsers.mock.calls[0]).toEqual([
@@ -426,12 +426,12 @@ describe('Control plane resource screens', () => {
 
     renderWithRouter('/users/usr_devices', { apiClient, initialSession: developmentSession })
 
-    expect(await screen.findByRole('table', { name: /registered devices/i })).toBeInTheDocument()
+    expect(await screen.findByRole('table', { name: /(registered devices|зарегистрированные устройства)/i })).toBeInTheDocument()
     expect(screen.getByText(/user metadata/i)).toBeInTheDocument()
     expect(screen.getByText(/numeric_id=77/i)).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: /delete device phone/i }))
+    await user.click(screen.getByRole('button', { name: /(delete|удалить) device phone|(delete|удалить) устройство phone/i }))
     await waitFor(() => expect(deleteUserDevice).toHaveBeenCalledWith('usr_devices', 'phone'))
-    await user.click(screen.getByRole('button', { name: /clear all devices/i }))
+    await user.click(screen.getByRole('button', { name: /(clear all devices|очистить все устройства)/i }))
     await waitFor(() => expect(clearUserDevices).toHaveBeenCalledWith('usr_devices'))
   })
 
