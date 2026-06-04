@@ -937,6 +937,46 @@ export function createDevelopmentLumenApiClient(): LumenApiClient {
         }),
       }
     },
+    listProfileRuntimeReadiness: async () => ({
+      items: profiles.map((profile) => {
+        const activeHosts = hosts.filter(
+          (host) =>
+            host.protocol_profile_id === profile.id &&
+            host.status === 'active' &&
+            !host.hidden &&
+            !host.subscription_excluded,
+        )
+        const runtimeClients = subscriptions.filter((subscription) => {
+          const delivery = subscription.delivery_profile
+          return (
+            subscription.node_id === profile.node_id &&
+            subscription.status === 'active' &&
+            (delivery.profile_id === profile.id ||
+              (!delivery.profile_id && (delivery.adapter === profile.adapter || delivery.protocol === profile.adapter)))
+          )
+        })
+        const blockers = [
+          profile.status !== 'active' ? 'profile_not_active' : null,
+          activeHosts.length === 0 ? 'active_host_required' : null,
+          runtimeClients.length === 0 ? 'active_subscription_required' : null,
+        ].filter((item): item is string => Boolean(item))
+        const sync: Record<string, unknown> = profile.runtime_sync ?? {}
+        return {
+          active_hosts: activeHosts.length,
+          adapter: profile.adapter,
+          apply_ready: blockers.length === 0,
+          blockers,
+          last_command_id: typeof sync.last_command_id === 'string' ? sync.last_command_id : null,
+          latest_apply_command: null,
+          name: profile.name,
+          node_id: profile.node_id,
+          pending_apply: typeof sync.pending_apply === 'boolean' ? sync.pending_apply : null,
+          profile_id: profile.id,
+          runtime_clients: runtimeClients.length,
+          runtime_sync_status: typeof sync.status === 'string' ? sync.status : null,
+        }
+      }),
+    }),
     getUserDetail: async (userId: string) => {
       const user = users.find((item) => item.id === userId)
       if (!user) {

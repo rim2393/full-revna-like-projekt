@@ -144,6 +144,42 @@ async def test_apply_hysteria2_profile_queues_outbound_apply(route_app: RouteApp
         assert command.payload_json["hysteria2Config"]["auth"]["password"]
 
 
+async def test_profile_runtime_readiness_reports_real_blockers(route_app: RouteApp) -> None:
+    ready_profile_id, ready_node_id = await _seed_profile(route_app, "hysteria2")
+    blocked_profile_id, _ = await _seed_profile(
+        route_app,
+        "tuic-v5",
+        with_subscription=False,
+    )
+    async with route_app.sessionmaker() as session:
+        session.add(
+            Host(
+                name=f"host-ready-{uuid4().hex[:6]}",
+                hostname="ready.example.test",
+                node_id=UUID(ready_node_id),
+                protocol_profile_id=UUID(ready_profile_id),
+                status="active",
+                port=443,
+                hidden=False,
+                subscription_excluded=False,
+            )
+        )
+        await session.commit()
+
+    response = await route_app.client.get("/api/v1/profiles/runtime-readiness")
+    assert response.status_code == 200, response.text
+    records = {item["profile_id"]: item for item in response.json()["items"]}
+
+    assert records[ready_profile_id]["apply_ready"] is True
+    assert records[ready_profile_id]["active_hosts"] == 1
+    assert records[ready_profile_id]["runtime_clients"] == 1
+    assert records[ready_profile_id]["blockers"] == []
+
+    assert records[blocked_profile_id]["apply_ready"] is False
+    assert records[blocked_profile_id]["runtime_clients"] == 0
+    assert "active_subscription_required" in records[blocked_profile_id]["blockers"]
+
+
 async def test_apply_ikev2_profile_queues_concrete_strongswan_config(
     route_app: RouteApp,
 ) -> None:

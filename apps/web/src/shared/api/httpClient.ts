@@ -214,6 +214,7 @@ export function createHttpLumenApiClient({
       request(`/api/v1/profiles/${profileId}/computed-config`),
     listProfileInbounds: (profileId: string) => request(`/api/v1/profiles/${profileId}/inbounds`),
     listGlobalProfileInbounds: () => request('/api/v1/profiles/inbounds'),
+    listProfileRuntimeReadiness: () => request('/api/v1/profiles/runtime-readiness'),
     getSquadDetail: (squadId: string) => request(`/api/v1/squads/${squadId}/detail`),
     listApiKeys: async () => {
       const response = await request<ApiKeyListResponse>('/api/v1/api-keys')

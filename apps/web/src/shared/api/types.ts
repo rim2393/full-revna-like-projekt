@@ -566,6 +566,36 @@ export type ProtocolProfileListResponse = {
   items: ProtocolProfileRecord[]
 }
 
+export type ProfileLatestApplyCommandRecord = {
+  adapter: string | null
+  claimed_at: string | null
+  completed_at: string | null
+  created_at: string | null
+  error_code: string | null
+  id: string
+  implementation_status: string | null
+  status: string
+}
+
+export type ProfileRuntimeReadinessRecord = {
+  active_hosts: number
+  adapter: string
+  apply_ready: boolean
+  blockers: string[]
+  last_command_id: string | null
+  latest_apply_command: ProfileLatestApplyCommandRecord | null
+  name: string
+  node_id: string
+  pending_apply: boolean | null
+  profile_id: string
+  runtime_clients: number
+  runtime_sync_status: string | null
+}
+
+export type ProfileRuntimeReadinessListResponse = {
+  items: ProfileRuntimeReadinessRecord[]
+}
+
 export type ProfileComputedNodeRecord = {
   capabilities: Record<string, string>
   id: string
@@ -1389,6 +1419,7 @@ export type LumenApiClient = {
   getProfileComputedConfig: (profileId: string) => Promise<ProfileComputedConfigResponse>
   listProfileInbounds: (profileId: string) => Promise<ProfileInboundListResponse>
   listGlobalProfileInbounds: () => Promise<ProfileInboundListResponse>
+  listProfileRuntimeReadiness: () => Promise<ProfileRuntimeReadinessListResponse>
   listApiKeys: () => Promise<ResourceListResponse<ApiKeyRecord>>
   listHosts: () => Promise<HostListResponse>
   listLicenses: () => Promise<LicenseListResponse>

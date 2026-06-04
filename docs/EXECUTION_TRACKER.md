@@ -67,6 +67,7 @@ evidence here is wrong or stale.
 | PH-008 | Profiles reorder parity | DONE | Real backend reorder endpoint and UI controls persist order, tests cover order | `1fb3559`, `v0.1.69`, release run `26780147882`, installer/deploy run `26780247823`, manifest `rim2393/lumen_vpn@4042794`; web `tsc` passed; `ruff` passed; `pytest tests/test_control_plane_foundation_routes.py -k profile_reorder` passed; local targeted Vitest hung on Windows and existing wiki mitigation applies; prod health OK and `/profiles` live UI shows `Ручной порядок`, `Вверх`, `Вниз` after signed deploy. |
 | PH-009 | Protocol-specific profile builders | DONE | Builders for supported adapters produce valid payloads and port reservations, no raw JSON-only requirement | `5f3233b`, `v0.1.70`, release run `26780707608`, installer/deploy run `26780786555`, manifest `rim2393/lumen_vpn@b0ac95d`; web `tsc` passed; `ruff` passed; focused backend pytest passed; profile test contract now asserts builder `serverName` reaches `config_json.security`; prod health OK and live `/profiles` editor shows `Собрать JSON из полей протокола`. |
 | PH-010 | Profile JSON editor with validation | DONE | JSON editor validates schema/secret rules and shows backend errors without fake success | `becc9c8`, `v0.1.71`, release run `26780993334`, installer/deploy run `26781081704`, manifest `rim2393/lumen_vpn@37508a8`; web `tsc` passed; `ruff` passed; focused backend pytest passed; profile test contract rejects inline `privateKey`; prod health OK and live `/profiles` editor shows config JSON, credentials ref, and protocol builder after signed deploy. |
+| PH-011 | Profile runtime apply readiness | NEXT | API/UI shows whether each profile can be applied to a real node, and blocks Apply with concrete blockers when no active host or no active real subscription exists | Added real `/api/v1/profiles/runtime-readiness`, web readiness badges, Apply preflight guard, and `scripts/live/active-profile-apply-readiness-smoke.py`. Local gates passed: `ruff`, focused `pytest tests/test_apply_profile_to_node_routes.py -k "runtime_readiness or apply_hysteria2"` (`2 passed`), web `tsc`. Live read-only prod run on `v0.1.121` found real `node-01` active with 46 active profiles but only 2 apply-ready by strict backend rules; many old active profiles have no active runtime clients or no active visible host. Needs `v0.1.122` release/deploy evidence. |
 
 ## P1: Users
 
@@ -208,14 +209,14 @@ evidence here is wrong or stale.
 
 ## Next Slice
 
-`PR-006`: Client app import verification.
+`PH-011`: release and verify profile runtime apply readiness in production.
 
 Proposed implementation:
 
-1. Use the current prod public render targets as the source of truth.
-2. Wire Android Lumen import fixtures to the real prod subscription formats without logging raw URLs.
-3. Add app/client parser fixtures for Happ, Hiddify, Amnezia, Mihomo/Stash/Clash and sing-box/NekoBox/NekoRay families.
-4. Then verify live connect per already closed protocol family one client at a time, with cleanup counts in evidence.
+1. Build and publish digest-pinned `lumen-api` and `lumen-web` `v0.1.122` from current product head.
+2. Sign and publish the public installer manifest, then deploy through official `upgrade.sh`.
+3. Verify `/api/v1/profiles/runtime-readiness` on prod, `/profiles` UI readiness badges, panel/node cleanliness, and no admin files on node.
+4. Then continue backend/admin cleanup: either disable/delete stale active QA profiles with no real subscriptions, or add an operator-safe “issue real subscription from profile” workflow before applying those profiles.
 
 ## Checkpoint Notes
 

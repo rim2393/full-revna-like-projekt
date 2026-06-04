@@ -19,6 +19,7 @@ from app.domains.protocols.schemas import (
     PortCheckResponse,
     ProfileComputedConfigResponse,
     ProfileInboundListResponse,
+    ProfileRuntimeReadinessListResponse,
     ProtocolAdapterListResponse,
     ProtocolProfileCreateRequest,
     ProtocolProfileListResponse,
@@ -57,6 +58,7 @@ from app.domains.protocols.service import (
     list_global_profile_inbounds,
     list_hosts,
     list_profile_inbounds,
+    list_profile_runtime_readiness,
     list_profiles,
     list_protocol_adapters,
     list_squads,
@@ -130,6 +132,16 @@ async def read_all_profile_inbounds(
     session: DatabaseSession,
 ) -> ProfileInboundListResponse:
     return ProfileInboundListResponse(items=await list_global_profile_inbounds(session))
+
+
+@profiles_router.get("/runtime-readiness", response_model=ProfileRuntimeReadinessListResponse)
+async def read_profile_runtime_readiness(
+    _: Manager,
+    session: DatabaseSession,
+) -> ProfileRuntimeReadinessListResponse:
+    return ProfileRuntimeReadinessListResponse(
+        items=await list_profile_runtime_readiness(session)
+    )
 
 
 @profiles_router.get("/{profile_id}", response_model=ProtocolProfileResponse)

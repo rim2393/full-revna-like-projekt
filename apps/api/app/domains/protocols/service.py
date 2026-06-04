@@ -30,6 +30,8 @@ from app.domains.protocols.schemas import (
     ProfileComputedNodeResponse,
     ProfileInboundHostBindingResponse,
     ProfileInboundResponse,
+    ProfileLatestApplyCommandResponse,
+    ProfileRuntimeReadinessResponse,
     ProtocolAdapterResponse,
     ProtocolProfileCreateRequest,
     ProtocolProfileReorderRequest,
@@ -408,6 +410,51 @@ async def list_profiles(session: AsyncSession) -> list[ProtocolProfile]:
     )
     profiles = list(result.scalars().all())
     return sorted(profiles, key=_profile_sort_key)
+
+
+async def list_profile_runtime_readiness(
+    session: AsyncSession,
+) -> list[ProfileRuntimeReadinessResponse]:
+    profiles = await list_profiles(session)
+    records: list[ProfileRuntimeReadinessResponse] = []
+    for profile in profiles:
+        active_hosts = [
+            host
+            for host in await _list_profile_hosts(session, profile_id=profile.id)
+            if host.status == "active" and not host.hidden and not host.subscription_excluded
+        ]
+        runtime_clients = await list_profile_runtime_clients(session, profile=profile)
+        blockers: list[str] = []
+        if profile.status != "active":
+            blockers.append("profile_not_active")
+        if not active_hosts:
+            blockers.append("active_host_required")
+        if not runtime_clients:
+            blockers.append("active_subscription_required")
+        latest_command = await _latest_profile_apply_command(
+            session,
+            node_id=profile.node_id,
+            profile_id=profile.id,
+        )
+        runtime_sync = _runtime_sync_from_metadata(profile.metadata_json)
+        pending_apply = runtime_sync.get("pending_apply")
+        records.append(
+            ProfileRuntimeReadinessResponse(
+                profile_id=profile.id,
+                name=profile.name,
+                node_id=profile.node_id,
+                adapter=profile.adapter,
+                active_hosts=len(active_hosts),
+                runtime_clients=len(runtime_clients),
+                apply_ready=not blockers,
+                blockers=blockers,
+                runtime_sync_status=_optional_string(runtime_sync.get("status")),
+                pending_apply=pending_apply if isinstance(pending_apply, bool) else None,
+                last_command_id=_optional_string(runtime_sync.get("last_command_id")),
+                latest_apply_command=_profile_latest_apply_command_response(latest_command),
+            )
+        )
+    return records
 
 
 async def get_profile(session: AsyncSession, *, profile_id: UUID) -> ProtocolProfile:
@@ -1336,6 +1383,57 @@ def _profile_ids_from_apply_command(command: NodeCommand) -> list[UUID]:
         except ValueError:
             continue
     return profile_ids
+
+
+async def _latest_profile_apply_command(
+    session: AsyncSession,
+    *,
+    node_id: UUID,
+    profile_id: UUID,
+) -> NodeCommand | None:
+    commands = (
+        (
+            await session.execute(
+                select(NodeCommand)
+                .where(NodeCommand.node_id == node_id)
+                .where(NodeCommand.command_type == "outbound.apply")
+                .order_by(NodeCommand.created_at.desc())
+                .limit(250)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    for command in commands:
+        if profile_id in _profile_ids_from_apply_command(command):
+            return command
+    return None
+
+
+def _profile_latest_apply_command_response(
+    command: NodeCommand | None,
+) -> ProfileLatestApplyCommandResponse | None:
+    if command is None:
+        return None
+    result = command.result_json if isinstance(command.result_json, dict) else {}
+    payload = command.payload_json if isinstance(command.payload_json, dict) else {}
+    return ProfileLatestApplyCommandResponse(
+        id=command.id,
+        status=command.status,
+        adapter=_optional_string(payload.get("adapter")),
+        created_at=command.created_at,
+        claimed_at=command.claimed_at,
+        completed_at=command.completed_at,
+        error_code=command.error_code,
+        implementation_status=_optional_string(result.get("implementationStatus")),
+    )
+
+
+def _optional_string(value: object) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
 
 
 def _mark_runtime_applied(

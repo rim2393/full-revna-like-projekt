@@ -33,6 +33,7 @@ import {
   useGlobalProfileInbounds,
   useHostsPageData,
   useNodesPageData,
+  useProfileRuntimeReadiness,
   useProfileComputedConfig,
   useProfileInbounds,
   useProfilesPageData,
@@ -42,7 +43,13 @@ import {
   useBulkProfiles,
   useUpdateProfile,
 } from '../shared/api/resourceHooks'
-import type { HostRecord, PortReservation, ProfileInboundRecord, ProtocolProfileRecord } from '../shared/api/types'
+import type {
+  HostRecord,
+  PortReservation,
+  ProfileInboundRecord,
+  ProfileRuntimeReadinessRecord,
+  ProtocolProfileRecord,
+} from '../shared/api/types'
 import { useApiClient } from '../shared/api/apiClientContext'
 import { EmptyState, ErrorState, LoadingState } from '../shared/components/DataState'
 import { DataTable } from '../shared/components/DataTable'
@@ -112,6 +119,7 @@ export function ProfilesPage() {
   const squadsQuery = useSquadsPageData()
   const hostsQuery = useHostsPageData()
   const globalInboundsQuery = useGlobalProfileInbounds()
+  const readinessQuery = useProfileRuntimeReadiness()
   const createProfile = useCreateProfile()
   const updateProfile = useUpdateProfile()
   const deleteProfile = useDeleteProfile()
@@ -149,6 +157,10 @@ export function ProfilesPage() {
   const selectionBusy = isMutating
   const confirmDanger = (message: string) => window.confirm(message)
   const profileHosts = useMemo(() => groupHostsByProfile(hosts), [hosts])
+  const readinessByProfile = useMemo(
+    () => new Map((readinessQuery.data?.items ?? []).map((item) => [item.profile_id, item])),
+    [readinessQuery.data?.items],
+  )
   const filteredProfiles = useMemo(() => {
     const needle = search.trim().toLowerCase()
     const matched = profiles.filter((profile) => {
@@ -579,6 +591,15 @@ export function ProfilesPage() {
   async function handleApplyProfileToNode(profile: ProtocolProfileRecord) {
     setFormError(null)
     setActionMessage(null)
+    const readiness = readinessByProfile.get(profile.id)
+    if (readiness && !readiness.apply_ready) {
+      setFormError(
+        t('Profile is not apply-ready: {reason}', {
+          reason: readinessReason(readiness, t),
+        }),
+      )
+      return
+    }
     try {
       const response = await applyProfileToNode.mutateAsync(profile.id)
       setActionMessage(
@@ -849,6 +870,7 @@ export function ProfilesPage() {
                       onDuplicate={startClone}
                       onExport={(profile) => downloadJson(`${profile.name}-profile.json`, profileExport(profile))}
                       onApply={handleApplyProfileToNode}
+                      readinessByProfile={readinessByProfile}
                       onSelect={setProfileSelected}
                       onSelectRow={toggleSelectedProfile}
                       selectionBusy={selectionBusy}
@@ -884,6 +906,7 @@ export function ProfilesPage() {
                         onDuplicate={startClone}
                         onExport={() => downloadJson(`${profile.name}-profile.json`, profileExport(profile))}
                         onApply={handleApplyProfileToNode}
+                        readiness={readinessByProfile.get(profile.id)}
                         canMoveDown={canMoveProfile(profile, 1)}
                         canMoveUp={canMoveProfile(profile, -1)}
                         onMove={handleMoveProfile}
@@ -993,6 +1016,7 @@ function ProfileInventoryTable({
   onApply,
   onSelect,
   onSelectRow,
+  readinessByProfile,
   selectionBusy,
   selectedProfileIds,
   onToggle,
@@ -1016,6 +1040,7 @@ function ProfileInventoryTable({
   onApply: (profile: ProtocolProfileRecord) => void
   onSelect: (profileId: string) => void
   onSelectRow: (profileId: string) => void
+  readinessByProfile: Map<string, ProfileRuntimeReadinessRecord>
   selectionBusy: boolean
   selectedProfileIds: Set<string>
   onToggle: (profile: ProtocolProfileRecord) => void
@@ -1038,6 +1063,7 @@ function ProfileInventoryTable({
         t('Hosts'),
         t('Inbounds'),
         t('Config'),
+        t('Readiness'),
         t('Runtime'),
         t('Status'),
         t('Actions'),
@@ -1089,6 +1115,7 @@ function ProfileInventoryTable({
             </StatusBadge>
           </div>,
           <code key="config">{configSummary(profile)}</code>,
+          <ProfileReadinessBadge key="readiness" readiness={readinessByProfile.get(profile.id)} t={t} />,
           <RuntimeSyncBadge key="runtime" status={runtimeSyncStatus(profile)} />,
           <StatusBadge key="status" tone={toneForStatus(profile.status)}>
             {t(profile.status)}
@@ -1129,7 +1156,11 @@ function ProfileInventoryTable({
               className="button button--secondary"
               aria-label={t('Apply {name} to node', { name: profile.name })}
               onClick={() => onApply(profile)}
-              disabled={selectionBusy || profile.status !== 'active'}
+              disabled={
+                selectionBusy ||
+                profile.status !== 'active' ||
+                readinessByProfile.get(profile.id)?.apply_ready === false
+              }
             >
               <Send size={16} aria-hidden="true" />
               {t('Apply')}
@@ -1216,6 +1247,7 @@ function ProfileCard({
   onGoToNode,
   isCurrent,
   profile,
+  readiness,
   selected,
   selectionBusy,
   t,
@@ -1238,6 +1270,7 @@ function ProfileCard({
   onGoToNode: (nodeId: string) => void
   isCurrent: boolean
   profile: ProtocolProfileRecord
+  readiness: ProfileRuntimeReadinessRecord | undefined
   selected: boolean
   selectionBusy: boolean
   t: (value: string, params?: Record<string, string | number>) => string
@@ -1264,6 +1297,7 @@ function ProfileCard({
         <StatusBadge tone="good">{t('profile.hosts.count', { count: hosts.length })}</StatusBadge>
         <StatusBadge tone="neutral">{t('inbounds.count', { count: inbounds })}</StatusBadge>
         <RuntimeSyncBadge status={runtimeSyncStatus(profile)} />
+        <ProfileReadinessBadge readiness={readiness} t={t} />
         <div className="inline-actions inline-actions--compact">
           <RuntimeSyncBadge status={runtimeSyncStatus(profile)} />
           <StatusBadge tone={toneForStatus(profile.status)}>{t(profile.status)}</StatusBadge>
@@ -1325,7 +1359,7 @@ function ProfileCard({
           className="button button--secondary"
           aria-label={t('Apply {name} to node', { name: profile.name })}
           onClick={() => onApply(profile)}
-          disabled={selectionBusy || profile.status !== 'active'}
+          disabled={selectionBusy || profile.status !== 'active' || readiness?.apply_ready === false}
         >
           <Send size={16} aria-hidden="true" />
           {t('Apply')}
@@ -2476,6 +2510,52 @@ function runtimeSyncStatus(profile: ProtocolProfileRecord): { label: string; ton
     return { label: 'Pending apply', tone: 'watch' }
   }
   return { label: 'Never applied', tone: 'neutral' }
+}
+
+function ProfileReadinessBadge({
+  readiness,
+  t,
+}: {
+  readiness: ProfileRuntimeReadinessRecord | undefined
+  t: (value: string, params?: Record<string, string | number>) => string
+}) {
+  if (!readiness) {
+    return <StatusBadge tone="neutral">{t('Readiness loading')}</StatusBadge>
+  }
+  if (readiness.apply_ready) {
+    return (
+      <StatusBadge tone="good">
+        {`${t('Apply-ready')} · ${readiness.runtime_clients}`}
+      </StatusBadge>
+    )
+  }
+  return <StatusBadge tone="watch">{readinessReason(readiness, t)}</StatusBadge>
+}
+
+function readinessReason(
+  readiness: ProfileRuntimeReadinessRecord,
+  t: (value: string, params?: Record<string, string | number>) => string,
+) {
+  if (readiness.blockers.length === 0) {
+    return t('Not apply-ready')
+  }
+  return readiness.blockers.map((blocker) => readinessBlockerLabel(blocker, t)).join(', ')
+}
+
+function readinessBlockerLabel(
+  blocker: string,
+  t: (value: string, params?: Record<string, string | number>) => string,
+) {
+  switch (blocker) {
+    case 'profile_not_active':
+      return t('profile disabled')
+    case 'active_host_required':
+      return t('no active host')
+    case 'active_subscription_required':
+      return t('no active subscription')
+    default:
+      return t(blocker)
+  }
 }
 
 function portsLabel(profile: ProtocolProfileRecord, t: (value: string) => string): string {

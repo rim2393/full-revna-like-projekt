@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
@@ -115,6 +116,36 @@ class ProtocolProfileUpdateRequest(BaseModel):
 
 class ProtocolProfileListResponse(BaseModel):
     items: list[ProtocolProfileResponse]
+
+
+class ProfileLatestApplyCommandResponse(BaseModel):
+    id: UUID
+    status: str
+    adapter: str | None
+    created_at: datetime | None
+    claimed_at: datetime | None
+    completed_at: datetime | None
+    error_code: str | None
+    implementation_status: str | None
+
+
+class ProfileRuntimeReadinessResponse(BaseModel):
+    profile_id: UUID
+    name: str
+    node_id: UUID
+    adapter: str
+    active_hosts: int
+    runtime_clients: int
+    apply_ready: bool
+    blockers: list[str]
+    runtime_sync_status: str | None
+    pending_apply: bool | None
+    last_command_id: str | None
+    latest_apply_command: ProfileLatestApplyCommandResponse | None
+
+
+class ProfileRuntimeReadinessListResponse(BaseModel):
+    items: list[ProfileRuntimeReadinessResponse]
 
 
 class ProtocolProfileReorderRequest(BaseModel):

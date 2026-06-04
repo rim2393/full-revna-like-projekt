@@ -59,6 +59,7 @@ export const resourceQueryKeys = {
   nodeOverview: (nodeId: string) => ['resource', 'nodes', nodeId, 'overview'] as const,
   profiles: ['resource', 'profiles'] as const,
   profileGlobalInbounds: ['resource', 'profiles', 'inbounds'] as const,
+  profileRuntimeReadiness: ['resource', 'profiles', 'runtime-readiness'] as const,
   profileComputedConfig: (profileId: string) =>
     ['resource', 'profiles', profileId, 'computed-config'] as const,
   profileInbounds: (profileId: string) => ['resource', 'profiles', profileId, 'inbounds'] as const,
@@ -380,6 +381,15 @@ export function useGlobalProfileInbounds() {
   })
 }
 
+export function useProfileRuntimeReadiness() {
+  const apiClient = useApiClient()
+
+  return useQuery({
+    queryFn: apiClient.listProfileRuntimeReadiness,
+    queryKey: resourceQueryKeys.profileRuntimeReadiness,
+  })
+}
+
 export function useCreateProfile() {
   const apiClient = useApiClient()
   const queryClient = useQueryClient()
@@ -389,6 +399,7 @@ export function useCreateProfile() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.profiles })
       void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.profileGlobalInbounds })
+      void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.profileRuntimeReadiness })
     },
   })
 }
@@ -403,6 +414,7 @@ export function useBulkProfiles() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.profiles })
       void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.profileGlobalInbounds })
+      void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.profileRuntimeReadiness })
     },
   })
 }
@@ -421,6 +433,7 @@ export function useApplyProfileToNode() {
       })
       void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.profileInbounds(profileId) })
       void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.profileGlobalInbounds })
+      void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.profileRuntimeReadiness })
       void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.nodeCommands(_response.node_id) })
     },
   })
@@ -442,6 +455,7 @@ export function useUpdateProfile() {
       void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.hosts })
       void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.profileInbounds(variables.id) })
       void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.profileGlobalInbounds })
+      void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.profileRuntimeReadiness })
     },
   })
 }
@@ -455,6 +469,7 @@ export function useDeleteProfile() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.profiles })
       void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.profileGlobalInbounds })
+      void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.profileRuntimeReadiness })
     },
   })
 }
@@ -492,6 +507,7 @@ export function useCreateHost() {
       void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.profiles })
       void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.squads })
       void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.profileGlobalInbounds })
+      void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.profileRuntimeReadiness })
     },
   })
 }
@@ -507,6 +523,7 @@ export function useUpdateHost() {
       void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.hosts })
       void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.profiles })
       void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.profileGlobalInbounds })
+      void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.profileRuntimeReadiness })
     },
   })
 }
@@ -521,6 +538,7 @@ export function useDeleteHost() {
       void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.hosts })
       void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.profiles })
       void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.profileGlobalInbounds })
+      void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.profileRuntimeReadiness })
     },
   })
 }
@@ -536,6 +554,7 @@ export function useBulkHosts() {
       void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.hosts })
       void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.profiles })
       void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.profileGlobalInbounds })
+      void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.profileRuntimeReadiness })
     },
   })
 }
@@ -550,6 +569,7 @@ export function useReorderHosts() {
       void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.hosts })
       void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.profiles })
       void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.profileGlobalInbounds })
+      void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.profileRuntimeReadiness })
     },
   })
 }
