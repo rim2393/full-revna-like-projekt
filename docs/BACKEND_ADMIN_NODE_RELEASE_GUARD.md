@@ -53,6 +53,8 @@ runtime protocols, node-agent, installer, upgrade or manifest behavior:
 GitHub-hosted Actions are currently an external release-system blocker when the
 account refuses to start jobs because of billing/spending limits.
 
+The detailed recovery checklist is `docs/GITHUB_ACTIONS_BILLING_UNBLOCK.md`.
+
 Until the account owner fixes billing/spending:
 
 - do not claim that normal CI/CD is healthy;
@@ -72,6 +74,8 @@ After billing/spending is fixed, the next release must prove:
   images;
 - the public installer manifest is produced by the normal secret-backed
   release pipeline instead of ad-hoc local signing.
+- the passing workflow run ids and signing verification evidence are recorded
+  in `docs/EXECUTION_TRACKER.md`.
 
 ## Release Signing Secret
 

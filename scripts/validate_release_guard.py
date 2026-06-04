@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 TRACKER = ROOT / "docs" / "EXECUTION_TRACKER.md"
 REALITY_CONTRACT = ROOT / "docs" / "PRODUCT_REALITY_CONTRACT.md"
 RELEASE_GUARD = ROOT / "docs" / "BACKEND_ADMIN_NODE_RELEASE_GUARD.md"
+BILLING_UNBLOCK = ROOT / "docs" / "GITHUB_ACTIONS_BILLING_UNBLOCK.md"
 ADMIN_SMOKE = ROOT / "scripts" / "live" / "admin-surface-smoke.py"
 ADMIN_SMOKE_RUNNER = ROOT / "scripts" / "live" / "run-admin-surface-smoke-on-panel.sh"
 QUALITY_WORKFLOW = ROOT / ".github" / "workflows" / "quality.yml"
@@ -77,6 +78,7 @@ def main() -> int:
     tracker = read(TRACKER)
     reality = read(REALITY_CONTRACT)
     guard = read(RELEASE_GUARD)
+    billing_unblock = read(BILLING_UNBLOCK)
     workflow = read(QUALITY_WORKFLOW)
     release_workflow = read(RELEASE_WORKFLOW)
 
@@ -96,6 +98,7 @@ def main() -> int:
             "cleanup returns `0`",
             "/tmp/lumen-*",
             "GitHub-hosted Actions",
+            "docs/GITHUB_ACTIONS_BILLING_UNBLOCK.md",
             "billing/spending",
             "digest-pinned",
             "signed public manifest",
@@ -109,6 +112,25 @@ def main() -> int:
     )
 
     require_contains(
+        "docs/GITHUB_ACTIONS_BILLING_UNBLOCK.md",
+        billing_unblock,
+        [
+            "Billing & plans",
+            "Rerun the latest failed `Quality gates`",
+            "Rerun the latest failed `Build release images`",
+            "Validate backend/admin/node release guard",
+            "LUMEN_PUBLIC_REPO_TOKEN",
+            "LUMEN_RELEASE_SIGNING_KEY",
+            "LUMEN_RELEASE_SIGNING_KID",
+            "manual image promotion",
+            "digest-pinned",
+            "scripts/live/run-admin-surface-smoke-on-panel.sh",
+            "cleanup must return `0`",
+            "Manual fallback is not a replacement",
+        ],
+    )
+
+    require_contains(
         "docs/EXECUTION_TRACKER.md",
         tracker,
         [
@@ -116,6 +138,7 @@ def main() -> int:
             "scripts/validate_release_guard.py",
             "GitHub-hosted Actions remain externally blocked",
             "manual image promotion must stay digest-pinned",
+            "docs/GITHUB_ACTIONS_BILLING_UNBLOCK.md",
         ],
     )
 
