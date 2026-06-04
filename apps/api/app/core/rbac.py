@@ -3,7 +3,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import Cookie, Depends, Header, status
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings, get_settings
@@ -62,7 +62,7 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
 
 class Principal(BaseModel):
     subject: str
-    email: EmailStr | None = None
+    email: str | None = None
     roles: set[Role]
     permissions: set[Permission]
     session_id: UUID | None = None

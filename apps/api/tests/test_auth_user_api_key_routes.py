@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 import app.db.models  # noqa: F401
 from app.core.config import Settings, get_settings
+from app.core.rbac import Permission, Principal
 from app.db.base import Base
 from app.db.session import create_engine, get_db_session
 from app.domains.auth.service import generate_totp_code
@@ -229,6 +230,17 @@ def test_api_key_routes_issue_scope_and_revoke_keys(tmp_path) -> None:
         )
         assert rejected.status_code == 401
         assert rejected.json()["error"]["code"] == "invalid_api_key"
+
+
+def test_principal_accepts_existing_reserved_domain_email() -> None:
+    principal = Principal(
+        subject="existing-owner",
+        email="owner@example.test",
+        roles=set(),
+        permissions={Permission.SUBSCRIPTION_MANAGE},
+    )
+
+    assert principal.email == "owner@example.test"
 
 
 def test_remna_tokens_compat_requires_web_session_and_uses_remna_shape(tmp_path) -> None:
