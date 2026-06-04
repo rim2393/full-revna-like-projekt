@@ -153,6 +153,20 @@ evidence here is wrong or stale.
 
 ### Backend/Subscription Smoke After API Hotfix
 
+- 2026-06-04 protected admin surface smoke added as
+  `scripts/live/admin-surface-smoke.py` and run inside the prod API container
+  against `https://panel.lumentech.tel` on `v0.1.127`. It used a temporary
+  real owner and scoped API key, checked protected admin/API surfaces for
+  nodes, profiles, hosts, squads, users, subscriptions, API keys, licenses,
+  settings/groups/auth providers, subscription templates/response
+  rules/subpage configs, audit, node plugins, infra billing, IP control, tools
+  inspectors, HApp routing build and X25519 utility. Real live counts included
+  `nodes=1`, `profiles=46`, `hosts=18`, `users=12`, `subscriptions=11`,
+  `auth_providers=8`, `setting_groups=4`; utility endpoints returned `ok`
+  without printing generated secrets. Cleanup returned `0`
+  users/api_keys/QA subscriptions/profiles/hosts/squads, and temp checks
+  confirmed `panel-admin-smoke-clean`, `api-container-admin-smoke-clean` and
+  `node-admin-smoke-clean`.
 - 2026-06-04 API-only lint/startup hardening `3c7625d` was manually built as
   `ghcr.io/rim2393/lumen-api:v0.1.127@sha256:340ef210410ced6d788537b280a11994c5f897b7a0d94481be4db4a52224956b`
   because GitHub-hosted Actions still refuse to start due to account
