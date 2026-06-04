@@ -181,6 +181,22 @@ evidence here is wrong or stale.
   users/api_keys/QA subscriptions/profiles/hosts/squads, and temp checks
   confirmed `panel-admin-smoke-clean`, `api-container-admin-smoke-clean` and
   `node-admin-smoke-clean`.
+- 2026-06-04 follow-up admin/backend/node reality check on current prod
+  `v0.1.127`: the panel VPS and API container were cleaned after the aborted
+  Android IKEv2 fixture, with fixture cleanup returning `0`
+  licenses/profiles/subscriptions/users and a real `outbound.remove` command
+  accepted by `node-01`. The node VPS was checked without copying files to it:
+  no `/tmp` fixture or matrix scripts were present, only the node runtime
+  container was running, and a штатный `lumen-node-agent --run-once` from inside
+  `lumen-node-node-agent-1` reported heartbeat `active`, node `node-01`,
+  runtime metric creation, telemetry scan, and real restored runtime processes
+  for Xray, Shadowsocks, OpenVPN, OpenVPN-over-Shadowsocks and TUIC. A fresh
+  `admin-surface-smoke.py` live run against `https://panel.lumentech.tel`
+  returned `ok=true` with real counts `nodes=1`, `profiles=46`, `hosts=18`,
+  `users=12`, `subscriptions=11`, `node_plugins=1`, `auth_providers=8`,
+  `setting_groups=4`, `tools_sessions=200`, `tools_user_ips=94`, and cleanup
+  leftovers all `0`; the script was deleted from both the panel host and API
+  container after the run.
 - 2026-06-04 API-only lint/startup hardening `3c7625d` was manually built as
   `ghcr.io/rim2393/lumen-api:v0.1.127@sha256:340ef210410ced6d788537b280a11994c5f897b7a0d94481be4db4a52224956b`
   because GitHub-hosted Actions still refuse to start due to account
