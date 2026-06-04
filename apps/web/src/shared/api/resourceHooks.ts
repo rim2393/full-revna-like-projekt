@@ -35,6 +35,7 @@ import type {
   SquadUpdateRequest,
   SquadUserMutationRequest,
   SubscriptionCreateRequest,
+  SubscriptionIssueFromProfileRequest,
   SubscriptionPageConfigCloneRequest,
   SubscriptionPageConfigCreateRequest,
   SubscriptionPageConfigUpdateRequest,
@@ -1092,6 +1093,21 @@ export function useCreateSubscription() {
     mutationFn: (request: SubscriptionCreateRequest) => apiClient.createSubscription(request),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.subscriptions })
+      void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.users })
+    },
+  })
+}
+
+export function useIssueSubscriptionFromProfile() {
+  const apiClient = useApiClient()
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (request: SubscriptionIssueFromProfileRequest) =>
+      apiClient.issueSubscriptionFromProfile(request),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.subscriptions })
+      void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.profileRuntimeReadiness })
       void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.users })
     },
   })

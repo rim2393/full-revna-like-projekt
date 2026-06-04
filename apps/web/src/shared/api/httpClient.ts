@@ -43,6 +43,7 @@ import type {
   SquadUpdateRequest,
   SquadUserMutationRequest,
   SubscriptionCreateRequest,
+  SubscriptionIssueFromProfileRequest,
   SubscriptionPageConfigCloneRequest,
   SubscriptionPageConfigCreateRequest,
   SubscriptionPageConfigUpdateRequest,
@@ -172,6 +173,8 @@ export function createHttpLumenApiClient({
       request('/api/v1/squads', { body: payload, method: 'POST' }),
     createSubscription: (payload: SubscriptionCreateRequest) =>
       request('/api/v1/subscriptions', { body: payload, method: 'POST' }),
+    issueSubscriptionFromProfile: (payload: SubscriptionIssueFromProfileRequest) =>
+      request('/api/v1/subscriptions/actions/issue-from-profile', { body: payload, method: 'POST' }),
     cloneSubscription: (subscriptionId: string) =>
       request(`/api/v1/subscriptions/${subscriptionId}/clone`, { method: 'POST' }),
     createSubscriptionTemplate: (payload: SubscriptionTemplateCreateRequest) =>

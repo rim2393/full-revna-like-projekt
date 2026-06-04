@@ -32,6 +32,8 @@ import {
   useDeleteProfile,
   useGlobalProfileInbounds,
   useHostsPageData,
+  useIssueSubscriptionFromProfile,
+  useLicensesPageData,
   useNodesPageData,
   useProfileRuntimeReadiness,
   useProfileComputedConfig,
@@ -42,13 +44,17 @@ import {
   useSquadsPageData,
   useBulkProfiles,
   useUpdateProfile,
+  useUsersPageData,
 } from '../shared/api/resourceHooks'
 import type {
   HostRecord,
+  LicenseRecord,
   PortReservation,
   ProfileInboundRecord,
   ProfileRuntimeReadinessRecord,
   ProtocolProfileRecord,
+  SubscriptionRecord,
+  UserRecord,
 } from '../shared/api/types'
 import { useApiClient } from '../shared/api/apiClientContext'
 import { EmptyState, ErrorState, LoadingState } from '../shared/components/DataState'
@@ -118,6 +124,8 @@ export function ProfilesPage() {
   const nodesQuery = useNodesPageData()
   const squadsQuery = useSquadsPageData()
   const hostsQuery = useHostsPageData()
+  const usersQuery = useUsersPageData()
+  const licensesQuery = useLicensesPageData()
   const globalInboundsQuery = useGlobalProfileInbounds()
   const readinessQuery = useProfileRuntimeReadiness()
   const createProfile = useCreateProfile()
@@ -126,11 +134,14 @@ export function ProfilesPage() {
   const bulkProfiles = useBulkProfiles()
   const reorderProfiles = useReorderProfiles()
   const applyProfileToNode = useApplyProfileToNode()
+  const issueSubscriptionFromProfile = useIssueSubscriptionFromProfile()
   const profiles = profilesQuery.data?.items ?? []
   const adapters = adaptersQuery.data?.items ?? []
   const nodes = nodesQuery.data?.items ?? []
   const squads = squadsQuery.data?.items ?? []
   const hosts = hostsQuery.data?.items ?? []
+  const users = usersQuery.data?.items ?? []
+  const licenses = licensesQuery.data?.items ?? []
   const [selectedProfileId, setSelectedProfileId] = useState('')
   const [selectedProfileIds, setSelectedProfileIds] = useState<Set<string>>(new Set())
   const [editingProfileId, setEditingProfileId] = useState<string | null>(null)
@@ -153,6 +164,7 @@ export function ProfilesPage() {
     deleteProfile.isPending ||
     bulkProfiles.isPending ||
     applyProfileToNode.isPending ||
+    issueSubscriptionFromProfile.isPending ||
     reorderProfiles.isPending
   const selectionBusy = isMutating
   const confirmDanger = (message: string) => window.confirm(message)
@@ -359,6 +371,8 @@ export function ProfilesPage() {
     nodesQuery.isLoading ||
     squadsQuery.isLoading ||
     hostsQuery.isLoading ||
+    usersQuery.isLoading ||
+    licensesQuery.isLoading ||
     globalInboundsQuery.isLoading
   const error =
     profilesQuery.error ??
@@ -366,6 +380,8 @@ export function ProfilesPage() {
     nodesQuery.error ??
     squadsQuery.error ??
     hostsQuery.error ??
+    usersQuery.error ??
+    licensesQuery.error ??
     globalInboundsQuery.error
   const profileStats = {
     active: profiles.filter((profile) => profile.status === 'active').length,
@@ -610,6 +626,37 @@ export function ProfilesPage() {
       )
     } catch (error) {
       setFormError(error instanceof Error ? error.message : t('Profile apply command failed.'))
+    }
+  }
+
+  async function handleIssueSubscriptionFromProfile(request: {
+    host_id: string
+    license_id: string
+    profile_id: string
+    profile_title: string
+    render_targets: string[]
+    user_id: string
+  }): Promise<SubscriptionRecord> {
+    setFormError(null)
+    setActionMessage(null)
+    try {
+      const subscription = await issueSubscriptionFromProfile.mutateAsync({
+        host_id: request.host_id,
+        license_id: request.license_id,
+        profile_id: request.profile_id,
+        profile_title: request.profile_title,
+        render_targets: request.render_targets,
+        user_id: request.user_id,
+      })
+      setActionMessage(
+        t('Subscription issued from profile: {publicId}', {
+          publicId: subscription.public_id,
+        }),
+      )
+      return subscription
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : t('Subscription could not be issued.'))
+      throw error
     }
   }
 
@@ -960,6 +1007,16 @@ export function ProfilesPage() {
                   steps={profileWorkflowSteps}
                 />
               )}
+
+              <ProfileSubscriptionIssuer
+                hosts={selectedProfileHosts}
+                licenses={licenses}
+                onIssue={handleIssueSubscriptionFromProfile}
+                pending={issueSubscriptionFromProfile.isPending}
+                profile={selectedProfile}
+                t={t}
+                users={users}
+              />
 
               <ProfileDetailPanel
                 computedConfig={computedQuery.data?.computed_config}
@@ -1436,6 +1493,259 @@ function ProfileCard({
 
 function RuntimeSyncBadge({ status }: { status: { label: string; tone: 'danger' | 'good' | 'info' | 'neutral' | 'watch' } }) {
   return <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
+}
+
+const profileSubscriptionTargets = [
+  'happ',
+  'hiddify',
+  'raw-uri',
+  'v2ray',
+  'v2ray-base64',
+  'mihomo',
+  'clash-meta',
+  'sing-box',
+  'nekobox',
+  'amnezia',
+  'xray-json',
+]
+
+function ProfileSubscriptionIssuer({
+  hosts,
+  licenses,
+  onIssue,
+  pending,
+  profile,
+  t,
+  users,
+}: {
+  hosts: HostRecord[]
+  licenses: LicenseRecord[]
+  onIssue: (request: {
+    host_id: string
+    license_id: string
+    profile_id: string
+    profile_title: string
+    render_targets: string[]
+    user_id: string
+  }) => Promise<SubscriptionRecord>
+  pending: boolean
+  profile: ProtocolProfileRecord | undefined
+  t: (value: string, params?: Record<string, string | number>) => string
+  users: UserRecord[]
+}) {
+  const renderableHosts = hosts.filter(
+    (host) => host.status === 'active' && !host.hidden && !host.subscription_excluded,
+  )
+  const [userId, setUserId] = useState(users[0]?.id ?? '')
+  const [licenseId, setLicenseId] = useState(licenses[0]?.id ?? '')
+  const [hostId, setHostId] = useState(renderableHosts[0]?.id ?? '')
+  const [title, setTitle] = useState(profile?.name ?? '')
+  const [targets, setTargets] = useState<Set<string>>(new Set(['happ', 'sing-box', 'mihomo']))
+  const [issued, setIssued] = useState<SubscriptionRecord | null>(null)
+  const [localError, setLocalError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!userId && users[0]?.id) {
+      setUserId(users[0].id)
+    }
+  }, [userId, users])
+
+  useEffect(() => {
+    if (!licenseId && licenses[0]?.id) {
+      setLicenseId(licenses[0].id)
+    }
+  }, [licenseId, licenses])
+
+  useEffect(() => {
+    if (!hostId || !renderableHosts.some((host) => host.id === hostId)) {
+      setHostId(renderableHosts[0]?.id ?? '')
+    }
+  }, [hostId, renderableHosts])
+
+  useEffect(() => {
+    setTitle(profile?.name ?? '')
+    setIssued(null)
+    setLocalError(null)
+  }, [profile?.id, profile?.name])
+
+  const disabledReason = !profile
+    ? t('Select a profile first.')
+    : profile.status !== 'active'
+      ? t('Profile must be active.')
+      : renderableHosts.length === 0
+        ? t('Profile needs an active visible host included in subscriptions.')
+        : users.length === 0
+          ? t('Create a real user first.')
+          : licenses.length === 0
+            ? t('Create or sync a real license first.')
+            : targets.size === 0
+              ? t('Select at least one client target.')
+              : null
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setIssued(null)
+    setLocalError(null)
+    if (!profile || disabledReason) {
+      setLocalError(disabledReason ?? t('Subscription cannot be issued.'))
+      return
+    }
+    try {
+      const subscription = await onIssue({
+        host_id: hostId,
+        license_id: licenseId,
+        profile_id: profile.id,
+        profile_title: title.trim() || profile.name,
+        render_targets: Array.from(targets),
+        user_id: userId,
+      })
+      setIssued(subscription)
+    } catch (error) {
+      setLocalError(error instanceof Error ? error.message : t('Subscription could not be issued.'))
+    }
+  }
+
+  function toggleTarget(target: string) {
+    setTargets((current) => {
+      const next = new Set(current)
+      if (next.has(target)) {
+        next.delete(target)
+      } else {
+        next.add(target)
+      }
+      return next
+    })
+  }
+
+  return (
+    <article className="panel">
+      <div className="panel__header">
+        <div>
+          <p className="eyebrow">{t('Real subscription')}</p>
+          <h2>{t('Issue from profile')}</h2>
+        </div>
+        <StatusBadge tone={disabledReason ? 'watch' : 'good'}>
+          {disabledReason ? t('Needs input') : t('Ready')}
+        </StatusBadge>
+      </div>
+
+      <form className="resource-form" onSubmit={handleSubmit}>
+        <label htmlFor="profile-issue-user">
+          {t('User')}
+          <select
+            id="profile-issue-user"
+            value={userId}
+            onChange={(event) => setUserId(event.target.value)}
+            disabled={pending || users.length === 0}
+            required
+          >
+            <option value="">{t('Select user')}</option>
+            {users.map((user) => (
+              <option key={user.id} value={user.id}>
+                {user.display_name ?? user.username ?? user.email}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label htmlFor="profile-issue-license">
+          {t('License')}
+          <select
+            id="profile-issue-license"
+            value={licenseId}
+            onChange={(event) => setLicenseId(event.target.value)}
+            disabled={pending || licenses.length === 0}
+            required
+          >
+            <option value="">{t('Select license')}</option>
+            {licenses.map((license) => (
+              <option key={license.id} value={license.id}>
+                {profileLicenseLabel(license)}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label htmlFor="profile-issue-host">
+          {t('Host')}
+          <select
+            id="profile-issue-host"
+            value={hostId}
+            onChange={(event) => setHostId(event.target.value)}
+            disabled={pending || renderableHosts.length === 0}
+            required
+          >
+            <option value="">{t('Select host')}</option>
+            {renderableHosts.map((host) => (
+              <option key={host.id} value={host.id}>
+                {host.hostname} · {host.port ?? 443}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label htmlFor="profile-issue-title">
+          {t('Subscription title')}
+          <input
+            id="profile-issue-title"
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+            disabled={pending || !profile}
+            maxLength={128}
+            placeholder={profile?.name ?? t('Subscription title')}
+          />
+        </label>
+
+        <fieldset className="checkbox-grid">
+          <legend>{t('Client targets')}</legend>
+          {profileSubscriptionTargets.map((target) => (
+            <label key={target}>
+              <input
+                type="checkbox"
+                checked={targets.has(target)}
+                onChange={() => toggleTarget(target)}
+                disabled={pending}
+              />
+              {target}
+            </label>
+          ))}
+        </fieldset>
+
+        {disabledReason ? <p className="auth-card__note">{disabledReason}</p> : null}
+        {localError ? <FormError message={localError} /> : null}
+        <button
+          type="submit"
+          className="button button--primary"
+          disabled={pending || Boolean(disabledReason)}
+        >
+          <ShieldCheck size={16} aria-hidden="true" />
+          {pending ? t('Issuing...') : t('Issue subscription')}
+        </button>
+      </form>
+
+      {issued ? (
+        <div className="details-card">
+          <p className="eyebrow">{t('Issued')}</p>
+          <p>
+            <span className="mono-value">{issued.public_id}</span>
+          </p>
+          <div className="inline-actions">
+            {Object.entries(issued.public_render_urls).slice(0, 4).map(([target, url]) => (
+              <button
+                key={target}
+                type="button"
+                className="button button--secondary"
+                onClick={() => void navigator.clipboard.writeText(url)}
+              >
+                <Copy size={14} aria-hidden="true" />
+                {target}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </article>
+  )
 }
 
 function ProfileDetailPanel({
@@ -2471,6 +2781,12 @@ function groupHostsByProfile(hosts: HostRecord[]) {
     groups.set(host.protocol_profile_id, items)
   }
   return groups
+}
+
+function profileLicenseLabel(license: LicenseRecord) {
+  const customer = license.customer_ref ?? license.id.slice(0, 8)
+  const expiry = license.expires_at ? formatTimestamp(license.expires_at) : 'no expiry'
+  return `${customer} · ${license.status} · ${license.max_devices} devices · ${expiry}`
 }
 
 function profileExport(profile: ProtocolProfileRecord) {

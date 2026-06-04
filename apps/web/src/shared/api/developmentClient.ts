@@ -76,6 +76,7 @@ import type {
   SquadUserMutationRequest,
   SrhInspectorResponse,
   SubscriptionCreateRequest,
+  SubscriptionIssueFromProfileRequest,
   SubscriptionListResponse,
   SubscriptionPageConfigCloneRequest,
   SubscriptionPageConfigCreateRequest,
@@ -737,6 +738,56 @@ export function createDevelopmentLumenApiClient(): LumenApiClient {
         id: `sub_${request.user_id}_${Date.now()}`,
         license_id: request.license_id,
         node_id: request.node_id ?? null,
+        public_id: publicId,
+        ...subscriptionPublicFields(publicId, deliveryProfile),
+        revoked_at: null,
+        status: 'active',
+        updated_at: now,
+        user_id: request.user_id,
+      }
+      subscriptions.unshift(subscription)
+      return subscription
+    },
+    issueSubscriptionFromProfile: async (
+      request: SubscriptionIssueFromProfileRequest,
+    ): Promise<SubscriptionRecord> => {
+      const profile = profiles.find((item) => item.id === request.profile_id)
+      if (!profile) {
+        throw new Error('Profile not found')
+      }
+      const host =
+        hosts.find((item) => item.id === request.host_id && item.protocol_profile_id === profile.id) ??
+        hosts.find(
+          (item) =>
+            item.protocol_profile_id === profile.id &&
+            item.status === 'active' &&
+            !item.hidden &&
+            !item.subscription_excluded,
+        )
+      if (!host) {
+        throw new Error('Profile has no active subscription host')
+      }
+      const renderTargets = request.render_targets?.length ? request.render_targets : ['happ', 'sing-box']
+      const deliveryProfile = {
+        adapter: profile.adapter,
+        client: renderTargets.join(','),
+        format: renderTargets[0],
+        host_id: host.id,
+        profile_id: profile.id,
+        profile_title: request.profile_title?.trim() || profile.name,
+        protocol: profile.adapter,
+        server_name: host.sni ?? host.hostname,
+      }
+      const publicId = `sub_pub_${request.user_id}_${Date.now()}`
+      const now = new Date().toISOString()
+      const subscription: SubscriptionRecord = {
+        config_hash: request.config_hash ?? null,
+        created_at: now,
+        delivery_profile: deliveryProfile,
+        expires_at: request.expires_at ?? null,
+        id: `sub_profile_${request.profile_id}_${Date.now()}`,
+        license_id: request.license_id,
+        node_id: profile.node_id,
         public_id: publicId,
         ...subscriptionPublicFields(publicId, deliveryProfile),
         revoked_at: null,

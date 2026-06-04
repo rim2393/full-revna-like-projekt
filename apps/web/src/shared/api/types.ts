@@ -733,6 +733,17 @@ export type SubscriptionCreateRequest = {
   user_id: string
 }
 
+export type SubscriptionIssueFromProfileRequest = {
+  config_hash?: string | null
+  expires_at?: string | null
+  host_id?: string | null
+  license_id: string
+  profile_id: string
+  profile_title?: string | null
+  render_targets?: string[]
+  user_id: string
+}
+
 export type SubscriptionUpdateRequest = Partial<{
   config_hash: string | null
   delivery_profile: Record<string, string>
@@ -1390,6 +1401,9 @@ export type LumenApiClient = {
   resetNodeTraffic: (nodeId: string) => Promise<NodeCommandRecord>
   createSquad: (request: SquadCreateRequest) => Promise<SquadRecord>
   createSubscription: (request: SubscriptionCreateRequest) => Promise<SubscriptionRecord>
+  issueSubscriptionFromProfile: (
+    request: SubscriptionIssueFromProfileRequest,
+  ) => Promise<SubscriptionRecord>
   cloneSubscription: (subscriptionId: string) => Promise<SubscriptionRecord>
   createSubscriptionTemplate: (
     request: SubscriptionTemplateCreateRequest,

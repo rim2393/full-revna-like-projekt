@@ -28,6 +28,7 @@ from app.domains.subscriptions.renderers import (
 from app.domains.subscriptions.schemas import (
     SubscriptionCreateRequest,
     SubscriptionDeviceRecord,
+    SubscriptionIssueFromProfileRequest,
     SubscriptionResponse,
     SubscriptionUpdateRequest,
 )
@@ -82,6 +83,25 @@ AMNEZIA_WG_HINT_KEYS = (
 )
 AMNEZIA_WG_POSITIVE_INT_HINT_KEYS = frozenset({"Jc", "Jmin", "Jmax", "S1", "S2", "S3", "S4"})
 AMNEZIA_WG_JUNK_COUNT_HINT_KEYS = frozenset({"Jc", "Jmin", "Jmax"})
+DEFAULT_PROFILE_SUBSCRIPTION_RENDER_TARGETS = (
+    "happ",
+    "hiddify",
+    "raw-uri",
+    "v2ray",
+    "v2ray-base64",
+    "mihomo",
+    "clash-meta",
+    "clash",
+    "flclash",
+    "stash",
+    "koala-clash",
+    "sing-box",
+    "nekobox",
+    "nekoray",
+    "amnezia",
+    "xray-json",
+    "lumen-json",
+)
 
 
 def utc_now() -> datetime:
@@ -634,6 +654,59 @@ async def create_subscription(
     return subscription
 
 
+async def issue_subscription_from_profile(
+    session: AsyncSession,
+    *,
+    request: SubscriptionIssueFromProfileRequest,
+) -> Subscription:
+    profile = await session.get(ProtocolProfile, request.profile_id)
+    if profile is None:
+        raise APIError(
+            code="subscription_profile_not_found",
+            message="Subscription profile was not found.",
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+    if profile.status != "active":
+        raise APIError(
+            code="subscription_profile_not_active",
+            message="Subscription profile must be active before it can be issued.",
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            details=[str(profile.id), profile.status],
+        )
+
+    host = await _resolve_profile_issue_host(
+        session,
+        profile=profile,
+        host_id=request.host_id,
+    )
+    render_targets = _normalize_profile_issue_render_targets(request.render_targets)
+    delivery_profile = {
+        "protocol": profile.adapter,
+        "adapter": profile.adapter,
+        "profile_id": str(profile.id),
+        "host_id": str(host.id),
+        "client": ",".join(render_targets),
+        "format": render_targets[0],
+        "profile_title": _normalize_profile_issue_title(request.profile_title) or profile.name,
+    }
+    if host.sni:
+        delivery_profile["server_name"] = host.sni
+    elif host.hostname:
+        delivery_profile["server_name"] = host.hostname
+
+    return await create_subscription(
+        session,
+        request=SubscriptionCreateRequest(
+            user_id=request.user_id,
+            license_id=request.license_id,
+            node_id=profile.node_id,
+            delivery_profile=delivery_profile,
+            config_hash=request.config_hash,
+            expires_at=request.expires_at,
+        ),
+    )
+
+
 async def update_subscription(
     session: AsyncSession,
     *,
@@ -839,6 +912,81 @@ def _ensure_renderable_subscription_request(
         status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         details=["delivery_profile.protocol"],
     )
+
+
+async def _resolve_profile_issue_host(
+    session: AsyncSession,
+    *,
+    profile: ProtocolProfile,
+    host_id: UUID | None,
+) -> Host:
+    if host_id is not None:
+        host = await session.get(Host, host_id)
+        if host is None:
+            raise APIError(
+                code="subscription_host_not_found",
+                message="Subscription host was not found.",
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+        if host.protocol_profile_id != profile.id:
+            raise APIError(
+                code="subscription_host_profile_mismatch",
+                message="Subscription host must belong to the selected profile.",
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                details=[str(host.id), str(profile.id)],
+            )
+        if host.node_id != profile.node_id:
+            raise APIError(
+                code="subscription_host_node_mismatch",
+                message="Subscription host must belong to the selected profile node.",
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                details=[str(host.id), str(profile.node_id)],
+            )
+        _ensure_host_can_be_served(host, explicit=True)
+        return host
+
+    result = await session.execute(
+        select(Host)
+        .where(Host.node_id == profile.node_id)
+        .where(Host.protocol_profile_id == profile.id)
+        .where(Host.status == "active")
+        .order_by(Host.created_at.asc(), Host.name.asc())
+    )
+    for candidate in result.scalars().all():
+        if _host_is_subscription_visible(candidate):
+            return candidate
+    raise APIError(
+        code="subscription_profile_host_required",
+        message="Subscription profile must have an active visible host before it can be issued.",
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+        details=[str(profile.id), "host"],
+    )
+
+
+def _normalize_profile_issue_render_targets(values: list[str]) -> list[str]:
+    raw_values = values or list(DEFAULT_PROFILE_SUBSCRIPTION_RENDER_TARGETS)
+    targets: list[str] = []
+    for value in raw_values:
+        for item in str(value or "").replace("/", ",").replace(" ", ",").split(","):
+            normalized = item.strip().lower()
+            if not normalized:
+                continue
+            if normalized == "singbox":
+                normalized = "sing-box"
+            if normalized == "clashmeta":
+                normalized = "clash-meta"
+            if normalized not in DEFAULT_PROFILE_SUBSCRIPTION_RENDER_TARGETS:
+                continue
+            if normalized not in targets:
+                targets.append(normalized)
+    return targets or list(DEFAULT_PROFILE_SUBSCRIPTION_RENDER_TARGETS)
+
+
+def _normalize_profile_issue_title(value: str | None) -> str | None:
+    if value is None:
+        return None
+    normalized = value.strip()
+    return normalized or None
 
 
 async def _external_squad_for_subscription(

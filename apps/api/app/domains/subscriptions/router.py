@@ -20,6 +20,7 @@ from app.domains.subscriptions.renderers import (
 from app.domains.subscriptions.schemas import (
     SubscriptionCreateRequest,
     SubscriptionDeviceListResponse,
+    SubscriptionIssueFromProfileRequest,
     SubscriptionListResponse,
     SubscriptionResponse,
     SubscriptionUpdateRequest,
@@ -32,6 +33,7 @@ from app.domains.subscriptions.service import (
     enforce_public_subscription_device,
     get_subscription_by_public_id,
     get_subscription_by_short_uuid,
+    issue_subscription_from_profile,
     list_subscription_devices,
     lookup_subscriptions,
     revoke_subscription,
@@ -79,6 +81,34 @@ async def create_subscription(
     session: DatabaseSession,
 ) -> SubscriptionResponse:
     subscription = await create_subscription_record(session, request=request)
+    await session.commit()
+    return subscription_to_response(subscription)
+
+
+@router.post(
+    "/actions/issue-from-profile",
+    response_model=SubscriptionResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def issue_subscription_from_profile_route(
+    request: SubscriptionIssueFromProfileRequest,
+    principal: SubscriptionManager,
+    session: DatabaseSession,
+) -> SubscriptionResponse:
+    subscription = await issue_subscription_from_profile(session, request=request)
+    await record_audit_event(
+        session,
+        principal=principal,
+        action="subscription.issued_from_profile",
+        resource_type="subscription",
+        resource_id=str(subscription.id),
+        metadata_json={
+            "profile_id": str(request.profile_id),
+            "host_id": str(request.host_id) if request.host_id else None,
+            "user_id": str(request.user_id),
+            "license_id": str(request.license_id),
+        },
+    )
     await session.commit()
     return subscription_to_response(subscription)
 

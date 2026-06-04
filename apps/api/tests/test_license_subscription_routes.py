@@ -228,6 +228,121 @@ async def test_subscription_routes_create_list_and_get(route_app: RouteTestApp) 
     assert get_response.json()["render_formats"] == ["happ", "hiddify"]
 
 
+async def test_subscription_route_issues_real_subscription_from_profile(
+    route_app: RouteTestApp,
+) -> None:
+    user, license_record, node = await seed_subscription_dependencies(route_app)
+    async with route_app.sessionmaker() as session:
+        profile = ProtocolProfile(
+            name="route-vless-profile",
+            node_id=node.id,
+            adapter="vless-reality",
+            status="active",
+            config_json={},
+            port_reservations=[{"port": 443, "protocol": "tcp"}],
+            metadata_json={},
+        )
+        session.add(profile)
+        await session.flush()
+        host = Host(
+            name="route-profile-host",
+            hostname="profile.example.test",
+            node_id=node.id,
+            protocol_profile_id=profile.id,
+            status="active",
+            port=443,
+            sni="profile.example.test",
+            metadata_json={},
+        )
+        session.add(host)
+        await session.commit()
+
+    response = await route_app.client.post(
+        "/api/v1/subscriptions/actions/issue-from-profile",
+        json={
+            "user_id": str(user.id),
+            "license_id": str(license_record.id),
+            "profile_id": str(profile.id),
+            "host_id": str(host.id),
+            "render_targets": ["happ", "singbox", "clashmeta"],
+            "profile_title": "Route profile",
+        },
+    )
+
+    assert response.status_code == 201
+    created = response.json()
+    assert created["node_id"] == str(node.id)
+    assert created["delivery_profile"]["protocol"] == "vless-reality"
+    assert created["delivery_profile"]["adapter"] == "vless-reality"
+    assert created["delivery_profile"]["profile_id"] == str(profile.id)
+    assert created["delivery_profile"]["host_id"] == str(host.id)
+    assert created["delivery_profile"]["client"] == "happ,sing-box,clash-meta"
+    assert created["delivery_profile"]["format"] == "happ"
+    assert created["delivery_profile"]["profile_title"] == "Route profile"
+    assert created["public_render_urls"]["happ"].endswith("/render?target=happ")
+    assert "sing-box" in created["public_render_urls"]
+    assert "mihomo" in created["public_render_urls"]
+
+    async with route_app.sessionmaker() as session:
+        audit = (
+            await session.execute(
+                select(AuditEvent).where(AuditEvent.action == "subscription.issued_from_profile")
+            )
+        ).scalar_one()
+    assert audit.resource_id == created["id"]
+    assert audit.metadata_json["profile_id"] == str(profile.id)
+
+
+async def test_subscription_route_rejects_host_from_another_profile(
+    route_app: RouteTestApp,
+) -> None:
+    user, license_record, node = await seed_subscription_dependencies(route_app)
+    async with route_app.sessionmaker() as session:
+        profile = ProtocolProfile(
+            name="route-primary-profile",
+            node_id=node.id,
+            adapter="vless-reality",
+            status="active",
+            config_json={},
+            port_reservations=[],
+            metadata_json={},
+        )
+        other_profile = ProtocolProfile(
+            name="route-other-profile",
+            node_id=node.id,
+            adapter="trojan-tcp-tls",
+            status="active",
+            config_json={},
+            port_reservations=[],
+            metadata_json={},
+        )
+        session.add_all([profile, other_profile])
+        await session.flush()
+        host = Host(
+            name="route-other-host",
+            hostname="other.example.test",
+            node_id=node.id,
+            protocol_profile_id=other_profile.id,
+            status="active",
+            metadata_json={},
+        )
+        session.add(host)
+        await session.commit()
+
+    response = await route_app.client.post(
+        "/api/v1/subscriptions/actions/issue-from-profile",
+        json={
+            "user_id": str(user.id),
+            "license_id": str(license_record.id),
+            "profile_id": str(profile.id),
+            "host_id": str(host.id),
+        },
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "subscription_host_profile_mismatch"
+
+
 async def test_subscription_create_requires_node_and_renderable_protocol(
     route_app: RouteTestApp,
 ) -> None:

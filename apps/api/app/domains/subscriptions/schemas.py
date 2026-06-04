@@ -15,6 +15,19 @@ class SubscriptionCreateRequest(BaseModel):
     expires_at: datetime | None = None
 
 
+class SubscriptionIssueFromProfileRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    user_id: UUID
+    license_id: UUID
+    profile_id: UUID
+    host_id: UUID | None = None
+    render_targets: list[str] = Field(default_factory=list, max_length=32)
+    profile_title: str | None = Field(default=None, max_length=128)
+    config_hash: str | None = Field(default=None, max_length=128)
+    expires_at: datetime | None = None
+
+
 class SubscriptionUpdateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
