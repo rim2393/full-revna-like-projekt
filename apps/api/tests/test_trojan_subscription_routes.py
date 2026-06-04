@@ -935,8 +935,8 @@ async def test_naiveproxy_subscription_renders_supported_clients(route_app: Rout
     xray = await route_app.client.get(
         f"/api/v1/subscriptions/public/{public_id}/render?target=amnezia",
     )
-    assert xray.status_code == 200
-    assert xray.json()["outbounds"] == []
+    assert xray.status_code == 422
+    assert xray.json()["error"]["code"] == "subscription_render_target_unsupported_for_protocol"
 
 
 async def test_openvpn_subscription_renders_ovpn_from_real_profile_pki(

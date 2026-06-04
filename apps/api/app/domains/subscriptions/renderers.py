@@ -152,6 +152,8 @@ def render_subscription_for_target(
         )
 
     if normalized_target in MIHOMO_TARGETS:
+        if not manifest_has_mihomo_proxy(manifest, settings=settings):
+            raise_render_target_unsupported(manifest, normalized_target)
         return RenderedSubscription(
             body=render_mihomo_yaml(manifest, settings=settings),
             content_type="application/yaml; charset=utf-8",
@@ -160,11 +162,10 @@ def render_subscription_for_target(
         )
 
     if normalized_target in SING_BOX_TARGETS:
-        body = json.dumps(
-            render_sing_box_config(manifest, settings=settings),
-            indent=2,
-            ensure_ascii=False,
-        )
+        config = render_sing_box_config(manifest, settings=settings)
+        if not has_non_selector_outbound(config):
+            raise_render_target_unsupported(manifest, normalized_target)
+        body = json.dumps(config, indent=2, ensure_ascii=False)
         return RenderedSubscription(
             body=f"{body}\n",
             content_type="application/json; charset=utf-8",
@@ -173,11 +174,10 @@ def render_subscription_for_target(
         )
 
     if normalized_target in XRAY_TARGETS:
-        body = json.dumps(
-            render_xray_json(manifest, settings=settings),
-            indent=2,
-            ensure_ascii=False,
-        )
+        config = render_xray_json(manifest, settings=settings)
+        if not config.get("outbounds"):
+            raise_render_target_unsupported(manifest, normalized_target)
+        body = json.dumps(config, indent=2, ensure_ascii=False)
         return RenderedSubscription(
             body=f"{body}\n",
             content_type="application/json; charset=utf-8",
@@ -190,6 +190,21 @@ def render_subscription_for_target(
         message="Subscription render target is not supported.",
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         details=[normalized_target],
+    )
+
+
+def raise_render_target_unsupported(manifest: dict[str, Any], target: str) -> None:
+    adapters = sorted(
+        {
+            str(entry["protocol"].get("adapter") or entry["protocol"].get("type") or "unknown")
+            for entry in iter_protocol_entries(manifest)
+        }
+    )
+    raise APIError(
+        code="subscription_render_target_unsupported_for_protocol",
+        message="Subscription render target is not supported for this protocol.",
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+        details=[target, ",".join(adapters)],
     )
 
 
@@ -641,6 +656,13 @@ def render_mihomo_yaml(manifest: dict[str, Any], *, settings: Settings) -> str:
     return "\n".join(lines)
 
 
+def manifest_has_mihomo_proxy(manifest: dict[str, Any], *, settings: Settings) -> bool:
+    return any(
+        mihomo_proxy(entry, settings=settings) is not None
+        for entry in iter_protocol_entries(manifest)
+    )
+
+
 def mihomo_proxy(entry: dict[str, Any], *, settings: Settings) -> dict[str, Any] | None:
     protocol = entry["protocol"]
     protocol_type = normalize_protocol_type(protocol.get("type"))
@@ -823,6 +845,13 @@ def render_sing_box_config(manifest: dict[str, Any], *, settings: Settings) -> d
         "outbounds": outbounds,
         "route": {"final": "Lumen", "auto_detect_interface": True},
     }
+
+
+def has_non_selector_outbound(config: dict[str, Any]) -> bool:
+    return any(
+        isinstance(outbound, dict) and outbound.get("type") != "selector"
+        for outbound in config.get("outbounds", [])
+    )
 
 
 def sing_box_outbound(entry: dict[str, Any], *, settings: Settings) -> dict[str, Any] | None:
