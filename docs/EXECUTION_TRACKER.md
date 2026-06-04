@@ -33,10 +33,10 @@ evidence here is wrong or stale.
 
 | Item | Current Evidence |
 | --- | --- |
-| Latest production release | `v0.1.128` API subscription runtime-sync hardening deployed by pinned GHCR digest on the real panel after GitHub-hosted Actions refused to start because of account billing/spending; web remains `v0.1.124`, subscription page `v0.1.120`, node-agent unchanged |
+| Latest production release | `v0.1.129` web production-reality hardening plus API `v0.1.128` subscription runtime-sync hardening deployed through signed public manifest on the real panel after GitHub-hosted Actions refused to start because of account billing/spending; subscription page `v0.1.120`, node-agent unchanged |
 | Product repo head | latest pushed `main` includes stale profile cleanup, PR-006 signed prod client compatibility evidence, IKEv2 PKI SAN hardening, API-key principal email hardening, and the API logging module rename |
-| Public installer manifest | `rim2393/lumen_vpn@ccdf53f` publishes signed `v0.1.128` manifest and current public release verification key |
-| Prod health | Panel API container `lumen-api-1` on digest-pinned `v0.1.128@sha256:e63e79d37ab4e82007c4ae7267c0cdd98f7aa4a01877bf223b7a12f6f2be6728` and Docker health `healthy`; public `https://panel.lumentech.tel/healthz` returns `200`; prod `lumen-web` on digest-pinned `v0.1.124`; prod `lumen-subscription/node-agent` on digest-pinned `v0.1.120`; backend DB shows real `node-01` active; official `upgrade.sh` has applied `LUMEN_VERSION=v0.1.128`; panel/API temporary files were cleaned after the `v0.1.128` deploy checks; node VPS contains only `/opt/lumen-node` runtime/config/state/policies files and no installer/admin checkout |
+| Public installer manifest | `rim2393/lumen_vpn@b9ef228` publishes signed `v0.1.129` manifest and current public release verification key |
+| Prod health | Panel API container `lumen-api-1` on digest-pinned `v0.1.128@sha256:e63e79d37ab4e82007c4ae7267c0cdd98f7aa4a01877bf223b7a12f6f2be6728` and Docker health `healthy`; prod `lumen-web` on digest-pinned `v0.1.129@sha256:747f0f5527972f74160a74b101db813643538fc97c49b8b5a519adfba1033dcb` and Docker health `healthy`; public `https://panel.lumentech.tel/healthz` returns `200`; prod `lumen-subscription/node-agent` on digest-pinned `v0.1.120`; backend DB shows real `node-01` active; official `upgrade.sh` has applied `LUMEN_VERSION=v0.1.129`; panel/API/web temporary files were cleaned after the `v0.1.129` deploy checks; node VPS contains only `/opt/lumen-node` runtime/config/state/policies files and no installer/admin checkout |
 | Current rule | Continue from this tracker; do not restart already closed host/subscription renderer work. GitHub-hosted Actions remain externally blocked by account billing/spending until the account owner fixes billing; manual image promotion must stay digest-pinned and followed by live smoke plus cleanup. |
 
 ## Execution Order
@@ -154,6 +154,24 @@ evidence here is wrong or stale.
 
 ### Backend/Subscription Smoke After API Hotfix
 
+- 2026-06-04 official `v0.1.129` web production-reality hardening:
+  `b9f0bef` removed the static `developmentClient` import and fixture branch
+  from the production API provider; tests must inject an explicit client, while
+  the runtime provider always uses the real HTTP API and fails closed if
+  `VITE_LUMEN_USE_FIXTURES` is present. It also added missing Russian
+  translations for production `t()` keys that were still falling back to
+  English. Local gates passed: `npm exec -- tsc -b --noEmit` from `apps/web`
+  and `npm test -- --run src/shared/data/productionReality.test.ts`
+  (`7 passed`). The web image was built on the panel VPS only as
+  `ghcr.io/rim2393/lumen-web:v0.1.129@sha256:747f0f5527972f74160a74b101db813643538fc97c49b8b5a519adfba1033dcb`;
+  public installer `rim2393/lumen_vpn@b9ef228` published a signed `v0.1.129`
+  manifest and the real panel ran official `upgrade.sh`, creating encrypted
+  backup `lumen-backup-20260604T105119Z.tar.gz.enc`, applying
+  `LUMEN_VERSION=v0.1.129`, and recreating only `lumen-web-1`. `doctor.sh`
+  returned all checks `ok`; post-upgrade checks showed web/API/subscription
+  containers healthy, public `/healthz` OK, prod web bundle did not contain
+  `developmentFixtures` or `createDevelopmentLumenApiClient`, and temp checks
+  returned `HOST_TMP=0`, `WEB_TMP=0`, `NODE_TMP=0`.
 - 2026-06-04 official `v0.1.128` post-upgrade admin surface smoke:
   after `rim2393/lumen_vpn@ccdf53f` was installed through `upgrade.sh`,
   `scripts/live/admin-surface-smoke.py` was copied only to the panel/API
