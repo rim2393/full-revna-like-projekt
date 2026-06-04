@@ -197,6 +197,23 @@ evidence here is wrong or stale.
   `setting_groups=4`, `tools_sessions=200`, `tools_user_ips=94`, and cleanup
   leftovers all `0`; the script was deleted from both the panel host and API
   container after the run.
+- 2026-06-04 live admin UI route walkthrough on current prod: a temporary real
+  owner account was created in the prod DB only for the smoke, authenticated
+  through the real `/guard/login` form, and then deleted with its sessions
+  after the walkthrough (`removed=1`, `leftovers=0`). The in-app browser opened
+  `/dashboard`, `/users`, `/nodes`, `/node-plugins`, `/hosts`, `/profiles`,
+  `/squads`, `/subscription`, `/templates`, `/response-rules`,
+  `/subscription-page`, `/settings`, `/license`, `/infra-billing`,
+  `/api-keys`, and `/tools` against `https://panel.lumentech.tel`; every route
+  returned the authenticated app shell with no console errors and no visible
+  `Something went wrong`, `Request validation failed`, `API request failed`,
+  `not implemented`, `mock`, `fake`, `undefined`, or `Infinity` markers. HTML
+  input placeholder attributes were excluded from the fake-placeholder check
+  because they are normal form hints, not fake data. `/squads` had one early
+  transient `NaN`/language read during the first fast loop, then five settled
+  reloads at 3 seconds each returned Russian shell and `NaN=false`; no code
+  change was required. Temporary UI smoke scripts were removed from the panel
+  host, API container and local product workspace.
 - 2026-06-04 API-only lint/startup hardening `3c7625d` was manually built as
   `ghcr.io/rim2393/lumen-api:v0.1.127@sha256:340ef210410ced6d788537b280a11994c5f897b7a0d94481be4db4a52224956b`
   because GitHub-hosted Actions still refuse to start due to account
