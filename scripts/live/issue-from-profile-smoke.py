@@ -183,6 +183,25 @@ async def main() -> None:
             raise AssertionError("happ render missing target header")
 
         async with sessionmaker() as session:
+            refreshed_profile = await session.get(ProtocolProfile, ids["profile"])
+            refreshed_host = await session.get(Host, ids["host"])
+            if refreshed_profile is None or refreshed_host is None:
+                raise AssertionError("linked profile/host disappeared during smoke")
+            profile_sync = (refreshed_profile.metadata_json or {}).get("runtime_sync") or {}
+            host_sync = (refreshed_host.metadata_json or {}).get("runtime_sync") or {}
+            if profile_sync.get("pending_apply") is not True:
+                raise AssertionError(f"profile was not marked pending_apply: {profile_sync}")
+            if host_sync.get("pending_apply") is not True:
+                raise AssertionError(f"host was not marked pending_apply: {host_sync}")
+            if profile_sync.get("reason") != "subscription.created":
+                raise AssertionError(f"profile runtime_sync reason mismatch: {profile_sync}")
+            if host_sync.get("reason") != "subscription.created":
+                raise AssertionError(f"host runtime_sync reason mismatch: {host_sync}")
+            if "subscription" not in set(profile_sync.get("changed_fields") or []):
+                raise AssertionError(f"profile runtime_sync changed_fields mismatch: {profile_sync}")
+            if "subscription" not in set(host_sync.get("changed_fields") or []):
+                raise AssertionError(f"host runtime_sync changed_fields mismatch: {host_sync}")
+
             await session.execute(delete(Subscription).where(Subscription.id == created_subscription_id))
             await session.execute(delete(ApiKey).where(ApiKey.id == ids["api_key"]))
             await session.execute(delete(License).where(License.id == ids["license"]))
@@ -219,6 +238,12 @@ async def main() -> None:
                     "issue_status": status,
                     "happ_status": happ_status,
                     "render_targets": sorted(body["public_render_urls"].keys()),
+                    "runtime_sync": {
+                        "profile_pending_apply": profile_sync.get("pending_apply"),
+                        "profile_reason": profile_sync.get("reason"),
+                        "host_pending_apply": host_sync.get("pending_apply"),
+                        "host_reason": host_sync.get("reason"),
+                    },
                     "cleanup_leftovers": leftovers,
                 },
                 ensure_ascii=False,
