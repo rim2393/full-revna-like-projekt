@@ -1,11 +1,13 @@
+from ipaddress import ip_address
 from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
+from cryptography import x509
 
 from app.core.errors import APIError
 from app.domains.protocols.models import ProtocolProfile
-from app.domains.protocols.service import build_node_outbound_payload
+from app.domains.protocols.service import _ensure_ikev2_profile_pki, build_node_outbound_payload
 
 
 def _profile(adapter: str, config_json: dict | None = None) -> ProtocolProfile:
@@ -208,6 +210,19 @@ def test_ikev2_apply_payload_requires_real_users_and_pki():
         )
     assert exc_info.value.code == "ikev2_runtime_config_incomplete"
     assert "users" in exc_info.value.details
+
+
+def test_ikev2_pki_includes_node_public_address_in_server_san():
+    profile = _profile("ikev2-eap", {"server_id": "ikev2.85.192.60.8"})
+
+    _ensure_ikev2_profile_pki(profile, extra_server_names=["85.192.60.8"])
+
+    pki = profile.metadata_json["ikev2_pki"]
+    cert = x509.load_pem_x509_certificate(pki["server_cert"].encode())
+    san = cert.extensions.get_extension_for_class(x509.SubjectAlternativeName).value
+    assert san.get_values_for_type(x509.DNSName) == ["ikev2.85.192.60.8"]
+    assert san.get_values_for_type(x509.IPAddress) == [ip_address("85.192.60.8")]
+    assert pki["server_names"] == ["ikev2.85.192.60.8", "85.192.60.8"]
 
 
 def test_wireguard_profile_builds_wireguard_payload():

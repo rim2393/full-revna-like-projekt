@@ -662,7 +662,7 @@ async def create_profile(
     *,
     request: ProtocolProfileCreateRequest,
 ) -> ProtocolProfile:
-    await _ensure_node_exists(session, request.node_id)
+    node = await _ensure_node_exists(session, request.node_id)
     if request.squad_id is not None:
         await get_squad(session, squad_id=request.squad_id)
     _ensure_adapter_live_for_active_profile(request.adapter, request.status)
@@ -703,7 +703,7 @@ async def create_profile(
     session.add(profile)
     await session.flush()
     _ensure_openvpn_profile_pki(profile)
-    _ensure_ikev2_profile_pki(profile)
+    _ensure_ikev2_profile_pki(profile, extra_server_names=[node.public_address])
     _mark_profile_runtime_pending(
         profile,
         reason="profile.created",
@@ -774,7 +774,8 @@ async def update_profile(
         setattr(profile, field, value)
     await session.flush()
     _ensure_openvpn_profile_pki(profile)
-    _ensure_ikev2_profile_pki(profile)
+    node = await _get_profile_node(session, profile)
+    _ensure_ikev2_profile_pki(profile, extra_server_names=[node.public_address])
     if changed_fields:
         _mark_profile_runtime_pending(
             profile,
@@ -1234,7 +1235,7 @@ async def _get_profiles_by_ids(session: AsyncSession, ids: list[UUID]) -> list[P
     return profiles
 
 
-async def _ensure_node_exists(session: AsyncSession, node_id: UUID) -> None:
+async def _ensure_node_exists(session: AsyncSession, node_id: UUID) -> Node:
     node = await session.get(Node, node_id)
     if node is None:
         raise APIError(
@@ -1242,6 +1243,7 @@ async def _ensure_node_exists(session: AsyncSession, node_id: UUID) -> None:
             message="Node was not found.",
             status_code=status.HTTP_404_NOT_FOUND,
         )
+    return node
 
 
 def _ensure_adapter_known(adapter: str) -> None:
@@ -2454,20 +2456,42 @@ def _ikev2_server_names(profile: ProtocolProfile) -> list[str]:
     return names or [str(profile.id)]
 
 
-def _ensure_ikev2_profile_pki(profile: ProtocolProfile) -> None:
+def _dedupe_server_names(names: list[str]) -> list[str]:
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for raw_name in names:
+        name = str(raw_name).strip()
+        if not name or name in seen:
+            continue
+        seen.add(name)
+        deduped.append(name)
+    return deduped
+
+
+def _ensure_ikev2_profile_pki(
+    profile: ProtocolProfile,
+    *,
+    extra_server_names: list[str] | None = None,
+) -> None:
     if not profile.adapter.startswith("ikev2") and not profile.adapter.startswith("ipsec"):
         return
     metadata = dict(profile.metadata_json or {})
     pki = metadata.get("ikev2_pki") if isinstance(metadata.get("ikev2_pki"), dict) else {}
+    server_names = _dedupe_server_names(
+        [*_ikev2_server_names(profile), *(extra_server_names or [])],
+    )
     if all(
         isinstance(pki.get(key), str) and pki[key]
         for key in ("ca_cert", "server_cert", "server_key")
-    ):
+    ) and pki.get("server_names") == server_names:
         return
-    metadata["ikev2_pki"] = _generate_ikev2_pki(
-        common_name=str(profile.id),
-        server_names=_ikev2_server_names(profile),
-    )
+    metadata["ikev2_pki"] = {
+        **_generate_ikev2_pki(
+            common_name=str(profile.id),
+            server_names=server_names,
+        ),
+        "server_names": server_names,
+    }
     profile.metadata_json = metadata
 
 
