@@ -19,6 +19,7 @@ from app.db.session import create_engine
 from app.domains.licenses.models import License
 from app.domains.licenses.service import hash_license_key
 from app.domains.nodes.models import Node
+from app.domains.protocols.models import Host, ProtocolProfile
 from app.domains.subscriptions.models import Subscription
 from app.domains.subscriptions.service import create_subscription_public_id
 from app.domains.users.models import User
@@ -138,6 +139,22 @@ async def main() -> None:
                 node = (await session.execute(select(Node).order_by(Node.created_at.desc()))).scalars().first()
             if node is None:
                 raise RuntimeError("No real node exists for PR-006 live smoke")
+            live_binding = (
+                await session.execute(
+                    select(ProtocolProfile, Host)
+                    .join(Host, Host.protocol_profile_id == ProtocolProfile.id)
+                    .where(ProtocolProfile.node_id == node.id)
+                    .where(ProtocolProfile.status == "active")
+                    .where(ProtocolProfile.adapter == "vless-reality")
+                    .where(Host.status == "active")
+                    .where(Host.hidden.is_(False))
+                    .where(Host.subscription_excluded.is_(False))
+                    .order_by(ProtocolProfile.created_at.asc(), Host.created_at.asc())
+                )
+            ).first()
+            if live_binding is None:
+                raise RuntimeError("No active real vless-reality profile+host exists for PR-006 live smoke")
+            profile, host = live_binding
 
             user = User(
                 email=f"{run_id}@example.test",
@@ -174,15 +191,11 @@ async def main() -> None:
                 node_id=node.id,
                 status="active",
                 delivery_profile={
-                    "protocol": "vless-reality",
-                    "adapter": "vless-reality",
+                    "protocol": profile.adapter,
+                    "adapter": profile.adapter,
+                    "profile_id": str(profile.id),
+                    "host_id": str(host.id),
                     "profile_title": "Lumen PR-006 Client Matrix",
-                    "server_name": "www.example.com",
-                    "public_key": "F1E2D3C4B5A69788776655443322110abcdEFGH_-",
-                    "short_id": "a1b2c3d4",
-                    "fingerprint": "chrome",
-                    "spider_x": "/",
-                    "flow": "xtls-rprx-vision",
                     "traffic_limit_gb": "500",
                     "client": ",".join(TARGET_CONTRACTS),
                 },
