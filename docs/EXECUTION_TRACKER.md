@@ -170,6 +170,26 @@ evidence here is wrong or stale.
 
 ### Backend/Subscription Smoke After API Hotfix
 
+- 2026-06-04 current-prod active-profile subscription render matrix:
+  `scripts/live/active-profile-render-matrix-smoke.py` was copied only to the
+  real panel `/tmp`, executed inside `lumen-api-1` against
+  `https://panel.lumentech.tel`, and removed from host/API `/tmp` afterwards.
+  The smoke used existing active real profile+host bindings on real `node-01`,
+  created only temporary real users/licenses/subscriptions, and checked `18`
+  active adapters across `21` public render targets each. Result `ok=true`,
+  `profiles_checked=18`, `targets_per_profile=21`; adapters checked:
+  `http-proxy`, `hysteria2`, `naiveproxy`, `openvpn-shadowsocks`,
+  `openvpn-udp`, `shadowsocks-native`, `socks5`, `trojan-tcp-reality`,
+  `trojan-tcp-tls`, `tuic-v5`, `vless-grpc-tls`, `vless-reality`,
+  `vless-tcp`, `vless-tcp-tls`, `vless-ws-tls`, `vmess-ws-tls`,
+  `wireguard-amneziawg`, `wireguard-native`. Valid compatible targets returned
+  `200`; incompatible structured targets returned expected
+  `422 subscription_render_target_unsupported_for_protocol`, not empty fake
+  configs. Cleanup leftovers returned `0` subscriptions/licenses/users.
+  Final cleanliness checks returned panel `/tmp/lumen-* = 0`, API container
+  `/tmp/lumen-* = 0`, node `/tmp/lumen-* = 0`, node admin checkout count `0`,
+  `/opt/lumen-node` top-level entries `.env,state,lumen-node.yml,secrets`, and
+  `lumen-node-node-agent-1` running `ghcr.io/rim2393/lumen-node-agent:v0.1.132`.
 - 2026-06-04 current-prod operational guard smoke after `9f56581`:
   `scripts/live/run-admin-surface-smoke-on-panel.sh` was copied only to the
   real panel `/tmp` together with `admin-surface-smoke.py`, run against
