@@ -1380,6 +1380,109 @@ for (const scenario of [
   });
 }
 
+test("run once rejects wireguard torrent-blocker policy without fake enforcement", async () => {
+  const stateDir = mkdtempSync(join(tmpdir(), "lumen-agent-state-"));
+  const wgDir = mkdtempSync(join(tmpdir(), "lumen-wg-"));
+  const configPath = join(wgDir, "lumen-wg.conf");
+  const execCalls = [];
+  const calls = [];
+  try {
+    writeFileSync(join(stateDir, "node-token"), "persisted-node-token\n", { mode: 0o600 });
+    writeFileSync(join(stateDir, "heartbeat-path"), "/api/v1/nodes/node-1/heartbeat\n", { mode: 0o600 });
+    const result = await runNodeAgentOnce({
+      env: {
+        LUMEN_CONTROL_PLANE_URL: "https://panel.example",
+        LUMEN_NODE_NAME: "node-1",
+        LUMEN_STATE_DIR: stateDir,
+        LUMEN_DRY_RUN: "false"
+      },
+      execFileImpl: async (command, args) => {
+        execCalls.push([command, args]);
+        return { stdout: "", stderr: "" };
+      },
+      fetchImpl: async (url, options) => {
+        calls.push({ url, options });
+        if (url.endsWith("/heartbeat")) {
+          return jsonResponse({
+            id: "node-1",
+            name: "node-1",
+            status: "active",
+            last_seen_at: "2026-05-27T00:00:00Z",
+            capabilities: {}
+          });
+        }
+        if (url.endsWith("/commands/next")) {
+          return jsonResponse({
+            id: "cmd-wireguard-policy-apply-1",
+            node_id: "node-1",
+            command_type: COMMAND_TYPES.OUTBOUND_APPLY,
+            status: "claimed",
+            payload_json: {
+              profileId: "profile-1",
+              adapter: "wireguard-native",
+              wireguardConfigPath: configPath,
+              wireguardConfig: {
+                interface: {
+                  private_key: "server-private-key",
+                  address: "10.66.0.1/24",
+                  listen_port: 51820
+                },
+                peers: [
+                  {
+                    public_key: "client-public-key",
+                    allowed_ips: "10.66.0.2/32"
+                  }
+                ]
+              },
+              nodePolicy: {
+                modelVersion: "lumen.node-policy.v1",
+                plugins: [
+                  {
+                    id: "torrent",
+                    kind: "torrent-blocker",
+                    name: "Fleet torrent blocker",
+                    enabled: true,
+                    config: { mode: "block" }
+                  }
+                ]
+              },
+              nodePolicyPath: join(stateDir, "policy.json")
+            },
+            created_at: "2026-05-27T00:01:00.000Z"
+          });
+        }
+        if (url.endsWith("/result")) {
+          return jsonResponse({
+            id: "cmd-wireguard-policy-apply-1",
+            node_id: "node-1",
+            command_type: COMMAND_TYPES.OUTBOUND_APPLY,
+            status: JSON.parse(options.body).status,
+            payload_json: {},
+            result_json: JSON.parse(options.body).result_json
+          });
+        }
+        return jsonResponse({
+          id: "metric-1",
+          node_id: "node-1",
+          metric_kind: "runtime",
+          values_json: JSON.parse(options.body).values_json
+        });
+      }
+    });
+
+    assert.equal(result.command.status, "failed");
+    assert.deepEqual(execCalls, []);
+    assert.equal(existsSync(configPath), false);
+    const resultBody = JSON.parse(calls[2].options.body);
+    assert.equal(resultBody.status, "failed");
+    assert.equal(resultBody.result_json.error.code, "wireguard_apply_failed");
+    assert.match(resultBody.result_json.error.message, /cannot enforce torrent-blocker policy/i);
+  } finally {
+    rmSync(stateDir, { recursive: true, force: true });
+    rmSync(wgDir, { recursive: true, force: true });
+  }
+});
+
 test("run once applies ikev2-eap outbound.apply via strongSwan runtime", async () => {
   const stateDir = mkdtempSync(join(tmpdir(), "lumen-agent-state-"));
   const swanctlDir = mkdtempSync(join(tmpdir(), "lumen-swanctl-"));

@@ -611,6 +611,7 @@ async def apply_profile_to_node(session: AsyncSession, *, profile_id: UUID):
         plugins=plugin_policy_records(plugins),
         ip_control=await build_ip_control_policy(session),
     )
+    _ensure_runtime_policy_supported(profile, runtime_policy)
     if _adapter_family(profile.adapter) == "xray":
         payload = await build_node_xray_outbound_payload(
             session,
@@ -1275,7 +1276,7 @@ def _ensure_adapter_live_for_active_profile(adapter: str, profile_status: str) -
             "until its node-agent runtime, "
             "renderer, and client compatibility checks are complete."
         ),
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         details=[adapter],
     )
 
@@ -3180,6 +3181,53 @@ def build_node_runtime_policy(
     if ip_control is not None:
         policy["ipControl"] = ip_control
     return policy
+
+
+def _ensure_runtime_policy_supported(
+    profile: ProtocolProfile,
+    policy: dict[str, object] | None,
+) -> None:
+    if _adapter_family(profile.adapter) != "wireguard":
+        return
+    if not _policy_has_blocking_torrent_plugin(policy):
+        return
+    raise APIError(
+        code="wireguard_torrent_policy_unsupported",
+        message=(
+            "WireGuard/AmneziaWG cannot enforce the torrent-blocker policy "
+            "without a transparent proxy/firewall enforcement layer. Disable "
+            "the torrent blocker for this node or use an enforceable runtime "
+            "family such as Xray or sing-box."
+        ),
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+        details=[
+            f"adapter={profile.adapter}",
+            "policy=torrent-blocker",
+            "supported=false",
+        ],
+    )
+
+
+def _policy_has_blocking_torrent_plugin(policy: dict[str, object] | None) -> bool:
+    if not isinstance(policy, dict):
+        return False
+    plugins = policy.get("plugins")
+    if not isinstance(plugins, list):
+        return False
+    for item in plugins:
+        if not isinstance(item, dict):
+            continue
+        if item.get("enabled") is False or item.get("kind") != "torrent-blocker":
+            continue
+        config = item.get("config")
+        action = (
+            str(config.get("action") or config.get("mode") or "block")
+            if isinstance(config, dict)
+            else "block"
+        )
+        if action in {"block", "drop", "blackhole"}:
+            return True
+    return False
 
 
 def _apply_xray_policy(

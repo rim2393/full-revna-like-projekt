@@ -111,6 +111,12 @@ export {
   createRuntimeTelemetryPlan,
   reportRuntimeTelemetry
 } from "./runtime-telemetry.js";
+export {
+  DEFAULT_WIREGUARD_TRAFFIC_STATE_FILE,
+  collectWireguardTrafficMetrics,
+  parseWireguardTransferOutput,
+  resetWireguardTrafficState
+} from "./wireguard-traffic.js";
 export { applyNodeCommand, enrollNodeAgent, runNodeAgentLoop, runNodeAgentOnce } from "./runtime-runner.js";
 export { readSecretFromEnv } from "./secret-input.js";
 export {

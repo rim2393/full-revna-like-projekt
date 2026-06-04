@@ -140,8 +140,10 @@ client evidence.
   - NaiveProxy and HTTP/SOCKS edge compatibility;
   - Clash/Mihomo/Stash/sing-box/Happ/Hiddify/Amnezia subscription compatibility
     per target app.
-- WireGuard/AWG torrent blocking must not be faked. It needs a real enforcement
-  design such as nftables marks/routing or a clear unsupported policy status.
+- WireGuard/AWG torrent blocking must not be faked. Current implementation
+  chooses clear unsupported policy status for blocking torrent policy on
+  WireGuard/AWG and must keep real traffic accounting through node-agent
+  `wg/awg show ... transfer` deltas after the `v0.1.131` live deploy.
 
 ### 4. Client Compatibility
 

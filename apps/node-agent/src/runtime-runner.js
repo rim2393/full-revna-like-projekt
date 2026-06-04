@@ -49,6 +49,10 @@ import {
 import { applyIkev2Config, createIkev2ApplyPlan, stopIkev2Runtime } from "./ikev2-runtime.js";
 import { applyTuicConfig, createTuicApplyPlan, ensureManagedTuicProcess } from "./tuic-runtime.js";
 import { applyWireguardConfig, createWireguardApplyPlan } from "./wireguard-runtime.js";
+import {
+  collectWireguardTrafficMetrics,
+  resetWireguardTrafficState
+} from "./wireguard-traffic.js";
 import { applyNodePolicy, createNodePolicyApplyPlan } from "./policy-runtime.js";
 import { DEFAULT_TELEMETRY_STATE_FILE, reportRuntimeTelemetry } from "./runtime-telemetry.js";
 
@@ -156,9 +160,11 @@ function resetRuntimeTrafficState(input = {}) {
     `${JSON.stringify({ emitted: {}, offsets: {}, resetAt: new Date().toISOString() }, null, 2)}\n`,
     { mode: 0o600 }
   );
+  const wireguardStateFile = resetWireguardTrafficState({ env });
   return Object.freeze({
     implementationStatus: "node-traffic-reset",
-    stateFile
+    stateFile,
+    wireguardStateFile
   });
 }
 
@@ -424,6 +430,29 @@ function nodePolicyApplyPlanFromPayload(payload, fallbackId) {
   });
 }
 
+function nodePolicyHasBlockingTorrentPlugin(policy) {
+  if (!policy || !Array.isArray(policy.plugins)) {
+    return false;
+  }
+  return policy.plugins.some((plugin) => {
+    if (!plugin || plugin.enabled === false || plugin.kind !== "torrent-blocker") {
+      return false;
+    }
+    const config = plugin.config && typeof plugin.config === "object" ? plugin.config : {};
+    const action = config.action ?? config.mode ?? "block";
+    return ["block", "drop", "blackhole"].includes(action);
+  });
+}
+
+function assertWireguardPolicySupported(policyPlan) {
+  if (!nodePolicyHasBlockingTorrentPlugin(policyPlan?.nodePolicy)) {
+    return;
+  }
+  throw new Error(
+    "WireGuard/AmneziaWG cannot enforce torrent-blocker policy without a transparent proxy/firewall enforcement layer"
+  );
+}
+
 function withResultOutputs(commandResult, outputs) {
   return Object.freeze({
     ...commandResult,
@@ -605,6 +634,7 @@ async function applyRuntimeEffects(command, commandResult, input = {}) {
       return withResultOutputs(commandResult, policy ? { ...tuic, nodePolicy: policy } : tuic);
     }
     if (commandResult.runtimeAction.type === "wireguard.apply") {
+      assertWireguardPolicySupported(policyPlan);
       const wireguard = await applyWireguardConfig(commandResult.runtimeAction.plan, {
         dryRun: input.dryRun,
         env: input.env,
@@ -1089,6 +1119,10 @@ export async function runNodeAgentOnce(input = {}) {
     fetchImpl: input.fetchImpl,
     nodeToken: enrollment.nodeToken
   });
+  const wireguardTraffic = await collectWireguardTrafficMetrics({
+    env: input.env ?? {},
+    execFileImpl: input.execFileImpl
+  });
 
   const metric = await recordNodeMetric({
     config: enrollment.config,
@@ -1099,7 +1133,8 @@ export async function runNodeAgentOnce(input = {}) {
       command_polled: command ? 1 : 0,
       command_completed: completedCommand ? 1 : 0,
       runtime_events_reported: telemetry.reportedEvents,
-      state_revision: latestState.revision
+      state_revision: latestState.revision,
+      ...wireguardTraffic.values
     }
   });
 

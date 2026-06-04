@@ -383,6 +383,42 @@ async def test_apply_amneziawg_profile_queues_awg_quick_peer_config(
         assert config["peers"][0]["allowed_ips"] == "10.77.0.2/32"
 
 
+async def test_apply_wireguard_rejects_torrent_blocker_policy_before_queue(
+    route_app: RouteApp,
+) -> None:
+    profile_id, node_id = await _seed_profile(
+        route_app,
+        "wireguard-native",
+        config_json={
+            "interface": {
+                "private_key": "server-private",
+                "address": "10.77.0.1/24",
+            }
+        },
+    )
+    async with route_app.sessionmaker() as session:
+        session.add(
+            NodePlugin(
+                node_id=None,
+                kind="torrent-blocker",
+                name="Fleet torrent blocker",
+                config_json={"mode": "block"},
+                enabled=True,
+            )
+        )
+        await session.commit()
+
+    response = await route_app.client.post(f"/api/v1/profiles/{profile_id}/apply-to-node")
+
+    assert response.status_code == 422, response.text
+    assert response.json()["error"]["code"] == "wireguard_torrent_policy_unsupported"
+    async with route_app.sessionmaker() as session:
+        commands = (
+            await session.execute(select(NodeCommand).where(NodeCommand.node_id == UUID(node_id)))
+        ).scalars().all()
+        assert commands == []
+
+
 async def test_apply_profile_includes_node_policy_and_xray_plugin_rules(
     route_app: RouteApp,
 ) -> None:
