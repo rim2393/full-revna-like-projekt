@@ -117,6 +117,13 @@ export {
   parseWireguardTransferOutput,
   resetWireguardTrafficState
 } from "./wireguard-traffic.js";
+export {
+  DEFAULT_IKEV2_TRAFFIC_STATE_FILE,
+  collectIkev2TrafficMetrics,
+  parseIpXfrmStateTraffic,
+  parseSwanctlListSasTraffic,
+  resetIkev2TrafficState
+} from "./ikev2-traffic.js";
 export { applyNodeCommand, enrollNodeAgent, runNodeAgentLoop, runNodeAgentOnce } from "./runtime-runner.js";
 export { readSecretFromEnv } from "./secret-input.js";
 export {

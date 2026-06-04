@@ -53,6 +53,10 @@ import {
   collectWireguardTrafficMetrics,
   resetWireguardTrafficState
 } from "./wireguard-traffic.js";
+import {
+  collectIkev2TrafficMetrics,
+  resetIkev2TrafficState
+} from "./ikev2-traffic.js";
 import { applyNodePolicy, createNodePolicyApplyPlan } from "./policy-runtime.js";
 import { DEFAULT_TELEMETRY_STATE_FILE, reportRuntimeTelemetry } from "./runtime-telemetry.js";
 
@@ -161,11 +165,26 @@ function resetRuntimeTrafficState(input = {}) {
     { mode: 0o600 }
   );
   const wireguardStateFile = resetWireguardTrafficState({ env });
+  const ikev2StateFile = resetIkev2TrafficState({ env });
   return Object.freeze({
     implementationStatus: "node-traffic-reset",
     stateFile,
-    wireguardStateFile
+    wireguardStateFile,
+    ikev2StateFile
   });
+}
+
+function mergeTrafficMetricValues(...metricResults) {
+  const values = {};
+  for (const result of metricResults) {
+    for (const [key, rawValue] of Object.entries(result?.values ?? {})) {
+      const value = Number(rawValue);
+      if (Number.isFinite(value)) {
+        values[key] = (values[key] ?? 0) + value;
+      }
+    }
+  }
+  return values;
 }
 
 function readJsonFile(path) {
@@ -1123,6 +1142,11 @@ export async function runNodeAgentOnce(input = {}) {
     env: input.env ?? {},
     execFileImpl: input.execFileImpl
   });
+  const ikev2Traffic = await collectIkev2TrafficMetrics({
+    env: input.env ?? {},
+    execFileImpl: input.execFileImpl
+  });
+  const trafficMetricValues = mergeTrafficMetricValues(wireguardTraffic, ikev2Traffic);
 
   const metric = await recordNodeMetric({
     config: enrollment.config,
@@ -1134,7 +1158,7 @@ export async function runNodeAgentOnce(input = {}) {
       command_completed: completedCommand ? 1 : 0,
       runtime_events_reported: telemetry.reportedEvents,
       state_revision: latestState.revision,
-      ...wireguardTraffic.values
+      ...trafficMetricValues
     }
   });
 
