@@ -153,6 +153,20 @@ evidence here is wrong or stale.
 
 ### Backend/Subscription Smoke After API Hotfix
 
+- 2026-06-04 current-prod existing-app subscription matrix re-run on API
+  `v0.1.127`: `scripts/live/client-compatibility-matrix-smoke.py` was copied
+  into the prod API container, run against `https://panel.lumentech.tel`, and
+  deleted from panel/API temp paths. It required an existing active real
+  `vless-reality` profile+host on real `node-01`, created only temporary real
+  user/license/subscription records, and verified all 21 public render targets
+  returned `200`: `raw-uri`, `v2ray`, `v2ray-base64`, `v2rayn`, `v2rayng`,
+  `streisand`, `shadowrocket`, `hiddify`, `happ`, `mihomo`, `clash-meta`,
+  `clash`, `flclash`, `stash`, `koala-clash`, `sing-box`, `nekobox`,
+  `nekoray`, `xray-json`, `amnezia`, `lumen-json`. Content families matched
+  text/plain, YAML or JSON as expected; cleanup returned `0`
+  subscriptions/licenses/users; temp checks confirmed
+  `panel-client-matrix-clean`, `api-container-client-matrix-clean` and
+  `node-client-matrix-clean`.
 - 2026-06-04 protected admin surface smoke added as
   `scripts/live/admin-surface-smoke.py` and run inside the prod API container
   against `https://panel.lumentech.tel` on `v0.1.127`. It used a temporary
