@@ -365,6 +365,18 @@ def _wants_browser_subscription_page(request: Request) -> bool:
     return "text/html" in accept.lower()
 
 
+def _public_request_url_with_query(request: Request, **query_params: str) -> str:
+    url = request.url.include_query_params(**query_params)
+    scheme = (request.headers.get("x-forwarded-proto") or "").split(",", 1)[0].strip()
+    host = (
+        (request.headers.get("x-forwarded-host") or "").split(",", 1)[0].strip()
+        or request.headers.get("host")
+    )
+    if scheme or host:
+        url = url.replace(scheme=scheme or url.scheme, netloc=host or url.netloc)
+    return str(url)
+
+
 def _subscription_browser_page(
     manifest: dict[str, object],
     *,
@@ -376,7 +388,7 @@ def _subscription_browser_page(
     metadata = _dict_value(manifest, "metadata")
     provider = _dict_value(manifest, "provider")
     subpage = _dict_value(metadata, "subpage")
-    raw_url = str(request.url.include_query_params(raw="1"))
+    raw_url = _public_request_url_with_query(request, raw="1")
     title = _string_value(subpage.get("title")) or _string_value(provider.get("name")) or "Lumen VPN"
     username = _string_value(subscription.get("id")) or "subscription"
     status = "Активна"

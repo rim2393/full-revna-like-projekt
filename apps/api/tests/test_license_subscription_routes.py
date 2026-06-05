@@ -233,13 +233,18 @@ async def test_subscription_routes_create_list_and_get(route_app: RouteTestApp) 
 
     browser_page_response = await route_app.client.get(
         created["public_render_urls"]["happ"],
-        headers={"Accept": "text/html,application/xhtml+xml"},
+        headers={
+            "Accept": "text/html,application/xhtml+xml",
+            "X-Forwarded-Host": "panel.example.test",
+            "X-Forwarded-Proto": "https",
+        },
     )
     assert browser_page_response.status_code == 200
     assert browser_page_response.headers["content-type"].startswith("text/html")
     assert browser_page_response.headers["x-lumen-subscription-page"] == "browser"
     assert "Добавить подписку" in browser_page_response.text
     assert "raw=1" in browser_page_response.text
+    assert "https://panel.example.test" in browser_page_response.text
 
     raw_browser_response = await route_app.client.get(
         f"{created['public_render_urls']['happ']}&raw=1",
