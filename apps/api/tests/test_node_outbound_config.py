@@ -411,6 +411,46 @@ def test_xray_transport_variants_build_server_stream_settings():
         assert stream[settings_key]
 
 
+def test_xray_tcp_transport_ignores_host_level_xhttp_metadata():
+    host = SimpleNamespace(
+        subscription_excluded=False,
+        hidden=False,
+        status="active",
+        path=None,
+        sni=None,
+        xray_template_json=None,
+        mux_json=None,
+        sockopt_json=None,
+        xhttp_json={"mode": "stream-up", "path": "/xhttp"},
+    )
+    payload = build_node_outbound_payload(
+        _profile("vless-tcp"),
+        [
+            SimpleNamespace(
+                tag="inbound-test",
+                listen="0.0.0.0",  # noqa: S104
+                port=18449,
+                protocol="vless",
+                transport="tcp",
+                security="none",
+                credentials_ref="vault://subscriptions/p/creds",
+                config_json={},
+                hosts=[host],
+            )
+        ],
+        runtime_clients=[
+            {
+                "public_id": "lumen_sub_live",
+                "uuid": "11111111-1111-4111-8111-111111111111",
+            }
+        ],
+    )
+
+    stream = payload["xrayConfig"]["inbounds"][0]["streamSettings"]
+    assert stream["network"] == "tcp"
+    assert "xhttpSettings" not in stream
+
+
 @pytest.mark.parametrize(
     ("adapter", "protocol", "transport", "security", "config", "settings_key", "settings_value"),
     [

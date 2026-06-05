@@ -1992,8 +1992,7 @@ def _primary_host_string(inbound: ProfileInboundResponse, key: str) -> str | Non
 
 
 def _effective_inbound_transport(inbound: ProfileInboundResponse) -> str:
-    xhttp = _primary_host_dict(inbound, "xhttp_json")
-    if xhttp:
+    if str(inbound.transport).lower() == "xhttp" and _primary_host_dict(inbound, "xhttp_json"):
         return "xhttp"
     return inbound.transport
 
@@ -2017,7 +2016,7 @@ def _effective_config_with_host(inbound: ProfileInboundResponse) -> dict[str, ob
         security["serverName"] = host_sni
         config["security"] = security
     xhttp = _primary_host_dict(inbound, "xhttp_json")
-    if xhttp:
+    if str(inbound.transport).lower() == "xhttp" and xhttp:
         config["xhttp"] = xhttp
     return config
 
