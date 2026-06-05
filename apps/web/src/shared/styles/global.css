@@ -1199,7 +1199,7 @@ h2 {
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: var(--space-2);
-  min-width: 150px;
+  min-width: 0;
 }
 
 .settings-registry-panel .data-table {
@@ -1828,9 +1828,18 @@ h2 {
   .settings-workbench {
     grid-template-columns: minmax(0, 1fr);
   }
+
+  .settings-provider-card {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .settings-provider-card__actions {
+    justify-content: flex-start;
+  }
 }
 
-@media (max-width: 860px) {
+@media (max-width: 1280px) {
   h1 {
     font-size: 1.9rem;
   }
@@ -1842,6 +1851,7 @@ h2 {
   .sidebar {
     position: fixed;
     z-index: 15;
+    width: min(var(--sidebar-width), calc(100vw - 48px));
     transform: translateX(-110%);
     transition: transform 220ms var(--ease-out);
   }
@@ -1902,6 +1912,37 @@ h2 {
     padding: var(--space-6);
     border-right: 0;
     border-bottom: 1px solid var(--color-line);
+  }
+}
+
+@media (min-width: 1281px) and (max-width: 1380px) {
+  .content {
+    padding: var(--space-5);
+  }
+
+  .topbar {
+    padding: 0 var(--space-5);
+  }
+
+  .settings-page {
+    max-width: 100%;
+  }
+
+  .settings-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .settings-workbench {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .settings-provider-card {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .settings-provider-card__actions {
+    justify-content: flex-start;
   }
 }
 
