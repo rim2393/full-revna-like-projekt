@@ -1894,6 +1894,19 @@ h2 {
     padding: var(--space-5);
   }
 
+  .settings-workbench {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .settings-provider-card {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .settings-provider-card__actions {
+    justify-content: flex-start;
+  }
+
   .page-header {
     align-items: flex-start;
     flex-direction: column;
