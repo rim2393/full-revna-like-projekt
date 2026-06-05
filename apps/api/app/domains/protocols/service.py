@@ -1410,6 +1410,34 @@ async def mark_subscription_runtime_pending(
                     changed_fields=changed_fields,
                 )
 
+    squad_id_text = delivery_profile.get("squad_id")
+    if squad_id_text:
+        try:
+            squad_id = UUID(squad_id_text)
+        except ValueError:
+            squad_id = None
+        if squad_id is not None:
+            profiles = (
+                await session.execute(
+                    select(ProtocolProfile).where(ProtocolProfile.squad_id == squad_id)
+                )
+            ).scalars()
+            for profile in profiles:
+                _mark_profile_runtime_pending(
+                    profile,
+                    reason=reason,
+                    changed_fields=changed_fields,
+                )
+            hosts = (
+                await session.execute(select(Host).where(Host.squad_id == squad_id))
+            ).scalars()
+            for host in hosts:
+                _mark_host_runtime_pending(
+                    host,
+                    reason=reason,
+                    changed_fields=changed_fields,
+                )
+
     host_id_text = delivery_profile.get("host_id")
     if host_id_text:
         try:

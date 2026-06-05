@@ -1170,6 +1170,17 @@ async def test_external_squad_subscription_renders_all_active_profiles_for_happ(
     assert create_response.status_code == 201
     public_id = create_response.json()["public_id"]
 
+    async with route_app.sessionmaker() as session:
+        refreshed_vless_profile = await session.get(ProtocolProfile, vless_profile.id)
+        refreshed_trojan_profile = await session.get(ProtocolProfile, trojan_profile.id)
+        refreshed_openvpn_host = (
+            await session.execute(select(Host).where(Host.name == "happ-openvpn-host"))
+        ).scalar_one()
+
+    assert refreshed_vless_profile.metadata_json["runtime_sync"]["status"] == "pending_apply"
+    assert refreshed_trojan_profile.metadata_json["runtime_sync"]["status"] == "pending_apply"
+    assert refreshed_openvpn_host.metadata_json["runtime_sync"]["status"] == "pending_apply"
+
     manifest_response = await route_app.client.get(
         f"/api/v1/subscriptions/public/{public_id}/manifest",
     )
