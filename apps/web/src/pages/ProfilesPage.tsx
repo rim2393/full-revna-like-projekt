@@ -373,25 +373,13 @@ export function ProfilesPage() {
   const selectedNode = nodes.find((node) => node.id === selectedProfile?.node_id)
   const selectedSquad = squads.find((squad) => squad.id === selectedProfile?.squad_id)
   const isLoading =
-    profilesQuery.isLoading ||
-    adaptersQuery.isLoading ||
-    nodesQuery.isLoading ||
-    squadsQuery.isLoading ||
-    hostsQuery.isLoading ||
-    usersQuery.isLoading ||
-    licensesQuery.isLoading ||
-    staleCleanupQuery.isLoading ||
-    globalInboundsQuery.isLoading
+    (profilesQuery.isLoading && profiles.length === 0) ||
+    (adaptersQuery.isLoading && adapters.length === 0) ||
+    (nodesQuery.isLoading && nodes.length === 0)
   const error =
     profilesQuery.error ??
     adaptersQuery.error ??
-    nodesQuery.error ??
-    squadsQuery.error ??
-    hostsQuery.error ??
-    usersQuery.error ??
-    licensesQuery.error ??
-    staleCleanupQuery.error ??
-    globalInboundsQuery.error
+    nodesQuery.error
   const profileStats = {
     active: profiles.filter((profile) => profile.status === 'active').length,
     disabled: profiles.filter((profile) => profile.status !== 'active').length,

@@ -25,89 +25,51 @@ export function ResourceCacheWarmer() {
     warmedSessionRef.current = session.userId
     let cancelled = false
 
-    const warm = () => {
+    const prefetch = (entries: Array<{ queryFn: () => Promise<unknown>; queryKey: readonly unknown[] }>) =>
+      Promise.allSettled(
+        entries.map((entry) =>
+          queryClient.prefetchQuery({
+            queryFn: entry.queryFn,
+            queryKey: entry.queryKey,
+            staleTime: WARM_STALE_TIME_MS,
+          }),
+        ),
+      )
+
+    const warmSecondary = () => {
       if (cancelled) {
         return
       }
 
-      void Promise.allSettled([
-        queryClient.prefetchQuery({
-          queryFn: apiClient.readPanelIdentity,
-          queryKey: resourceQueryKeys.panelIdentity,
-          staleTime: WARM_STALE_TIME_MS,
-        }),
-        queryClient.prefetchQuery({
-          queryFn: apiClient.listNodes,
-          queryKey: resourceQueryKeys.nodes,
-          staleTime: WARM_STALE_TIME_MS,
-        }),
-        queryClient.prefetchQuery({
-          queryFn: apiClient.listProfiles,
-          queryKey: resourceQueryKeys.profiles,
-          staleTime: WARM_STALE_TIME_MS,
-        }),
-        queryClient.prefetchQuery({
-          queryFn: apiClient.listHosts,
-          queryKey: resourceQueryKeys.hosts,
-          staleTime: WARM_STALE_TIME_MS,
-        }),
-        queryClient.prefetchQuery({
-          queryFn: apiClient.listSquads,
-          queryKey: resourceQueryKeys.squads,
-          staleTime: WARM_STALE_TIME_MS,
-        }),
-        queryClient.prefetchQuery({
-          queryFn: apiClient.listUsers,
-          queryKey: resourceQueryKeys.users,
-          staleTime: WARM_STALE_TIME_MS,
-        }),
-        queryClient.prefetchQuery({
-          queryFn: apiClient.listLicenses,
-          queryKey: resourceQueryKeys.licenses,
-          staleTime: WARM_STALE_TIME_MS,
-        }),
-        queryClient.prefetchQuery({
-          queryFn: apiClient.listSubscriptions,
-          queryKey: resourceQueryKeys.subscriptions,
-          staleTime: WARM_STALE_TIME_MS,
-        }),
-        queryClient.prefetchQuery({
-          queryFn: apiClient.listSettingGroups,
-          queryKey: resourceQueryKeys.settingGroups,
-          staleTime: WARM_STALE_TIME_MS,
-        }),
-        queryClient.prefetchQuery({
-          queryFn: apiClient.listSubscriptionPageConfigs,
-          queryKey: resourceQueryKeys.subscriptionPageConfigs,
-          staleTime: WARM_STALE_TIME_MS,
-        }),
-        queryClient.prefetchQuery({
-          queryFn: apiClient.listSubscriptionTemplates,
-          queryKey: resourceQueryKeys.subscriptionTemplates,
-          staleTime: WARM_STALE_TIME_MS,
-        }),
-        queryClient.prefetchQuery({
-          queryFn: apiClient.listResponseRules,
-          queryKey: resourceQueryKeys.responseRules,
-          staleTime: WARM_STALE_TIME_MS,
-        }),
-        queryClient.prefetchQuery({
-          queryFn: apiClient.listProtocolAdapters,
-          queryKey: resourceQueryKeys.protocolAdapters,
-          staleTime: WARM_STALE_TIME_MS,
-        }),
+      void prefetch([
+        { queryFn: apiClient.listUsers, queryKey: resourceQueryKeys.users },
+        { queryFn: apiClient.listLicenses, queryKey: resourceQueryKeys.licenses },
+        { queryFn: apiClient.listSubscriptions, queryKey: resourceQueryKeys.subscriptions },
+        { queryFn: apiClient.listSettingGroups, queryKey: resourceQueryKeys.settingGroups },
+        { queryFn: apiClient.listSubscriptionPageConfigs, queryKey: resourceQueryKeys.subscriptionPageConfigs },
+        { queryFn: apiClient.listSubscriptionTemplates, queryKey: resourceQueryKeys.subscriptionTemplates },
+        { queryFn: apiClient.listResponseRules, queryKey: resourceQueryKeys.responseRules },
       ])
     }
 
+    void prefetch([
+      { queryFn: apiClient.readPanelIdentity, queryKey: resourceQueryKeys.panelIdentity },
+      { queryFn: apiClient.listNodes, queryKey: resourceQueryKeys.nodes },
+      { queryFn: apiClient.listProfiles, queryKey: resourceQueryKeys.profiles },
+      { queryFn: apiClient.listHosts, queryKey: resourceQueryKeys.hosts },
+      { queryFn: apiClient.listSquads, queryKey: resourceQueryKeys.squads },
+      { queryFn: apiClient.listProtocolAdapters, queryKey: resourceQueryKeys.protocolAdapters },
+    ])
+
     if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
-      const idleId = window.requestIdleCallback(warm, { timeout: 1200 })
+      const idleId = window.requestIdleCallback(warmSecondary, { timeout: 1200 })
       return () => {
         cancelled = true
         window.cancelIdleCallback(idleId)
       }
     }
 
-    const timeoutId = globalThis.setTimeout(warm, 250)
+    const timeoutId = globalThis.setTimeout(warmSecondary, 250)
     return () => {
       cancelled = true
       globalThis.clearTimeout(timeoutId)
