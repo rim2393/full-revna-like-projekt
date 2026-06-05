@@ -661,6 +661,10 @@ async def test_xray_edge_subscription_render_matrix(
     else:
         assert raw.text.startswith(f"{expected_protocol}://")
         assert f"type={expected_network}" in raw.text
+        if expected_protocol == "trojan" and "reality" in adapter:
+            assert "security=reality" in raw.text
+            assert "pbk=trojan-reality-public" in raw.text
+            assert "sid=abcd" in raw.text
 
     xray = await route_app.client.get(
         f"/api/v1/subscriptions/public/{public_id}/render?target=xray-json",

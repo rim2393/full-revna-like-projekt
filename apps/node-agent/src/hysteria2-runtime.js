@@ -183,6 +183,24 @@ function isPidRunning(pid) {
   }
 }
 
+function isManagedSingBoxProcessRunning(pid, binary, configPath) {
+  if (!isPidRunning(pid)) {
+    return false;
+  }
+  let cmdline = "";
+  try {
+    cmdline = readFileSync(`/proc/${pid}/cmdline`, "utf8").replaceAll("\0", " ");
+  } catch {
+    return false;
+  }
+  return (
+    cmdline.includes(binary) &&
+    cmdline.includes(" run ") &&
+    cmdline.includes(" -c ") &&
+    cmdline.includes(configPath)
+  );
+}
+
 function stopPid(pidFile) {
   const pid = readPid(pidFile);
   if (!pid || !isPidRunning(pid)) {
@@ -224,7 +242,7 @@ export async function ensureManagedHysteria2Process(input = {}) {
   const pidFile = env.LUMEN_HYSTERIA2_PID_FILE ?? DEFAULT_HYSTERIA2_PID_FILE;
   await runExecFile(input.execFileImpl, binary, ["check", "-c", configPath]);
   const pid = readPid(pidFile);
-  if (isPidRunning(pid)) {
+  if (isManagedSingBoxProcessRunning(pid, binary, configPath)) {
     return Object.freeze({
       implementationStatus: "hysteria2-managed-process-running",
       configPath,

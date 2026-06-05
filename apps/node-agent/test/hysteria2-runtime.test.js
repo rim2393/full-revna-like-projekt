@@ -1,12 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   DEFAULT_HYSTERIA2_RELOAD_ARGV,
   applyHysteria2Config,
   createHysteria2ApplyPlan,
+  ensureManagedHysteria2Process,
   renderHysteria2SingBoxConfig
 } from "../src/hysteria2-runtime.js";
 
@@ -171,6 +172,37 @@ test("applyHysteria2Config process mode validates and starts managed sing-box", 
     const written = JSON.parse(readFileSync(configPath, "utf-8"));
     assert.equal(written.inbounds[0].type, "hysteria2");
     assert.equal(readFileSync(pidFile, "utf-8").trim(), "12345");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("ensureManagedHysteria2Process restarts when pid file points at another process", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "lumen-hy2-stale-pid-"));
+  const configPath = join(dir, "config.json");
+  const logPath = join(dir, "sing-box.log");
+  const pidFile = join(dir, "sing-box.pid");
+  const spawned = [];
+  try {
+    writeFileSync(configPath, `${JSON.stringify(renderHysteria2SingBoxConfig(validConfig()), null, 2)}\n`);
+    writeFileSync(pidFile, `${process.pid}\n`);
+    const result = await ensureManagedHysteria2Process({
+      env: {
+        LUMEN_HYSTERIA2_RELOAD_MODE: "process",
+        LUMEN_HYSTERIA2_CONFIG_FILE: configPath,
+        LUMEN_HYSTERIA2_LOG_FILE: logPath,
+        LUMEN_HYSTERIA2_PID_FILE: pidFile,
+        LUMEN_HYSTERIA2_BINARY: "sing-box"
+      },
+      execFileImpl: async () => {},
+      spawnImpl: (command, args) => {
+        spawned.push([command, args]);
+        return { pid: 54321, unref() {} };
+      }
+    });
+    assert.equal(result.implementationStatus, "hysteria2-managed-process-restored");
+    assert.deepEqual(spawned[0], ["sing-box", ["run", "-c", configPath]]);
+    assert.equal(readFileSync(pidFile, "utf-8").trim(), "54321");
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

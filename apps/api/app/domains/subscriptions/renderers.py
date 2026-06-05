@@ -404,6 +404,14 @@ def render_share_uri(entry: dict[str, Any], *, settings: Settings) -> str | None
         query = {"type": network_type(protocol), "security": security_name(protocol)}
         if security.get("serverName"):
             query["sni"] = str(security["serverName"])
+        if security.get("fingerprint"):
+            query["fp"] = str(security["fingerprint"])
+        if security.get("publicKey"):
+            query["pbk"] = str(security["publicKey"])
+        if security.get("shortId") is not None:
+            query["sid"] = str(security["shortId"])
+        if security.get("spiderX"):
+            query["spx"] = str(security["spiderX"])
         _add_share_transport_query(query, protocol)
         return build_uri("trojan", credentials.password, protocol, query, label)
 
