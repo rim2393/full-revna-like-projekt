@@ -7,7 +7,12 @@ from cryptography import x509
 
 from app.core.errors import APIError
 from app.domains.protocols.models import ProtocolProfile
-from app.domains.protocols.service import _ensure_ikev2_profile_pki, build_node_outbound_payload
+from app.domains.protocols.service import (
+    _ensure_ikev2_profile_pki,
+    _inbound_tag,
+    build_node_outbound_payload,
+    merge_xray_profile_configs,
+)
 
 
 def _profile(adapter: str, config_json: dict | None = None) -> ProtocolProfile:
@@ -51,6 +56,43 @@ def test_hysteria2_profile_builds_hysteria2_payload():
     assert config["listen"] == ":443"
     assert config["tls"] == {"acme": {"domains": ["edge.example.test"]}}
     assert config["clientsRef"] == "vault://subscriptions/p/creds"
+
+
+def test_xray_profile_merge_replaces_duplicate_inbound_tags():
+    first = {
+        "inbounds": [
+            {
+                "tag": "DEFAULT_INBOUND",
+                "listen": "0.0.0.0",  # noqa: S104
+                "port": 18448,
+                "protocol": "http",
+            }
+        ]
+    }
+    second = {
+        "inbounds": [
+            {
+                "tag": "DEFAULT_INBOUND",
+                "listen": "0.0.0.0",  # noqa: S104
+                "port": 18446,
+                "protocol": "shadowsocks",
+            }
+        ]
+    }
+
+    merged = merge_xray_profile_configs([first, second])
+
+    assert [inbound["tag"] for inbound in merged["inbounds"]] == ["DEFAULT_INBOUND"]
+    assert merged["inbounds"][0]["port"] == 18446
+
+
+def test_default_inbound_host_tag_is_treated_as_placeholder():
+    profile = _profile("vless-reality")
+    host = SimpleNamespace(inbound_tag="DEFAULT_INBOUND")
+
+    tag = _inbound_tag(profile=profile, hosts=[host], index=0)
+
+    assert tag == f"vless-reality-{profile.id}"
 
 
 def test_hysteria2_profile_defaults_to_node_runtime_tls_paths():

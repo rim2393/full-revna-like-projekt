@@ -3176,6 +3176,7 @@ def merge_xray_profile_configs(profile_configs: list[dict[str, object]]) -> dict
     outbound_tags = {"direct"}
     routing_rules: list[object] = []
     inbounds: list[object] = []
+    inbound_indexes_by_tag: dict[str, int] = {}
 
     for config in profile_configs:
         if isinstance(config.get("log"), dict):
@@ -3196,7 +3197,17 @@ def merge_xray_profile_configs(profile_configs: list[dict[str, object]]) -> dict
             routing_rules.extend(deepcopy(routing["rules"]))
         config_inbounds = config.get("inbounds")
         if isinstance(config_inbounds, list):
-            inbounds.extend(deepcopy(config_inbounds))
+            for inbound in config_inbounds:
+                if not isinstance(inbound, dict):
+                    continue
+                inbound_copy = deepcopy(inbound)
+                tag = str(inbound_copy.get("tag") or "")
+                if tag and tag in inbound_indexes_by_tag:
+                    inbounds[inbound_indexes_by_tag[tag]] = inbound_copy
+                    continue
+                if tag:
+                    inbound_indexes_by_tag[tag] = len(inbounds)
+                inbounds.append(inbound_copy)
 
     merged["routing"] = {"rules": routing_rules}
     merged["inbounds"] = inbounds
@@ -3446,7 +3457,7 @@ def _inbound_tag(*, profile: ProtocolProfile, hosts: list[Host], index: int) -> 
     config_tag = profile.config_json.get("tag")
     if isinstance(config_tag, str) and config_tag:
         return config_tag
-    if host_tag is not None:
+    if host_tag is not None and host_tag != "DEFAULT_INBOUND":
         return host_tag
     suffix = "" if index == 0 else f"-{index + 1}"
     return f"{profile.adapter}-{profile.id}{suffix}"
