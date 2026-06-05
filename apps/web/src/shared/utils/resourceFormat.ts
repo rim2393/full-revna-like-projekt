@@ -21,7 +21,23 @@ export function formatRecord(value: Record<string, unknown> | null | undefined) 
   if (entries.length === 0) {
     return 'None'
   }
-  return entries.map(([key, entry]) => `${key}=${String(entry)}`).join(', ')
+  return entries.map(([key, entry]) => `${key}=${formatRecordValue(entry)}`).join(', ')
+}
+
+function formatRecordValue(value: unknown): string {
+  if (value === null || value === undefined) {
+    return 'null'
+  }
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    return String(value)
+  }
+  if (Array.isArray(value)) {
+    return `[${value.map(formatRecordValue).join(', ')}]`
+  }
+  if (typeof value === 'object') {
+    return JSON.stringify(value)
+  }
+  return String(value)
 }
 
 export function parseKeyValueInput(value: string) {
