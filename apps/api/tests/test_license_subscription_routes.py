@@ -1100,10 +1100,32 @@ async def test_external_squad_subscription_renders_all_active_profiles_for_happ(
             port_reservations=[{"address": "0.0.0.0", "port": 8443, "protocol": "tcp"}],  # noqa: S104
             credentials_ref="vault://subscriptions/happ/trojan",
         )
-        session.add_all([vless_profile, trojan_profile])
+        openvpn_profile = ProtocolProfile(
+            name="happ-openvpn-bridge",
+            node_id=node.id,
+            squad_id=squad.id,
+            adapter="openvpn-shadowsocks",
+            status="active",
+            config_json={
+                "openvpn": {"listen_port": 1194},
+                "shadowsocks": {"method": "aes-256-gcm"},
+            },
+            port_reservations=[{"address": "0.0.0.0", "port": 1194, "protocol": "udp"}],  # noqa: S104
+            credentials_ref="vault://subscriptions/happ/openvpn",
+        )
+        session.add_all([vless_profile, trojan_profile, openvpn_profile])
         await session.flush()
         session.add_all(
             [
+                Host(
+                    name="happ-openvpn-host",
+                    hostname="openvpn.example.test",
+                    node_id=node.id,
+                    protocol_profile_id=openvpn_profile.id,
+                    squad_id=squad.id,
+                    status="active",
+                    port=1194,
+                ),
                 Host(
                     name="happ-vless-host",
                     hostname="vless.example.test",
@@ -1154,10 +1176,11 @@ async def test_external_squad_subscription_renders_all_active_profiles_for_happ(
     assert manifest_response.status_code == 200
     manifest = manifest_response.json()
     protocols = manifest["nodes"][0]["protocols"]
-    assert [protocol["adapter"] for protocol in protocols] == [
+    assert {protocol["adapter"] for protocol in protocols} == {
+        "openvpn-shadowsocks",
         "trojan-tcp-tls",
         "vless-reality",
-    ]
+    }
     assert manifest["metadata"]["deliveryMode"] == "squad"
     assert manifest["metadata"]["externalSquad"]["name"] == "happ-delivery-squad"
 
@@ -1170,6 +1193,8 @@ async def test_external_squad_subscription_renders_all_active_profiles_for_happ(
     assert "trojan://" in render_response.text
     assert "vless.example.test:443" in render_response.text
     assert "trojan.example.test:8443" in render_response.text
+    assert "openvpn.example.test" not in render_response.text
+    assert "<client>" not in render_response.text
 
     async with route_app.sessionmaker() as session:
         vless_runtime_clients = await list_profile_runtime_clients(session, profile=vless_profile)

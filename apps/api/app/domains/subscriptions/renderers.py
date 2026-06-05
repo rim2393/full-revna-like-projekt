@@ -69,6 +69,20 @@ AMNEZIA_WG_KEYS = (
 )
 AMNEZIA_WG_POSITIVE_INT_KEYS = frozenset({"Jc", "Jmin", "Jmax", "S1", "S2", "S3", "S4"})
 AMNEZIA_WG_JUNK_COUNT_KEYS = frozenset({"Jc", "Jmin", "Jmax"})
+RAW_URI_IMPORTABLE_PROTOCOLS = frozenset(
+    {
+        "vless",
+        "vmess",
+        "trojan",
+        "shadowsocks",
+        "hysteria2",
+        "tuic",
+        "naive",
+        "socks",
+        "http",
+    }
+)
+RAW_URI_CLIENT_TARGETS = RAW_URI_TARGETS - frozenset({"raw-uri"})
 
 
 @dataclass(frozen=True)
@@ -137,7 +151,11 @@ def render_subscription_for_target(
         )
 
     if normalized_target in RAW_URI_TARGETS or normalized_target == "v2ray-base64":
-        raw = render_raw_uri_subscription(manifest, settings=settings)
+        raw = render_raw_uri_subscription(
+            manifest,
+            settings=settings,
+            target=normalized_target,
+        )
         if normalized_target == "v2ray-base64":
             body = base64.b64encode(raw.encode("utf-8")).decode("ascii")
             if body:
@@ -293,13 +311,38 @@ def build_subscription_headers(manifest: dict[str, Any]) -> dict[str, str]:
     return headers
 
 
-def render_raw_uri_subscription(manifest: dict[str, Any], *, settings: Settings) -> str:
+def render_raw_uri_subscription(
+    manifest: dict[str, Any],
+    *,
+    settings: Settings,
+    target: str = "raw-uri",
+) -> str:
+    is_squad_bundle = manifest.get("metadata", {}).get("deliveryMode") == "squad"
     lines = [
         uri
         for entry in iter_protocol_entries(manifest)
+        if raw_uri_target_supports_entry(
+            entry,
+            target=target,
+            is_squad_bundle=is_squad_bundle,
+        )
         if (uri := render_share_uri(entry, settings=settings)) is not None
     ]
     return "\n".join(lines) + ("\n" if lines else "")
+
+
+def raw_uri_target_supports_entry(
+    entry: dict[str, Any],
+    *,
+    target: str,
+    is_squad_bundle: bool,
+) -> bool:
+    if not is_squad_bundle:
+        return True
+    protocol_type = normalize_protocol_type(entry["protocol"].get("type"))
+    if target in RAW_URI_CLIENT_TARGETS or target == "v2ray-base64":
+        return protocol_type in RAW_URI_IMPORTABLE_PROTOCOLS
+    return True
 
 
 def render_share_uri(entry: dict[str, Any], *, settings: Settings) -> str | None:
