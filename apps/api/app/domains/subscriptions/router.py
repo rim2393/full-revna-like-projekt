@@ -391,7 +391,7 @@ def _subscription_browser_page(
     raw_url = _public_request_url_with_query(request, raw="1")
     title = _string_value(subpage.get("title")) or _string_value(provider.get("name")) or "Lumen VPN"
     username = _string_value(subscription.get("id")) or "subscription"
-    status = "Активна"
+    status = "\u0410\u043a\u0442\u0438\u0432\u043d\u0430"
     expires_at = _string_value(subscription.get("expiresAt"))
     traffic_limit = _string_value(metadata.get("trafficLimitGb"))
     traffic_used = _string_value(metadata.get("trafficUsedGb")) or "0"
@@ -403,10 +403,14 @@ def _subscription_browser_page(
     escaped_title = html_escape(title)
     escaped_username = html_escape(username)
     escaped_status = html_escape(status)
-    escaped_expires = html_escape(_human_date(expires_at) if expires_at else "Не ограничено")
+    escaped_expires = html_escape(
+        _human_date(expires_at)
+        if expires_at
+        else "\u041d\u0435 \u043e\u0433\u0440\u0430\u043d\u0438\u0447\u0435\u043d\u043e"
+    )
     escaped_raw = html_escape(raw_url, quote=True)
     encoded_raw = quote(raw_url, safe="")
-    add_link = f"happ://add/{encoded_raw}" if render_target == "happ" else escaped_raw
+    add_link = f"happ://add/{encoded_raw}" if render_target == "happ" else raw_url
     app_title = "Happ" if render_target == "happ" else render_target
     body = f"""<!doctype html>
 <html lang="ru">
@@ -434,7 +438,7 @@ def _subscription_browser_page(
     .telegram {{ color: #41d9ff; border: 1px solid #263545; border-radius: 10px; padding: 12px 14px; text-decoration: none; }}
     section {{ border: 1px solid #293341; background: rgba(19,25,35,.86); border-radius: 16px; padding: 28px 32px; margin-bottom: 28px; box-shadow: 0 18px 60px rgba(0,0,0,.24); }}
     .summary {{ display: grid; grid-template-columns: 48px 1fr; gap: 18px; align-items: start; }}
-    .ok {{ display: grid; place-items: center; width: 48px; height: 48px; color: #42e0b5; border: 1px solid #168467; background: rgba(20,124,95,.18); border-radius: 50%; font-size: 24px; }}
+    .ok {{ display: grid; place-items: center; width: 48px; height: 48px; color: #42e0b5; border: 1px solid #168467; background: rgba(20,124,95,.18); border-radius: 50%; font-size: 14px; font-weight: 900; }}
     h1 {{ margin: 0 0 4px; font-size: 22px; }}
     .muted {{ color: #9aa6b5; margin: 0; }}
     .grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 22px; }}
@@ -449,8 +453,8 @@ def _subscription_browser_page(
     .tab {{ border: 1px solid #314457; color: #dce8f3; background: #1b2430; border-radius: 8px; padding: 12px 18px; font-weight: 700; }}
     .tab.active {{ color: #45e5ff; border-color: #1fc7e8; background: rgba(32,164,196,.18); }}
     .step {{ display: grid; grid-template-columns: 44px 1fr; gap: 18px; align-items: start; padding: 18px 20px; border: 1px solid #293645; border-radius: 14px; background: rgba(26,35,47,.78); margin-top: 14px; }}
-    .icon {{ display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: rgba(32,172,204,.16); color: #48dfff; border: 1px solid #218fa5; }}
-    .button {{ display: inline-flex; align-items: center; gap: 10px; margin-top: 14px; padding: 12px 18px; border-radius: 8px; background: #164d61; color: #54e7ff; border: 0; text-decoration: none; font-weight: 800; cursor: pointer; }}
+    .icon {{ display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: rgba(32,172,204,.16); color: #48dfff; border: 1px solid #218fa5; font-weight: 900; }}
+    .button {{ display: inline-flex; align-items: center; gap: 10px; margin-top: 14px; margin-right: 10px; padding: 12px 18px; border-radius: 8px; background: #164d61; color: #54e7ff; border: 0; text-decoration: none; font-weight: 800; cursor: pointer; }}
     .button:hover {{ background: #1e637b; }}
     .raw {{ overflow-wrap: anywhere; color: #9fb0c1; font-size: 13px; margin-top: 12px; }}
     @media (max-width: 640px) {{ main {{ width: min(100% - 20px, 760px); padding-top: 20px; }} section {{ padding: 20px; }} .grid {{ grid-template-columns: 1fr; }} }}
@@ -464,21 +468,21 @@ def _subscription_browser_page(
     </header>
     <section>
       <div class="summary">
-        <div class="ok">✓</div>
+        <div class="ok">OK</div>
         <div>
           <h1>{escaped_username}</h1>
-          <p class="muted">Подписка готова к установке</p>
+          <p class="muted">\u041f\u043e\u0434\u043f\u0438\u0441\u043a\u0430 \u0433\u043e\u0442\u043e\u0432\u0430 \u043a \u0443\u0441\u0442\u0430\u043d\u043e\u0432\u043a\u0435</p>
           <div class="grid">
-            <div class="metric blue"><span>Имя пользователя</span><b>{escaped_username}</b></div>
-            <div class="metric green"><span>Статус</span><b>{escaped_status}</b></div>
-            <div class="metric red"><span>Истекает</span><b>{escaped_expires}</b></div>
-            <div class="metric gold"><span>Трафик</span><b>{traffic_label}</b></div>
+            <div class="metric blue"><span>\u0418\u043c\u044f \u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u0435\u043b\u044f</span><b>{escaped_username}</b></div>
+            <div class="metric green"><span>\u0421\u0442\u0430\u0442\u0443\u0441</span><b>{escaped_status}</b></div>
+            <div class="metric red"><span>\u0418\u0441\u0442\u0435\u043a\u0430\u0435\u0442</span><b>{escaped_expires}</b></div>
+            <div class="metric gold"><span>\u0422\u0440\u0430\u0444\u0438\u043a</span><b>{traffic_label}</b></div>
           </div>
         </div>
       </div>
     </section>
     <section>
-      <h2>Установка</h2>
+      <h2>\u0423\u0441\u0442\u0430\u043d\u043e\u0432\u043a\u0430</h2>
       <div class="tabs">
         <button class="tab active" type="button">{html_escape(app_title)}</button>
         <button class="tab" type="button">Hiddify</button>
@@ -486,20 +490,20 @@ def _subscription_browser_page(
         <button class="tab" type="button">Amnezia</button>
       </div>
       <div class="step">
-        <div class="icon">↓</div>
+        <div class="icon">v</div>
         <div>
-          <h3>Установка приложения</h3>
-          <p class="muted">Установите подходящий клиент для вашей платформы, затем добавьте подписку кнопкой ниже.</p>
-          <a class="button" href="https://www.happ.su/main" target="_blank" rel="noreferrer">Открыть сайт приложения</a>
+          <h3>\u0423\u0441\u0442\u0430\u043d\u043e\u0432\u043a\u0430 \u043f\u0440\u0438\u043b\u043e\u0436\u0435\u043d\u0438\u044f</h3>
+          <p class="muted">\u0423\u0441\u0442\u0430\u043d\u043e\u0432\u0438\u0442\u0435 \u043f\u043e\u0434\u0445\u043e\u0434\u044f\u0449\u0438\u0439 \u043a\u043b\u0438\u0435\u043d\u0442 \u0434\u043b\u044f \u0432\u0430\u0448\u0435\u0439 \u043f\u043b\u0430\u0442\u0444\u043e\u0440\u043c\u044b, \u0437\u0430\u0442\u0435\u043c \u0434\u043e\u0431\u0430\u0432\u044c\u0442\u0435 \u043f\u043e\u0434\u043f\u0438\u0441\u043a\u0443 \u043a\u043d\u043e\u043f\u043a\u043e\u0439 \u043d\u0438\u0436\u0435.</p>
+          <a class="button" href="https://www.happ.su/main" target="_blank" rel="noreferrer">\u041e\u0442\u043a\u0440\u044b\u0442\u044c \u0441\u0430\u0439\u0442 \u043f\u0440\u0438\u043b\u043e\u0436\u0435\u043d\u0438\u044f</a>
         </div>
       </div>
       <div class="step">
-        <div class="icon">＋</div>
+        <div class="icon">+</div>
         <div>
-          <h3>Добавление подписки</h3>
-          <p class="muted">Нажмите кнопку ниже — приложение откроется, и подписка добавится автоматически.</p>
-          <a class="button" href="{html_escape(add_link, quote=True)}">Добавить подписку</a>
-          <button class="button" type="button" data-url="{escaped_raw}" onclick="navigator.clipboard.writeText(this.dataset.url)">Скопировать ссылку</button>
+          <h3>\u0414\u043e\u0431\u0430\u0432\u043b\u0435\u043d\u0438\u0435 \u043f\u043e\u0434\u043f\u0438\u0441\u043a\u0438</h3>
+          <p class="muted">\u041d\u0430\u0436\u043c\u0438\u0442\u0435 \u043a\u043d\u043e\u043f\u043a\u0443 \u043d\u0438\u0436\u0435 - \u043f\u0440\u0438\u043b\u043e\u0436\u0435\u043d\u0438\u0435 \u043e\u0442\u043a\u0440\u043e\u0435\u0442\u0441\u044f, \u0438 \u043f\u043e\u0434\u043f\u0438\u0441\u043a\u0430 \u0434\u043e\u0431\u0430\u0432\u0438\u0442\u0441\u044f \u0430\u0432\u0442\u043e\u043c\u0430\u0442\u0438\u0447\u0435\u0441\u043a\u0438.</p>
+          <a class="button" href="{html_escape(add_link, quote=True)}">\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u043f\u043e\u0434\u043f\u0438\u0441\u043a\u0443</a>
+          <button class="button" type="button" data-url="{escaped_raw}" onclick="navigator.clipboard.writeText(this.dataset.url)">\u0421\u043a\u043e\u043f\u0438\u0440\u043e\u0432\u0430\u0442\u044c \u0441\u0441\u044b\u043b\u043a\u0443</button>
           <p class="raw">{escaped_raw}</p>
         </div>
       </div>
@@ -519,7 +523,6 @@ def _subscription_browser_page(
             "x-lumen-subscription-page": "browser",
         },
     )
-
 
 def _dict_value(mapping: dict[str, object], key: str) -> dict[str, object]:
     value = mapping.get(key)
