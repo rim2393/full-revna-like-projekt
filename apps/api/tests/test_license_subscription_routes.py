@@ -21,6 +21,7 @@ from app.domains.licenses.service import hash_license_key
 from app.domains.node_plugins.models import NodePlugin
 from app.domains.nodes.models import Node
 from app.domains.protocols.models import Host, ProtocolProfile, Squad
+from app.domains.protocols.service import list_profile_runtime_clients
 from app.domains.users.models import User
 from app.main import create_app
 
@@ -1055,6 +1056,127 @@ async def test_external_squad_subscription_overrides_affect_public_manifest_and_
     )
     assert second_device_response.status_code == 403
     assert second_device_response.json()["error"]["code"] == "subscription_device_limit_exceeded"
+
+
+async def test_external_squad_subscription_renders_all_active_profiles_for_happ(
+    route_app: RouteTestApp,
+) -> None:
+    user, license_record, node = await seed_subscription_dependencies(route_app)
+    async with route_app.sessionmaker() as session:
+        squad = Squad(
+            name="happ-delivery-squad",
+            kind="external",
+            status="active",
+            metadata_json={"user_ids": [str(user.id)]},
+        )
+        session.add(squad)
+        await session.flush()
+        vless_profile = ProtocolProfile(
+            name="happ-vless-reality",
+            node_id=node.id,
+            squad_id=squad.id,
+            adapter="vless-reality",
+            status="active",
+            config_json={
+                "security": {
+                    "type": "reality",
+                    "serverName": "www.example.com",
+                    "publicKey": "F1E2D3C4B5A69788776655443322110abcdEFGH_-",
+                    "shortId": "a1b2c3d4",
+                    "fingerprint": "chrome",
+                },
+                "flow": "xtls-rprx-vision",
+            },
+            port_reservations=[{"address": "0.0.0.0", "port": 443, "protocol": "tcp"}],  # noqa: S104
+            credentials_ref="vault://subscriptions/happ/vless",
+        )
+        trojan_profile = ProtocolProfile(
+            name="happ-trojan-tls",
+            node_id=node.id,
+            squad_id=squad.id,
+            adapter="trojan-tcp-tls",
+            status="active",
+            config_json={"security": {"type": "tls", "serverName": "trojan.example.test"}},
+            port_reservations=[{"address": "0.0.0.0", "port": 8443, "protocol": "tcp"}],  # noqa: S104
+            credentials_ref="vault://subscriptions/happ/trojan",
+        )
+        session.add_all([vless_profile, trojan_profile])
+        await session.flush()
+        session.add_all(
+            [
+                Host(
+                    name="happ-vless-host",
+                    hostname="vless.example.test",
+                    node_id=node.id,
+                    protocol_profile_id=vless_profile.id,
+                    squad_id=squad.id,
+                    status="active",
+                    port=443,
+                    sni="www.example.com",
+                    security="reality",
+                ),
+                Host(
+                    name="happ-trojan-host",
+                    hostname="trojan.example.test",
+                    node_id=node.id,
+                    protocol_profile_id=trojan_profile.id,
+                    squad_id=squad.id,
+                    status="active",
+                    port=8443,
+                    sni="trojan.example.test",
+                    security="tls",
+                ),
+            ]
+        )
+        await session.commit()
+
+    create_response = await route_app.client.post(
+        "/api/v1/subscriptions",
+        json={
+            "user_id": str(user.id),
+            "license_id": str(license_record.id),
+            "node_id": str(node.id),
+            "delivery_profile": {
+                "squad_id": str(squad.id),
+                "format": "happ",
+                "client": "happ",
+                "profile_title": "HApp squad bundle",
+            },
+            "config_hash": "sha256:happ-squad-bundle",
+        },
+    )
+    assert create_response.status_code == 201
+    public_id = create_response.json()["public_id"]
+
+    manifest_response = await route_app.client.get(
+        f"/api/v1/subscriptions/public/{public_id}/manifest",
+    )
+    assert manifest_response.status_code == 200
+    manifest = manifest_response.json()
+    protocols = manifest["nodes"][0]["protocols"]
+    assert [protocol["adapter"] for protocol in protocols] == [
+        "trojan-tcp-tls",
+        "vless-reality",
+    ]
+    assert manifest["metadata"]["deliveryMode"] == "squad"
+    assert manifest["metadata"]["externalSquad"]["name"] == "happ-delivery-squad"
+
+    render_response = await route_app.client.get(
+        f"/api/v1/subscriptions/public/{public_id}/render?target=happ",
+    )
+    assert render_response.status_code == 200
+    assert render_response.text.count("\n") == 2
+    assert "vless://" in render_response.text
+    assert "trojan://" in render_response.text
+    assert "vless.example.test:443" in render_response.text
+    assert "trojan.example.test:8443" in render_response.text
+
+    async with route_app.sessionmaker() as session:
+        vless_runtime_clients = await list_profile_runtime_clients(session, profile=vless_profile)
+        trojan_runtime_clients = await list_profile_runtime_clients(session, profile=trojan_profile)
+
+    assert [client["public_id"] for client in vless_runtime_clients] == [public_id]
+    assert [client["public_id"] for client in trojan_runtime_clients] == [public_id]
 
 
 async def test_public_subscription_renderers_emit_client_compatible_formats(

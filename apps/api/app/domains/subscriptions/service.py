@@ -264,6 +264,7 @@ async def build_subscription_manifest(
     external_squad = await _external_squad_for_subscription(
         session,
         user=user,
+        delivery=delivery,
         profile=profile,
         host=host,
     )
@@ -271,6 +272,19 @@ async def build_subscription_manifest(
     host_overrides = _dict_value(squad_overrides, "host")
     protocol_type = delivery.get("protocol") or (profile.adapter if profile is not None else None)
     if protocol_type is None or not str(protocol_type).startswith(RENDERABLE_PROTOCOL_PREFIXES):
+        if _delivery_squad_id(delivery) is not None:
+            protocol_type = "squad"
+        else:
+            raise APIError(
+                code="subscription_protocol_required",
+                message=(
+                    "Subscription delivery profile must reference a renderable protocol "
+                    "or profile."
+                ),
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                details=["delivery_profile.protocol"],
+            )
+    if protocol_type != "squad" and not str(protocol_type).startswith(RENDERABLE_PROTOCOL_PREFIXES):
         raise APIError(
             code="subscription_protocol_required",
             message=(
@@ -480,6 +494,29 @@ async def build_subscription_manifest(
         },
     }
     if external_squad is not None:
+        squad_protocols = await _build_squad_manifest_protocols(
+            session,
+            subscription=subscription,
+            delivery=delivery,
+            squad=external_squad,
+            node=node,
+            profile_title=profile_title,
+            squad_overrides=squad_overrides,
+            host_overrides=host_overrides,
+        )
+        if squad_protocols:
+            manifest["nodes"][0]["protocols"] = squad_protocols
+            manifest["metadata"]["deliveryMode"] = "squad"
+        elif protocol_type == "squad":
+            raise APIError(
+                code="subscription_squad_profiles_required",
+                message=(
+                    "Subscription squad must have active visible profiles and hosts "
+                    "before it can be rendered."
+                ),
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                details=[str(external_squad.id)],
+            )
         manifest["metadata"]["externalSquad"] = {
             "id": str(external_squad.id),
             "name": external_squad.name,
@@ -953,6 +990,8 @@ def _ensure_renderable_subscription_request(
     protocol = str(delivery_profile.get("protocol") or "")
     if protocol.startswith(RENDERABLE_PROTOCOL_PREFIXES):
         return
+    if _delivery_squad_id(delivery_profile) is not None:
+        return
     raise APIError(
         code="subscription_protocol_required",
         message="Subscription delivery profile must reference a renderable protocol or profile.",
@@ -1040,9 +1079,29 @@ async def _external_squad_for_subscription(
     session: AsyncSession,
     *,
     user: User,
+    delivery: dict[str, str],
     profile: ProtocolProfile | None,
     host: Host | None,
 ) -> Squad | None:
+    explicit_squad_id = _delivery_squad_id(delivery)
+    if explicit_squad_id is not None:
+        squad = await session.get(Squad, explicit_squad_id)
+        if squad is None or squad.kind != "external" or squad.status != "active":
+            raise APIError(
+                code="subscription_squad_not_found",
+                message="Subscription squad was not found or is not active.",
+                status_code=status.HTTP_404_NOT_FOUND,
+                details=[str(explicit_squad_id)],
+            )
+        user_id = str(user.id)
+        if user_id not in _squad_user_ids_from_metadata(squad.metadata_json):
+            raise APIError(
+                code="subscription_squad_user_required",
+                message="Subscription user must belong to the selected squad.",
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                details=[str(explicit_squad_id), str(user.id)],
+            )
+        return squad
     candidate_ids = [
         value
         for value in (
@@ -1092,6 +1151,7 @@ async def _subscription_device_policy(
     external_squad = await _external_squad_for_subscription(
         session,
         user=user,
+        delivery=delivery,
         profile=profile,
         host=host,
     )
@@ -1239,6 +1299,208 @@ def _normalized_hwid_policy(values: dict[str, object]) -> dict[str, object]:
     if "required" in values:
         normalized["required"] = _override_bool(values, "required")
     return normalized
+
+
+def _delivery_squad_id(delivery: dict[str, object]) -> UUID | None:
+    raw_squad_id = delivery.get("squad_id")
+    if raw_squad_id is None or str(raw_squad_id).strip() == "":
+        return None
+    try:
+        return UUID(str(raw_squad_id))
+    except ValueError as exc:
+        raise APIError(
+            code="subscription_manifest_squad_id_invalid",
+            message="delivery_profile.squad_id must be a valid UUID.",
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            details=["delivery_profile.squad_id"],
+        ) from exc
+
+
+async def _build_squad_manifest_protocols(
+    session: AsyncSession,
+    *,
+    subscription: Subscription,
+    delivery: dict[str, str],
+    squad: Squad,
+    node: Node,
+    profile_title: str,
+    squad_overrides: dict[str, object],
+    host_overrides: dict[str, object],
+) -> list[dict[str, object]]:
+    result = await session.execute(
+        select(ProtocolProfile)
+        .where(ProtocolProfile.squad_id == squad.id)
+        .where(ProtocolProfile.node_id == node.id)
+        .where(ProtocolProfile.status == "active")
+        .order_by(ProtocolProfile.name.asc(), ProtocolProfile.created_at.asc())
+    )
+    protocols: list[dict[str, object]] = []
+    for profile in result.scalars().all():
+        if not profile.adapter.startswith(RENDERABLE_PROTOCOL_PREFIXES):
+            continue
+        profile_delivery = {
+            **delivery,
+            "protocol": profile.adapter,
+            "adapter": profile.adapter,
+            "profile_id": str(profile.id),
+        }
+        host = await _resolve_manifest_host(
+            session,
+            delivery=profile_delivery,
+            profile=profile,
+            node=node,
+            subscription_public_id=f"{subscription.public_id}:{profile.id}",
+        )
+        if host is None:
+            continue
+        profile_delivery["host_id"] = str(host.id)
+        protocols.append(
+            await _build_manifest_protocol_entry(
+                session,
+                subscription=subscription,
+                delivery=profile_delivery,
+                profile=profile,
+                host=host,
+                node=node,
+                profile_title=_manifest_protocol_title(
+                    profile_title=profile_title,
+                    profile=profile,
+                    host=host,
+                    squad_overrides=squad_overrides,
+                ),
+                host_overrides=host_overrides,
+                squad_overrides=squad_overrides,
+            )
+        )
+    return protocols
+
+
+async def _build_manifest_protocol_entry(
+    session: AsyncSession,
+    *,
+    subscription: Subscription,
+    delivery: dict[str, str],
+    profile: ProtocolProfile | None,
+    host: Host | None,
+    node: Node,
+    profile_title: str,
+    host_overrides: dict[str, object],
+    squad_overrides: dict[str, object],
+) -> dict[str, object]:
+    protocol_type = delivery.get("protocol") or (profile.adapter if profile is not None else None)
+    if protocol_type is None or not str(protocol_type).startswith(RENDERABLE_PROTOCOL_PREFIXES):
+        raise APIError(
+            code="subscription_protocol_required",
+            message=(
+                "Subscription delivery profile must reference a renderable protocol "
+                "or profile."
+            ),
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            details=["delivery_profile.protocol"],
+        )
+    adapter = delivery.get("adapter") or (profile.adapter if profile is not None else protocol_type)
+    endpoint_host = _override_string(host_overrides, "endpoint_host") or _override_string(
+        host_overrides,
+        "final_mask",
+    ) or _manifest_endpoint_host(host=host, node=node)
+    endpoint_port = _override_int(
+        host_overrides,
+        "port",
+        field_name="squad.subscription_overrides.host.port",
+        min_value=1,
+        max_value=65535,
+    ) or _manifest_port(delivery=delivery, profile=profile, host=host)
+    credentials_ref = _manifest_credentials_ref(
+        profile=profile,
+        subscription=subscription,
+        protocol_type=protocol_type,
+    )
+    credentials = derive_client_credentials(
+        settings=get_settings(),
+        subscription_id=subscription.public_id,
+        credentials_ref=credentials_ref,
+        protocol_id=delivery.get("protocol_id") or protocol_type,
+        protocol_type=protocol_type,
+    )
+    security = _manifest_security(
+        profile=profile,
+        delivery=delivery,
+        protocol_type=protocol_type,
+        host=host,
+    )
+    _apply_security_overrides(security, host_overrides)
+    wireguard_client_address = await _manifest_wireguard_client_address(
+        session,
+        profile=profile,
+        subscription=subscription,
+    )
+    renderer_hints = _manifest_renderer_hints(
+        delivery=delivery,
+        host=host,
+        profile=profile,
+        profile_title=profile_title,
+        wireguard_client_address=wireguard_client_address,
+    )
+    _apply_renderer_hint_overrides(renderer_hints, squad_overrides=squad_overrides)
+    return {
+        "id": delivery.get("protocol_id") or protocol_type,
+        "type": protocol_type,
+        "adapter": adapter,
+        "endpoint": {
+            "host": endpoint_host,
+            "port": endpoint_port,
+            "transport": _override_string(host_overrides, "transport")
+            or delivery.get("transport")
+            or _host_transport(host)
+            or _default_transport(protocol_type),
+            "network": delivery.get("network") or "public",
+        },
+        "security": security,
+        "flow": delivery.get("flow") or _profile_config_string(profile, "flow"),
+        "path": _override_string(host_overrides, "path")
+        or delivery.get("path")
+        or _host_string(host, "path")
+        or _profile_config_string(profile, "path"),
+        "mode": _override_string(host_overrides, "mode")
+        or delivery.get("mode")
+        or _host_xhttp_string(host, "mode")
+        or _profile_config_string(profile, "mode"),
+        "serviceName": _override_string(host_overrides, "service_name")
+        or _override_string(host_overrides, "serviceName")
+        or delivery.get("service_name")
+        or delivery.get("serviceName")
+        or _profile_config_string(profile, "serviceName")
+        or _profile_config_string(profile, "service_name"),
+        "credentialsRef": credentials_ref,
+        "credentials": _manifest_credentials(
+            credentials,
+            username=subscription.public_id,
+            method=(
+                delivery.get("method")
+                or _profile_config_string(profile, "method")
+                or "2022-blake3-aes-128-gcm"
+            ),
+            shadowsocks_password_override=_openvpn_shadowsocks_password(profile),
+        ),
+        "capabilities": _manifest_capabilities(protocol_type),
+        "rendererHints": renderer_hints,
+    }
+
+
+def _manifest_protocol_title(
+    *,
+    profile_title: str,
+    profile: ProtocolProfile,
+    host: Host,
+    squad_overrides: dict[str, object],
+) -> str:
+    return (
+        _override_string(squad_overrides, "profile_title")
+        or _override_string(squad_overrides, "remark")
+        or _host_string(host, "remark")
+        or profile.name
+        or profile_title
+    )
 
 
 async def _get_optional_profile(
@@ -1697,11 +1959,19 @@ async def _manifest_wireguard_client_address(
         )
         delivery_profile_id = str(delivery.get("profile_id") or "")
         delivery_adapter = str(delivery.get("adapter") or delivery.get("protocol") or "")
-        if delivery_profile_id and delivery_profile_id != str(profile.id):
-            continue
-        if not delivery_profile_id and delivery_adapter and delivery_adapter != profile.adapter:
-            continue
-        if not delivery_profile_id and not delivery_adapter:
+        delivery_squad_id = str(delivery.get("squad_id") or "")
+        matches_squad = (
+            bool(delivery_squad_id)
+            and profile.squad_id is not None
+            and delivery_squad_id == str(profile.squad_id)
+        )
+        if delivery_profile_id:
+            if delivery_profile_id != str(profile.id):
+                continue
+        elif delivery_adapter:
+            if delivery_adapter != profile.adapter:
+                continue
+        elif not matches_squad:
             continue
         if candidate.id == subscription.id:
             return _wireguard_client_address_for_index(profile, client_index)

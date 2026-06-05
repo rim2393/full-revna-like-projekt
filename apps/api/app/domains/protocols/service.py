@@ -2560,11 +2560,19 @@ async def list_profile_runtime_clients(
         )
         delivery_profile_id = str(delivery.get("profile_id") or "")
         delivery_adapter = str(delivery.get("adapter") or delivery.get("protocol") or "")
-        if delivery_profile_id and delivery_profile_id != str(profile.id):
-            continue
-        if not delivery_profile_id and delivery_adapter and delivery_adapter != profile.adapter:
-            continue
-        if not delivery_profile_id and not delivery_adapter:
+        delivery_squad_id = str(delivery.get("squad_id") or "")
+        matches_squad = (
+            bool(delivery_squad_id)
+            and profile.squad_id is not None
+            and delivery_squad_id == str(profile.squad_id)
+        )
+        if delivery_profile_id:
+            if delivery_profile_id != str(profile.id):
+                continue
+        elif delivery_adapter:
+            if delivery_adapter != profile.adapter:
+                continue
+        elif not matches_squad:
             continue
 
         protocol_type = str(delivery.get("protocol") or profile.adapter)
