@@ -2,7 +2,7 @@
 import json
 from html import escape as html_escape
 from typing import Annotated
-from urllib.parse import quote, urlencode
+from urllib.parse import urlencode
 from uuid import UUID
 
 import segno
@@ -396,7 +396,7 @@ def _public_subscription_target_url(request: Request, target: str) -> str:
 
 
 def _subscription_qr_svg(value: str) -> str:
-    return segno.make(value, error="m").svg_inline(scale=5, border=2)
+    return segno.make(value, error="q").svg_inline(scale=7, border=4)
 
 
 def _subscription_target_tabs(request: Request, current_target: str) -> str:
@@ -447,10 +447,15 @@ def _subscription_browser_page(
         else "\u041d\u0435 \u043e\u0433\u0440\u0430\u043d\u0438\u0447\u0435\u043d\u043e"
     )
     escaped_raw = html_escape(raw_url, quote=True)
-    encoded_raw = quote(raw_url, safe="")
-    add_link = f"happ://add/{encoded_raw}" if render_target == "happ" else raw_url
+    add_link = raw_url
     tabs_html = _subscription_target_tabs(request, render_target)
     qr_svg = _subscription_qr_svg(raw_url)
+    client_label = {
+        "happ": "Happ",
+        "hiddify": "Hiddify",
+        "sing-box": "Sing-box",
+        "amnezia": "Amnezia",
+    }.get(render_target, render_target)
     body = f"""<!doctype html>
 <html lang="ru">
 <head>
@@ -458,93 +463,440 @@ def _subscription_browser_page(
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{escaped_title}</title>
   <style>
-    :root {{ color-scheme: dark; font-family: Inter, system-ui, -apple-system, Segoe UI, sans-serif; }}
+    :root {{
+      color-scheme: dark;
+      --bg: #10110f;
+      --rail: #151813;
+      --surface: #1b201a;
+      --surface-strong: #202720;
+      --line: #31382f;
+      --line-strong: #485144;
+      --ink: #e8eee5;
+      --ink-strong: #f8fbf4;
+      --muted: #9aa691;
+      --accent: #53e0ad;
+      --accent-strong: #9af2ca;
+      --warning: #e7b95b;
+      --danger: #ff766d;
+      --info: #87c9e8;
+      --shadow: 0 24px 80px rgb(0 0 0 / 32%);
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      font-family: Inter, system-ui, -apple-system, Segoe UI, sans-serif;
+    }}
     * {{ box-sizing: border-box; }}
+    html {{ min-height: 100%; background: var(--bg); }}
     body {{
-      margin: 0; min-height: 100vh; color: #f4f7fb;
-      background: radial-gradient(circle at 30% 0%, #1b2441 0, #101720 42%, #0c1118 100%);
+      margin: 0;
+      min-width: 320px;
+      min-height: 100vh;
+      color: var(--ink);
+      background:
+        linear-gradient(90deg, rgb(255 255 255 / 3%) 1px, transparent 1px),
+        linear-gradient(180deg, rgb(255 255 255 / 3%) 1px, transparent 1px),
+        radial-gradient(circle at 18% 0%, rgb(83 224 173 / 12%), transparent 32%),
+        var(--bg);
+      background-size: 44px 44px, 44px 44px, auto, auto;
+      font-synthesis: none;
+      -webkit-font-smoothing: antialiased;
     }}
-    body::before {{
-      content: ""; position: fixed; inset: 0;
-      background-image: linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px);
-      background-size: 64px 64px; pointer-events: none;
+    a, button {{ font: inherit; }}
+    button {{ cursor: pointer; }}
+    a {{ color: inherit; }}
+    h1, h2, h3, p {{ margin: 0; }}
+    h1, h2, h3 {{ color: var(--ink-strong); line-height: 1.1; letter-spacing: 0; }}
+    main {{
+      width: min(1180px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 28px 0 56px;
     }}
-    main {{ position: relative; width: min(760px, calc(100% - 28px)); margin: 0 auto; padding: 36px 0 64px; }}
-    header {{ display: flex; align-items: center; justify-content: space-between; padding: 18px 0 34px; }}
-    .brand {{ display: flex; align-items: center; gap: 12px; color: #43d9f5; font-size: 24px; font-weight: 800; }}
-    .mark {{ width: 34px; height: 34px; border-radius: 10px; background: linear-gradient(135deg,#35e4ff,#1468ff); }}
-    .telegram {{ color: #41d9ff; border: 1px solid #263545; border-radius: 10px; padding: 12px 14px; text-decoration: none; }}
-    section {{ border: 1px solid #293341; background: rgba(19,25,35,.86); border-radius: 16px; padding: 28px 32px; margin-bottom: 28px; box-shadow: 0 18px 60px rgba(0,0,0,.24); }}
-    .summary {{ display: grid; grid-template-columns: 48px 1fr; gap: 18px; align-items: start; }}
-    .ok {{ display: grid; place-items: center; width: 48px; height: 48px; color: #42e0b5; border: 1px solid #168467; background: rgba(20,124,95,.18); border-radius: 50%; font-size: 14px; font-weight: 900; }}
-    h1 {{ margin: 0 0 4px; font-size: 22px; }}
-    .muted {{ color: #9aa6b5; margin: 0; }}
-    .grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 22px; }}
-    .metric {{ border: 1px solid #304052; border-radius: 9px; padding: 12px; background: rgba(28,38,52,.68); }}
-    .metric b {{ display: block; margin-top: 6px; }}
-    .metric.blue {{ border-color: #245c91; background: rgba(28,66,103,.45); }}
-    .metric.green {{ border-color: #1d7d51; background: rgba(22,82,54,.38); }}
-    .metric.red {{ border-color: #8b3444; background: rgba(86,32,47,.38); }}
-    .metric.gold {{ border-color: #806321; background: rgba(82,64,24,.34); }}
-    h2 {{ margin: 0 0 18px; font-size: 24px; }}
-    .tabs {{ display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }}
-    .tab {{ border: 1px solid #314457; color: #dce8f3; background: #1b2430; border-radius: 8px; padding: 12px 18px; font-weight: 700; text-decoration: none; }}
-    .tab.active {{ color: #45e5ff; border-color: #1fc7e8; background: rgba(32,164,196,.18); }}
-    .step {{ display: grid; grid-template-columns: 44px 1fr; gap: 18px; align-items: start; padding: 18px 20px; border: 1px solid #293645; border-radius: 14px; background: rgba(26,35,47,.78); margin-top: 14px; }}
-    .icon {{ display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: rgba(32,172,204,.16); color: #48dfff; border: 1px solid #218fa5; font-weight: 900; }}
-    .button {{ display: inline-flex; align-items: center; gap: 10px; margin-top: 14px; margin-right: 10px; padding: 12px 18px; border-radius: 8px; background: #164d61; color: #54e7ff; border: 0; text-decoration: none; font-weight: 800; cursor: pointer; }}
-    .button:hover {{ background: #1e637b; }}
-    .qr {{ display: inline-grid; place-items: center; margin-top: 16px; padding: 12px; border-radius: 14px; background: #fff; }}
-    .qr svg {{ display: block; width: min(220px, 62vw); height: min(220px, 62vw); }}
-    .raw {{ overflow-wrap: anywhere; color: #9fb0c1; font-size: 13px; margin-top: 12px; }}
-    @media (max-width: 640px) {{ main {{ width: min(100% - 20px, 760px); padding-top: 20px; }} section {{ padding: 20px; }} .grid {{ grid-template-columns: 1fr; }} }}
+    .topbar {{
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      min-height: 64px;
+      padding: 0 0 24px;
+      border-bottom: 1px solid var(--line);
+    }}
+    .brand {{
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+      text-decoration: none;
+    }}
+    .brand-mark {{
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 42px;
+      height: 42px;
+      color: #08110c;
+      background: var(--accent);
+      border: 1px solid rgb(255 255 255 / 34%);
+      border-radius: var(--radius-md);
+      box-shadow: inset 0 -10px 22px rgb(0 0 0 / 12%);
+    }}
+    .brand-text {{
+      display: grid;
+      gap: 2px;
+      min-width: 0;
+      line-height: 1;
+    }}
+    .brand-text strong {{
+      overflow: hidden;
+      color: var(--ink-strong);
+      font-size: 1rem;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }}
+    .brand-text span {{
+      color: var(--muted);
+      font-size: .78rem;
+      font-weight: 700;
+    }}
+    .top-actions {{
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 8px;
+    }}
+    .button {{
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 9px;
+      min-height: 40px;
+      padding: 0 16px;
+      color: var(--ink);
+      font-weight: 800;
+      text-decoration: none;
+      background: rgb(255 255 255 / 6%);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+    }}
+    .button:hover {{ transform: translateY(-1px); border-color: var(--line-strong); }}
+    .button.primary {{
+      color: #08110c;
+      background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+      border-color: transparent;
+    }}
+    .button svg {{ width: 17px; height: 17px; flex: 0 0 auto; }}
+    .page-head {{
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 18px;
+      align-items: end;
+      padding: 28px 0 22px;
+    }}
+    .page-head > * {{ min-width: 0; }}
+    .eyebrow {{
+      color: var(--accent);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: .72rem;
+      font-weight: 800;
+      text-transform: uppercase;
+    }}
+    h1 {{ margin-top: 8px; overflow-wrap: anywhere; font-size: 2.1rem; }}
+    .lead {{ max-width: 64ch; margin-top: 10px; color: var(--muted); font-weight: 650; }}
+    .status-badge {{
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 32px;
+      padding: 0 12px;
+      color: var(--accent);
+      font-size: .82rem;
+      font-weight: 800;
+      background: rgb(83 224 173 / 10%);
+      border: 1px solid rgb(83 224 173 / 38%);
+      border-radius: var(--radius-sm);
+    }}
+    .status-badge::before {{
+      width: 8px;
+      height: 8px;
+      content: "";
+      background: var(--accent);
+      border-radius: 999px;
+      box-shadow: 0 0 18px var(--accent);
+    }}
+    .metrics {{
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+      margin-bottom: 16px;
+    }}
+    .metric, .panel {{
+      background:
+        linear-gradient(180deg, rgb(255 255 255 / 7%), transparent 56%),
+        var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow);
+    }}
+    .metric {{
+      display: grid;
+      gap: 12px;
+      min-height: 142px;
+      padding: 18px;
+    }}
+    .metric-icon, .step-icon {{
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 42px;
+      height: 42px;
+      color: var(--accent);
+      background: rgb(83 224 173 / 10%);
+      border: 1px solid rgb(83 224 173 / 28%);
+      border-radius: var(--radius-sm);
+    }}
+    .metric-icon svg, .step-icon svg {{ width: 20px; height: 20px; }}
+    .metric span {{
+      color: var(--muted);
+      font-size: .82rem;
+      font-weight: 800;
+    }}
+    .metric strong {{
+      display: block;
+      overflow-wrap: anywhere;
+      color: var(--ink-strong);
+      font-size: 1.35rem;
+      line-height: 1.05;
+    }}
+    .panel {{
+      padding: 22px;
+      margin-top: 16px;
+    }}
+    .panel-head {{
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--line);
+    }}
+    h2 {{ font-size: 1.18rem; }}
+    .tabs {{
+      display: inline-flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }}
+    .tab {{
+      display: inline-flex;
+      align-items: center;
+      min-height: 38px;
+      padding: 0 14px;
+      color: var(--muted);
+      font-weight: 800;
+      text-decoration: none;
+      background: rgb(255 255 255 / 5%);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+    }}
+    .tab:hover {{ color: var(--ink-strong); border-color: var(--line-strong); }}
+    .tab.active {{
+      color: var(--ink-strong);
+      background: rgb(83 224 173 / 12%);
+      border-color: rgb(83 224 173 / 34%);
+    }}
+    .install-grid {{
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(320px, 390px);
+      gap: 16px;
+      margin-top: 16px;
+    }}
+    .steps {{
+      display: grid;
+      align-content: start;
+      gap: 12px;
+    }}
+    .step {{
+      display: grid;
+      grid-template-columns: 42px minmax(0, 1fr);
+      gap: 14px;
+      min-width: 0;
+      padding: 16px;
+      background: rgb(255 255 255 / 4%);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+    }}
+    .step h3 {{ font-size: 1rem; }}
+    .muted {{ margin-top: 7px; color: var(--muted); }}
+    .step-actions {{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 9px;
+      margin-top: 14px;
+    }}
+    .qr-panel {{
+      display: grid;
+      align-content: start;
+      gap: 14px;
+      padding: 18px;
+      background:
+        linear-gradient(180deg, rgb(83 224 173 / 8%), transparent 44%),
+        var(--surface-strong);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+    }}
+    .qr-top {{
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }}
+    .qr-top span {{
+      color: var(--muted);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: .72rem;
+      font-weight: 800;
+      text-transform: uppercase;
+    }}
+    .qr {{
+      display: grid;
+      place-items: center;
+      width: 100%;
+      aspect-ratio: 1;
+      padding: 16px;
+      background: #fff;
+      border: 1px solid #d8e0d4;
+      border-radius: var(--radius-sm);
+    }}
+    .qr svg {{
+      display: block;
+      width: 100%;
+      max-width: 336px;
+      height: auto;
+    }}
+    .raw {{
+      max-height: 96px;
+      padding: 12px;
+      overflow: auto;
+      overflow-wrap: anywhere;
+      color: var(--muted);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: .76rem;
+      line-height: 1.5;
+      background: rgb(0 0 0 / 22%);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+    }}
+    @media (max-width: 920px) {{
+      .page-head, .install-grid {{ grid-template-columns: 1fr; }}
+      .metrics {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }}
+    }}
+    @media (max-width: 620px) {{
+      main {{ width: min(100% - 20px, 1180px); padding-top: 16px; }}
+      .topbar, .panel-head {{ align-items: flex-start; flex-direction: column; }}
+      .page-head {{ display: flex; align-items: flex-start; flex-direction: column; }}
+      .top-actions, .tabs, .step-actions {{ width: 100%; }}
+      .button, .tab {{ width: 100%; }}
+      .metrics {{ grid-template-columns: 1fr; }}
+      .panel {{ padding: 16px; }}
+      h1 {{ font-size: 1.7rem; }}
+      .install-grid {{ gap: 12px; }}
+      .qr-panel {{ padding: 14px; }}
+    }}
+    @media (prefers-reduced-motion: reduce) {{
+      *, *::before, *::after {{ scroll-behavior: auto !important; transition: none !important; }}
+    }}
   </style>
 </head>
 <body>
   <main>
-    <header>
-      <div class="brand"><span class="mark"></span><span>{escaped_title}</span></div>
-      <a class="telegram" href="https://t.me/lumentech" rel="noreferrer">Telegram</a>
+    <header class="topbar">
+      <a class="brand" href="{escaped_raw}">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4v16"/><path d="M18 4v16"/><path d="M9 7h6"/><path d="M9 17h6"/></svg>
+        </span>
+        <span class="brand-text"><strong>{escaped_title}</strong><span>subscription control surface</span></span>
+      </a>
+      <nav class="top-actions" aria-label="Support links">
+        <a class="button" href="https://t.me/lumentech" rel="noreferrer">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
+          Telegram
+        </a>
+        <a class="button" href="{escaped_raw}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.1 0l2-2a5 5 0 0 0-7.1-7.1l-1.2 1.2"/><path d="M14 11a5 5 0 0 0-7.1 0l-2 2a5 5 0 0 0 7.1 7.1l1.2-1.2"/></svg>
+          Raw
+        </a>
+      </nav>
     </header>
-    <section>
-      <div class="summary">
-        <div class="ok">OK</div>
-        <div>
-          <h1>{escaped_username}</h1>
-          <p class="muted">\u041f\u043e\u0434\u043f\u0438\u0441\u043a\u0430 \u0433\u043e\u0442\u043e\u0432\u0430 \u043a \u0443\u0441\u0442\u0430\u043d\u043e\u0432\u043a\u0435</p>
-          <div class="grid">
-            <div class="metric blue"><span>\u0418\u043c\u044f \u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u0435\u043b\u044f</span><b>{escaped_username}</b></div>
-            <div class="metric green"><span>\u0421\u0442\u0430\u0442\u0443\u0441</span><b>{escaped_status}</b></div>
-            <div class="metric red"><span>\u0418\u0441\u0442\u0435\u043a\u0430\u0435\u0442</span><b>{escaped_expires}</b></div>
-            <div class="metric gold"><span>\u0422\u0440\u0430\u0444\u0438\u043a</span><b>{traffic_label}</b></div>
-          </div>
-        </div>
+    <div class="page-head">
+      <div>
+        <p class="eyebrow">Lumen public subscription</p>
+        <h1>{escaped_username}</h1>
+        <p class="lead">\u0413\u043e\u0442\u043e\u0432\u044b\u0439 \u043f\u0440\u043e\u0444\u0438\u043b\u044c \u0434\u043b\u044f {html_escape(client_label)}. \u0421\u043a\u0430\u043d\u0438\u0440\u0443\u0439\u0442\u0435 QR, \u043e\u0442\u043a\u0440\u043e\u0439\u0442\u0435 \u0434\u0438\u043f\u043b\u0438\u043d\u043a \u0438\u043b\u0438 \u0441\u043a\u043e\u043f\u0438\u0440\u0443\u0439\u0442\u0435 raw URL.</p>
       </div>
+      <span class="status-badge">{escaped_status}</span>
+    </div>
+    <section class="metrics" aria-label="Subscription summary">
+      <article class="metric">
+        <span class="metric-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+        <div><span>\u0421\u0442\u0430\u0442\u0443\u0441</span><strong>{escaped_status}</strong></div>
+      </article>
+      <article class="metric">
+        <span class="metric-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4"/><path d="M16 2v4"/><path d="M3 10h18"/><path d="M5 4h14a2 2 0 0 1 2 2v15H3V6a2 2 0 0 1 2-2Z"/></svg></span>
+        <div><span>\u0418\u0441\u0442\u0435\u043a\u0430\u0435\u0442</span><strong>{escaped_expires}</strong></div>
+      </article>
+      <article class="metric">
+        <span class="metric-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-7"/></svg></span>
+        <div><span>\u0422\u0440\u0430\u0444\u0438\u043a</span><strong>{traffic_label}</strong></div>
+      </article>
+      <article class="metric">
+        <span class="metric-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/></svg></span>
+        <div><span>\u0424\u043e\u0440\u043c\u0430\u0442</span><strong>{html_escape(client_label)}</strong></div>
+      </article>
     </section>
-    <section>
-      <h2>\u0423\u0441\u0442\u0430\u043d\u043e\u0432\u043a\u0430</h2>
-      <div class="tabs">
-        {tabs_html}
+    <section class="panel">
+      <div class="panel-head">
+        <h2>\u0414\u043e\u0431\u0430\u0432\u043b\u0435\u043d\u0438\u0435 \u043f\u043e\u0434\u043f\u0438\u0441\u043a\u0438</h2>
+        <div class="tabs">{tabs_html}</div>
       </div>
-      <div class="step">
-        <div class="icon">v</div>
-        <div>
-          <h3>\u0423\u0441\u0442\u0430\u043d\u043e\u0432\u043a\u0430 \u043f\u0440\u0438\u043b\u043e\u0436\u0435\u043d\u0438\u044f</h3>
-          <p class="muted">\u0423\u0441\u0442\u0430\u043d\u043e\u0432\u0438\u0442\u0435 \u043f\u043e\u0434\u0445\u043e\u0434\u044f\u0449\u0438\u0439 \u043a\u043b\u0438\u0435\u043d\u0442 \u0434\u043b\u044f \u0432\u0430\u0448\u0435\u0439 \u043f\u043b\u0430\u0442\u0444\u043e\u0440\u043c\u044b, \u0437\u0430\u0442\u0435\u043c \u0434\u043e\u0431\u0430\u0432\u044c\u0442\u0435 \u043f\u043e\u0434\u043f\u0438\u0441\u043a\u0443 \u043a\u043d\u043e\u043f\u043a\u043e\u0439 \u043d\u0438\u0436\u0435.</p>
-          <a class="button" href="https://www.happ.su/main" target="_blank" rel="noreferrer">\u041e\u0442\u043a\u0440\u044b\u0442\u044c \u0441\u0430\u0439\u0442 \u043f\u0440\u0438\u043b\u043e\u0436\u0435\u043d\u0438\u044f</a>
+      <div class="install-grid">
+        <div class="steps">
+          <article class="step">
+            <span class="step-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg></span>
+            <div>
+              <h3>\u0423\u0441\u0442\u0430\u043d\u043e\u0432\u043a\u0430 \u043a\u043b\u0438\u0435\u043d\u0442\u0430</h3>
+              <p class="muted">\u0415\u0441\u043b\u0438 {html_escape(client_label)} \u0435\u0449\u0435 \u043d\u0435 \u0443\u0441\u0442\u0430\u043d\u043e\u0432\u043b\u0435\u043d, \u043e\u0442\u043a\u0440\u043e\u0439\u0442\u0435 \u0441\u0430\u0439\u0442 \u043a\u043b\u0438\u0435\u043d\u0442\u0430 \u0438 \u0432\u0435\u0440\u043d\u0438\u0442\u0435\u0441\u044c \u043a \u0438\u043c\u043f\u043e\u0440\u0442\u0443.</p>
+              <div class="step-actions">
+                <a class="button" href="https://www.happ.su/main" target="_blank" rel="noreferrer">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/></svg>
+                  \u0421\u0430\u0439\u0442 \u043a\u043b\u0438\u0435\u043d\u0442\u0430
+                </a>
+              </div>
+            </div>
+          </article>
+          <article class="step">
+            <span class="step-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg></span>
+            <div>
+              <h3>\u0418\u043c\u043f\u043e\u0440\u0442</h3>
+              <p class="muted">\u041e\u0442\u043a\u0440\u043e\u0439\u0442\u0435 deep link \u0438\u043b\u0438 \u043e\u0442\u0441\u043a\u0430\u043d\u0438\u0440\u0443\u0439\u0442\u0435 QR. \u0414\u043b\u044f \u0440\u0443\u0447\u043d\u043e\u0433\u043e \u043f\u0443\u0442\u0438 \u0441\u043a\u043e\u043f\u0438\u0440\u0443\u0439\u0442\u0435 raw URL.</p>
+              <div class="step-actions">
+                <a class="button primary" href="{html_escape(add_link, quote=True)}">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+                  \u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u043f\u043e\u0434\u043f\u0438\u0441\u043a\u0443
+                </a>
+                <button class="button" type="button" data-url="{escaped_raw}" onclick="navigator.clipboard.writeText(this.dataset.url)">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><rect x="3" y="3" width="13" height="13" rx="2"/></svg>
+                  \u0421\u043a\u043e\u043f\u0438\u0440\u043e\u0432\u0430\u0442\u044c
+                </button>
+              </div>
+            </div>
+          </article>
         </div>
-      </div>
-      <div class="step">
-        <div class="icon">+</div>
-        <div>
-          <h3>\u0414\u043e\u0431\u0430\u0432\u043b\u0435\u043d\u0438\u0435 \u043f\u043e\u0434\u043f\u0438\u0441\u043a\u0438</h3>
-          <p class="muted">\u041d\u0430\u0436\u043c\u0438\u0442\u0435 \u043a\u043d\u043e\u043f\u043a\u0443 \u043d\u0438\u0436\u0435 - \u043f\u0440\u0438\u043b\u043e\u0436\u0435\u043d\u0438\u0435 \u043e\u0442\u043a\u0440\u043e\u0435\u0442\u0441\u044f, \u0438 \u043f\u043e\u0434\u043f\u0438\u0441\u043a\u0430 \u0434\u043e\u0431\u0430\u0432\u0438\u0442\u0441\u044f \u0430\u0432\u0442\u043e\u043c\u0430\u0442\u0438\u0447\u0435\u0441\u043a\u0438.</p>
-          <a class="button" href="{html_escape(add_link, quote=True)}">\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u043f\u043e\u0434\u043f\u0438\u0441\u043a\u0443</a>
-          <button class="button" type="button" data-url="{escaped_raw}" onclick="navigator.clipboard.writeText(this.dataset.url)">\u0421\u043a\u043e\u043f\u0438\u0440\u043e\u0432\u0430\u0442\u044c \u0441\u0441\u044b\u043b\u043a\u0443</button>
+        <aside class="qr-panel">
+          <div class="qr-top">
+            <h3>QR</h3>
+            <span>{html_escape(client_label)}</span>
+          </div>
           <div class="qr" role="img" aria-label="QR subscription">{qr_svg}</div>
           <p class="raw">{escaped_raw}</p>
-        </div>
+        </aside>
       </div>
     </section>
   </main>

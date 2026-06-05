@@ -22,6 +22,7 @@ from app.domains.node_plugins.models import NodePlugin
 from app.domains.nodes.models import Node
 from app.domains.protocols.models import Host, ProtocolProfile, Squad
 from app.domains.protocols.service import list_profile_runtime_clients
+from app.domains.subscriptions import router as subscriptions_router
 from app.domains.users.models import User
 from app.main import create_app
 
@@ -177,7 +178,10 @@ async def test_license_route_duplicate_key_returns_api_error(route_app: RouteTes
     assert duplicate_response.json()["error"]["code"] == "license_key_exists"
 
 
-async def test_subscription_routes_create_list_and_get(route_app: RouteTestApp) -> None:
+async def test_subscription_routes_create_list_and_get(
+    route_app: RouteTestApp,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     user, license_record, node = await seed_subscription_dependencies(route_app)
 
     create_response = await route_app.client.post(
@@ -231,6 +235,14 @@ async def test_subscription_routes_create_list_and_get(route_app: RouteTestApp) 
     assert get_response.json()["public_id"] == created["public_id"]
     assert get_response.json()["render_formats"] == ["happ", "hiddify"]
 
+    qr_payloads: list[str] = []
+
+    def fake_qr_svg(value: str) -> str:
+        qr_payloads.append(value)
+        return "<svg data-test-qr=\"1\"></svg>"
+
+    monkeypatch.setattr(subscriptions_router, "_subscription_qr_svg", fake_qr_svg)
+
     browser_page_response = await route_app.client.get(
         f"{created['public_render_urls']['happ']}&hwid=route-browser-device",
         headers={
@@ -253,7 +265,18 @@ async def test_subscription_routes_create_list_and_get(route_app: RouteTestApp) 
     assert "target=sing-box" in browser_page_response.text
     assert "target=amnezia" in browser_page_response.text
     assert "hwid=route-browser-device" in browser_page_response.text
-    assert '<div class="qr" role="img" aria-label="QR subscription"><svg' in browser_page_response.text
+    assert (
+        '<div class="qr" role="img" aria-label="QR subscription"><svg'
+        in browser_page_response.text
+    )
+    assert "happ://add" not in browser_page_response.text
+    assert qr_payloads == [
+        (
+            "https://panel.example.test/api/v1/subscriptions"
+            f"/public/{created['public_id']}/render?target=happ"
+            "&hwid=route-browser-device&raw=1"
+        )
+    ]
     assert 'src="data:image/svg+xml,' not in browser_page_response.text
     assert "QR subscription" in browser_page_response.text
 
