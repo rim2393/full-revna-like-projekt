@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { RefreshCw } from 'lucide-react'
 import {
   useDeleteMfaMethod,
   useDeleteWebAuthnCredential,
@@ -24,14 +25,16 @@ import type {
 } from '../shared/api/types'
 import {
   FormError,
-  ResourceScreen,
   ScreenForm,
   SubmitButton,
 } from '../shared/components/ResourceScreen'
+import { DataTable } from '../shared/components/DataTable'
+import { EmptyState, ErrorState, LoadingState } from '../shared/components/DataState'
+import { PageHeader } from '../shared/components/PageHeader'
 import { StatusBadge } from '../shared/components/StatusBadge'
 import { sectionSpecs } from '../shared/data/resourceMeta'
 import { useI18n } from '../shared/i18n/I18nProvider'
-import { formatDateTime, formatRecord, parseKeyValueInput } from '../shared/utils/resourceFormat'
+import { formatDateTime, parseKeyValueInput } from '../shared/utils/resourceFormat'
 
 const settingsSpec = {
   ...sectionSpecs.subscription,
@@ -52,7 +55,12 @@ export function SettingsPage() {
   const updateGroup = useUpdateSettingGroup()
   const updateProvider = useUpdateAuthProvider()
   const settings = query.data?.items ?? []
+  const groups = groupsQuery.data?.items ?? []
   const providers = providersQuery.data?.items ?? []
+  const activeProviders = providers.filter((provider) => provider.enabled).length
+  const configurableProviders = providers.filter(
+    (provider) => provider.status === 'active' || provider.status === 'disabled',
+  ).length
   const [key, setKey] = useState('subscription.info')
   const [value, setValue] = useState('title=LUMEN, auto_update_hours=2')
   const [formError, setFormError] = useState<string | null>(null)
@@ -84,88 +92,76 @@ export function SettingsPage() {
   }
 
   return (
-    <ResourceScreen
-      caption="Panel setting inventory"
-      columns={['Key', 'Value', 'Updated by', 'Updated']}
-      createForm={
-        <ScreenForm onSubmit={handleSubmit}>
-          <div>
-            <p className="eyebrow">{t('Upsert setting')}</p>
-            <h2>{t('Safe JSON value')}</h2>
-            <p>{t('Settings are written as key=value fields; secret-like keys are rejected.')}</p>
+    <section className="page settings-page">
+      <PageHeader
+        eyebrow={settingsSpec.eyebrow}
+        title={settingsSpec.title}
+        description={settingsSpec.description}
+        actions={
+          <button
+            type="button"
+            className="button button--secondary"
+            aria-label={t('Refresh settings')}
+            disabled={query.isFetching || groupsQuery.isFetching || providersQuery.isFetching}
+            onClick={() => {
+              void query.refetch()
+              void groupsQuery.refetch()
+              void providersQuery.refetch()
+            }}
+          >
+            <RefreshCw size={18} aria-hidden="true" />
+            {t('Refresh')}
+          </button>
+        }
+      />
+
+      <section className="settings-summary-grid" aria-label={t('Settings overview')}>
+        <SettingsSummaryCard label="Typed groups" value={groups.length} detail="Structured live settings" />
+        <SettingsSummaryCard label="Registry keys" value={settings.length} detail="Raw persisted records" />
+        <SettingsSummaryCard label="Auth providers" value={`${activeProviders}/${providers.length}`} detail="Enabled login methods" />
+        <SettingsSummaryCard label="Configurable providers" value={configurableProviders} detail="Ready for operator toggles" />
+      </section>
+
+      <section className="settings-workbench">
+        <article className="panel settings-workbench__main">
+          <div className="panel__header">
+            <div>
+              <p className="eyebrow">{t('Typed settings')}</p>
+              <h2>{t('Settings groups')}</h2>
+            </div>
+            <StatusBadge tone="good">typed API</StatusBadge>
           </div>
-          <label htmlFor="setting-key">
-            {t('Key')}
-            <input id="setting-key" required value={key} onChange={(event) => setKey(event.target.value)} />
-          </label>
-          <label htmlFor="setting-value">
-            {t('Value')}
-            <textarea id="setting-value" required value={value} onChange={(event) => setValue(event.target.value)} />
-          </label>
-          <FormError message={formError} />
-          {updateSetting.isSuccess ? (
-            <p className="auth-card__note" aria-live="polite">
-              {t('Setting saved.')}
-            </p>
+          {groupsQuery.isLoading ? <LoadingState label="Loading settings groups..." /> : null}
+          {groupsQuery.isError ? (
+            <ErrorState
+              title="Settings groups unavailable"
+              error={groupsQuery.error ?? new Error('Settings groups unavailable.')}
+            />
           ) : null}
-          <SubmitButton pending={updateSetting.isPending}>{t('Save setting')}</SubmitButton>
-        </ScreenForm>
-      }
-      emptyDescription="Panel settings appear after an administrator saves the first setting."
-      emptyTitle="No settings saved"
-      error={query.error}
-      errorTitle="Settings unavailable"
-      isError={query.isError}
-      isLoading={query.isLoading}
-      isSuccess={query.isSuccess}
-      items={settings}
-      loadingLabel="Loading settings..."
-      onRefresh={() => void query.refetch()}
-      renderRow={(setting) => ({
-        cells: [
-          setting.key,
-          formatRecord(setting.value_json),
-          setting.updated_by ?? 'system',
-          formatDateTime(setting.updated_at),
-        ],
-        id: setting.id ?? setting.key,
-      })}
-      rightPanel={
-        <div className="side-stack">
-          <article className="panel">
-            <div className="panel__header">
-              <div>
-                <p className="eyebrow">{t('Typed settings')}</p>
-                <h2>{t('Settings groups')}</h2>
-              </div>
-              <StatusBadge tone="good">typed API</StatusBadge>
-            </div>
-            {groupsQuery.isLoading ? (
-              <p className="auth-card__note">{t('Loading settings groups...')}</p>
-            ) : null}
-            {groupsQuery.isError ? (
-              <p className="auth-card__note" role="alert">
-                {groupsQuery.error instanceof Error
-                  ? groupsQuery.error.message
-                  : 'Settings groups unavailable.'}
-              </p>
-            ) : null}
-            <div className="resource-list">
-              {(groupsQuery.data?.items ?? []).map((group) => (
-                <SettingGroupForm
-                  key={group.key}
-                  group={group}
-                  pending={updateGroup.isPending}
-                  onSave={(groupKey, valueJson) =>
-                    updateGroup.mutateAsync({
-                      groupKey,
-                      request: { value_json: valueJson },
-                    })
-                  }
-                />
-              ))}
-            </div>
-          </article>
+          {groupsQuery.isSuccess && groups.length === 0 ? (
+            <EmptyState
+              title="No settings groups"
+              description="Typed settings groups will appear after the backend exposes them."
+            />
+          ) : null}
+          <div className="settings-group-grid">
+            {groups.map((group) => (
+              <SettingGroupForm
+                key={group.key}
+                group={group}
+                pending={updateGroup.isPending}
+                onSave={(groupKey, valueJson) =>
+                  updateGroup.mutateAsync({
+                    groupKey,
+                    request: { value_json: valueJson },
+                  })
+                }
+              />
+            ))}
+          </div>
+        </article>
+
+        <aside className="side-stack settings-workbench__side">
           <article className="panel">
             <div className="panel__header">
               <div>
@@ -174,20 +170,19 @@ export function SettingsPage() {
               </div>
               <StatusBadge tone="good">api-backed</StatusBadge>
             </div>
-            {providersQuery.isLoading ? <p className="auth-card__note">{t('Loading providers...')}</p> : null}
+            {providersQuery.isLoading ? <LoadingState label="Loading providers..." /> : null}
             {providersQuery.isError ? (
-              <p className="auth-card__note" role="alert">
-                {providersQuery.error instanceof Error
-                  ? providersQuery.error.message
-                  : 'Auth providers unavailable.'}
-              </p>
+              <ErrorState
+                title="Auth providers unavailable"
+                error={providersQuery.error ?? new Error('Auth providers unavailable.')}
+              />
             ) : null}
             {providerError ? (
               <p className="auth-card__note" role="alert">
                 {providerError}
               </p>
             ) : null}
-            <div className="resource-list">
+            <div className="settings-provider-list">
               {providers.map((provider) => (
                 <AuthProviderRow
                   key={provider.provider}
@@ -199,13 +194,120 @@ export function SettingsPage() {
             </div>
           </article>
           <SecurityMethodsPanel />
+          <ScreenForm onSubmit={handleSubmit}>
+            <div>
+              <p className="eyebrow">{t('Upsert setting')}</p>
+              <h2>{t('Safe JSON value')}</h2>
+              <p>{t('Settings are written as key=value fields; secret-like keys are rejected.')}</p>
+            </div>
+            <label htmlFor="setting-key">
+              {t('Key')}
+              <input id="setting-key" required value={key} onChange={(event) => setKey(event.target.value)} />
+            </label>
+            <label htmlFor="setting-value">
+              {t('Value')}
+              <textarea id="setting-value" required value={value} onChange={(event) => setValue(event.target.value)} />
+            </label>
+            <FormError message={formError} />
+            {updateSetting.isSuccess ? (
+              <p className="auth-card__note" aria-live="polite">
+                {t('Setting saved.')}
+              </p>
+            ) : null}
+            <SubmitButton pending={updateSetting.isPending}>{t('Save setting')}</SubmitButton>
+          </ScreenForm>
+        </aside>
+      </section>
+
+      <article className="panel panel--wide settings-registry-panel">
+        <div className="panel__header">
+          <div>
+            <p className="eyebrow">{t('Instance settings')}</p>
+            <h2>{t('Settings registry')}</h2>
+          </div>
+          <StatusBadge>{t('api готов')}</StatusBadge>
         </div>
-      }
-      spec={settingsSpec}
-      tableEyebrow="Instance settings"
-      tableTitle="Settings registry"
-    />
+        {query.isLoading ? <LoadingState label="Loading settings..." /> : null}
+        {query.isError ? (
+          <ErrorState title="Settings unavailable" error={query.error ?? new Error('Settings unavailable')} />
+        ) : null}
+        {query.isSuccess && settings.length === 0 ? (
+          <EmptyState
+            title="No settings saved"
+            description="Panel settings appear after an administrator saves the first setting."
+          />
+        ) : null}
+        {query.isSuccess && settings.length > 0 ? (
+          <DataTable
+            caption="Panel setting inventory"
+            columns={['Key', 'Value', 'Updated by', 'Updated']}
+            rows={settings.map((setting) => ({
+              cells: [
+                <code className="settings-key">{setting.key}</code>,
+                <SettingValuePreview value={setting.value_json} />,
+                setting.updated_by ?? 'system',
+                formatDateTime(setting.updated_at),
+              ],
+              id: setting.id ?? setting.key,
+            }))}
+          />
+        ) : null}
+      </article>
+    </section>
   )
+}
+
+function SettingsSummaryCard({
+  detail,
+  label,
+  value,
+}: {
+  detail: string
+  label: string
+  value: number | string
+}) {
+  const { t } = useI18n()
+  return (
+    <article className="settings-summary-card">
+      <span>{t(label)}</span>
+      <strong>{value}</strong>
+      <small>{t(detail)}</small>
+    </article>
+  )
+}
+
+function SettingValuePreview({ value }: { value: Record<string, unknown> | null | undefined }) {
+  const entries = Object.entries(value ?? {})
+  if (entries.length === 0) {
+    return <span className="settings-value-empty">None</span>
+  }
+
+  return (
+    <div className="settings-value-preview">
+      {entries.slice(0, 6).map(([key, entry]) => (
+        <span className="settings-value-chip" key={key}>
+          <strong>{key}</strong>
+          <small>{formatSettingValue(entry)}</small>
+        </span>
+      ))}
+      {entries.length > 6 ? (
+        <span className="settings-value-more">+{entries.length - 6}</span>
+      ) : null}
+    </div>
+  )
+}
+
+function formatSettingValue(value: unknown) {
+  if (value === null || value === undefined) {
+    return 'null'
+  }
+  if (Array.isArray(value)) {
+    return `${value.length} items`
+  }
+  if (typeof value === 'object') {
+    return JSON.stringify(value)
+  }
+  return String(value)
 }
 
 function SecurityMethodsPanel() {
@@ -523,7 +625,7 @@ function SettingGroupForm({
   }
 
   return (
-    <form className="screen-form" onSubmit={submit}>
+    <form className="settings-group-card" onSubmit={submit}>
       <div>
         <p className="eyebrow">{group.key}</p>
         <h3>{t(group.title)}</h3>
@@ -771,17 +873,25 @@ function AuthProviderRow({
   const canToggle = provider.status === 'active' || provider.status === 'disabled'
   const actionLabel = provider.enabled ? 'Disable' : canToggle ? 'Enable' : 'Unavailable'
 
+  const metadata = Object.entries(provider.metadata_json)
+
   return (
-    <div className="resource-list__item">
-      <span>
-        {provider.display_name}
-        <small>{provider.provider}</small>
+    <div className="settings-provider-card">
+      <div className="settings-provider-card__body">
+        <strong>{provider.display_name}</strong>
+        <span>{provider.provider}</span>
         <small>{provider.scopes.join(', ') || 'no scopes'}</small>
-        {Object.keys(provider.metadata_json).length > 0 ? (
-          <small>{formatRecord(provider.metadata_json)}</small>
+        {metadata.length > 0 ? (
+          <div className="settings-provider-card__meta">
+            {metadata.slice(0, 4).map(([key, value]) => (
+              <span key={key}>
+                {key}: {formatSettingValue(value)}
+              </span>
+            ))}
+          </div>
         ) : null}
-      </span>
-      <span className="inline-actions">
+      </div>
+      <div className="settings-provider-card__actions">
         <StatusBadge tone={provider.enabled ? 'good' : 'neutral'}>
           {provider.enabled ? 'enabled' : 'disabled'}
         </StatusBadge>
@@ -795,7 +905,7 @@ function AuthProviderRow({
         >
           {actionLabel}
         </button>
-      </span>
+      </div>
     </div>
   )
 }

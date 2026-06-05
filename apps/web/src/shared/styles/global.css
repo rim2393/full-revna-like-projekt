@@ -993,6 +993,247 @@ h2 {
   color: var(--color-muted);
 }
 
+.settings-page {
+  max-width: 1380px;
+}
+
+.settings-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.settings-summary-card {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+  min-height: 112px;
+  align-content: start;
+  padding: var(--space-4);
+  background:
+    linear-gradient(180deg, rgb(83 224 173 / 8%), transparent 62%),
+    rgb(255 255 255 / 4%);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+}
+
+.settings-summary-card span,
+.settings-summary-card small {
+  color: var(--color-muted);
+}
+
+.settings-summary-card span {
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.settings-summary-card strong {
+  color: var(--color-ink-strong);
+  font-size: 1.65rem;
+  line-height: 1.1;
+}
+
+.settings-workbench {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 0.42fr);
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.settings-workbench__main,
+.settings-workbench__side {
+  min-width: 0;
+}
+
+.settings-group-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+
+.settings-group-card {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+  padding: var(--space-4);
+  background: rgb(255 255 255 / 4%);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+}
+
+.settings-group-card h3 {
+  margin-top: var(--space-1);
+  font-size: 1.05rem;
+}
+
+.settings-group-card p:not(.eyebrow) {
+  margin-top: var(--space-2);
+  color: var(--color-muted);
+}
+
+.settings-group-card label,
+.checkbox-row {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+  color: var(--color-muted-strong);
+  font-weight: 700;
+}
+
+.settings-group-card input,
+.settings-group-card select,
+.settings-group-card textarea,
+.settings-workbench .auth-card input,
+.settings-workbench .auth-card select,
+.settings-workbench .auth-card textarea {
+  width: 100%;
+  min-height: 42px;
+  padding: 0 var(--space-3);
+  color: var(--color-ink);
+  background: rgb(255 255 255 / 6%);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+}
+
+.settings-group-card textarea,
+.settings-workbench .auth-card textarea {
+  min-height: 112px;
+  padding-block: var(--space-3);
+  font-family: var(--font-mono);
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.checkbox-row {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  min-height: 42px;
+}
+
+.checkbox-row input {
+  width: 18px;
+  height: 18px;
+}
+
+.settings-provider-list {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+
+.settings-provider-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: center;
+  min-width: 0;
+  padding: var(--space-3);
+  background: rgb(255 255 255 / 4%);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+}
+
+.settings-provider-card__body {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.settings-provider-card__body strong {
+  color: var(--color-ink-strong);
+}
+
+.settings-provider-card__body span,
+.settings-provider-card__body small,
+.settings-provider-card__meta {
+  color: var(--color-muted);
+  overflow-wrap: anywhere;
+}
+
+.settings-provider-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: var(--space-2);
+}
+
+.settings-provider-card__meta span {
+  display: inline-flex;
+  min-height: 24px;
+  align-items: center;
+  padding: 0 var(--space-2);
+  color: var(--color-muted-strong);
+  background: rgb(0 0 0 / 16%);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  font-size: 0.78rem;
+}
+
+.settings-provider-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  min-width: 150px;
+}
+
+.settings-registry-panel .data-table {
+  min-width: 980px;
+}
+
+.settings-key {
+  color: var(--color-accent);
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+}
+
+.settings-value-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+  max-width: 620px;
+}
+
+.settings-value-chip {
+  display: inline-grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 6px;
+  max-width: 100%;
+  min-height: 28px;
+  align-items: center;
+  padding: 0 var(--space-2);
+  color: var(--color-muted-strong);
+  background: rgb(255 255 255 / 5%);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+}
+
+.settings-value-chip strong {
+  color: var(--color-ink-strong);
+  font-size: 0.78rem;
+}
+
+.settings-value-chip small {
+  min-width: 0;
+  max-width: 280px;
+  overflow: hidden;
+  color: var(--color-muted);
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-value-empty,
+.settings-value-more {
+  color: var(--color-muted);
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+}
+
 .workflow-list {
   display: grid;
   gap: var(--space-3);
@@ -1533,6 +1774,15 @@ h2 {
   .resource-layout {
     grid-template-columns: minmax(0, 1fr);
   }
+
+  .settings-summary-grid,
+  .settings-group-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .settings-workbench {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 @media (max-width: 860px) {
@@ -1646,9 +1896,31 @@ h2 {
   }
 
   .summary-grid,
+  .settings-summary-grid,
+  .settings-group-grid,
   .profile-facts,
   .profile-form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .settings-provider-card {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .settings-provider-card__actions {
+    justify-content: flex-start;
+    min-width: 0;
+  }
+
+  .settings-value-chip {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    padding-block: var(--space-2);
+  }
+
+  .settings-value-chip small {
+    max-width: 100%;
   }
 
   .workflow-list li,
