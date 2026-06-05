@@ -343,6 +343,77 @@ async def test_profile_backed_subscription_runtime_clients_use_manifest_credenti
     assert protocol["credentialsRef"] == f"vault://subscriptions/{subscription.public_id}/vless-tcp"
 
 
+async def test_profile_backed_shadowsocks_runtime_password_matches_rendered_subscription(
+    route_app: RouteTestApp,
+) -> None:
+    user, license_record, node = await _seed(route_app)
+    async with route_app.sessionmaker() as session:
+        profile = ProtocolProfile(
+            name="profile-backed-shadowsocks-default-method",
+            node_id=node.id,
+            adapter="shadowsocks-native",
+            status="active",
+            credentials_ref=None,
+            config_json={"network": "tcp", "port": "18446"},
+            port_reservations=[],
+            metadata_json={},
+        )
+        session.add(profile)
+        await session.flush()
+        host = Host(
+            name="profile-backed-shadowsocks-host",
+            hostname="85.192.60.8",
+            node_id=node.id,
+            protocol_profile_id=profile.id,
+            status="active",
+            tags=[],
+            metadata_json={},
+            port=18446,
+            security="none",
+        )
+        session.add(host)
+        await session.commit()
+
+    async with route_app.sessionmaker() as session:
+        subscription = await issue_subscription_from_profile(
+            session,
+            request=SubscriptionIssueFromProfileRequest(
+                user_id=user.id,
+                license_id=license_record.id,
+                profile_id=profile.id,
+                host_id=host.id,
+                profile_title="Profile backed Shadowsocks",
+                render_targets=["happ"],
+                config_hash="sha256:profile-backed-shadowsocks",
+            ),
+        )
+        await session.commit()
+
+    raw = await route_app.client.get(
+        f"/api/v1/subscriptions/public/{subscription.public_id}/render?target=happ",
+    )
+    assert raw.status_code == 200, raw.text
+    userinfo = raw.text.removeprefix("ss://").split("@", 1)[0]
+    decoded = base64.urlsafe_b64decode(userinfo + "=" * (-len(userinfo) % 4)).decode()
+    rendered_method, rendered_password = decoded.split(":", 1)
+    assert rendered_method == "aes-256-gcm"
+
+    native = await route_app.client.get(
+        f"/api/v1/subscriptions/public/{subscription.public_id}/render?target=lumen-json",
+    )
+    assert native.status_code == 200, native.text
+    protocol = native.json()["nodes"][0]["protocols"][0]
+
+    async with route_app.sessionmaker() as session:
+        persisted_profile = await session.get(ProtocolProfile, profile.id)
+        assert persisted_profile is not None
+        runtime_clients = await list_profile_runtime_clients(session, profile=persisted_profile)
+
+    assert len(runtime_clients) == 1
+    assert protocol["credentials"]["shadowsocksPassword"] == rendered_password
+    assert runtime_clients[0]["shadowsocks_password"] == rendered_password
+
+
 async def test_shadowsocks_subscription_renders_all_client_formats(
     route_app: RouteTestApp,
 ) -> None:

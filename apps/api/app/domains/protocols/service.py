@@ -52,6 +52,7 @@ from app.domains.protocols.schemas import (
 )
 from app.domains.subscriptions.models import Subscription
 from app.domains.subscriptions.renderers import (
+    DEFAULT_SHADOWSOCKS_METHOD,
     derive_client_credentials,
     shadowsocks_password_for_method,
 )
@@ -2613,7 +2614,9 @@ async def list_profile_runtime_clients(
             protocol_type=protocol_type,
         )
         shadowsocks_method = str(
-            profile.config_json.get("method") or delivery.get("method") or "2022-blake3-aes-128-gcm"
+            profile.config_json.get("method")
+            or delivery.get("method")
+            or DEFAULT_SHADOWSOCKS_METHOD
         )
         clients.append(
             {

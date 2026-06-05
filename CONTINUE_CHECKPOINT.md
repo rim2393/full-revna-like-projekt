@@ -181,6 +181,14 @@ Last audited: 2026-06-01 21:28 Europe/Moscow.
 - Live prod evidence for `v0.1.63`: images and signed public manifest are
   published, but VPS upgrade/smoke is blocked by network reachability timeout
   to the production host.
+- Live prod evidence for release
+  `main-0da5ae39ecef256671af592411622b4ac74e8b46`: official signed
+  publish/deploy workflow completed successfully; panel `.env` and running
+  containers show API/Web/Subscription on the pinned release; node-agent was
+  aligned to the same pinned image. HApp Shadowsocks rendering now decodes to
+  `aes-256-gcm`, matching the live Xray Shadowsocks inbound on TCP `18446`.
+  A temporary Xray client inside the node-agent container connected through the
+  live Shadowsocks inbound and received HTTP 204 from an external endpoint.
 - Alembic heads: single head `0009_node_management_parity` after this slice.
 
 ## Fixes Applied During Audit

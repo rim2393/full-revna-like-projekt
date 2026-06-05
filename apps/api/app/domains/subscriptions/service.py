@@ -23,6 +23,7 @@ from app.domains.settings.service import SUBSCRIPTION_DELIVERY_KEY
 from app.domains.subscription_assets.service import resolve_subpage_config
 from app.domains.subscriptions.models import Subscription
 from app.domains.subscriptions.renderers import (
+    DEFAULT_SHADOWSOCKS_METHOD,
     derive_client_credentials,
     shadowsocks_password_for_method,
 )
@@ -460,7 +461,7 @@ async def build_subscription_manifest(
                             method=(
                                 delivery.get("method")
                                 or _profile_config_string(profile, "method")
-                                or "2022-blake3-aes-128-gcm"
+                                or DEFAULT_SHADOWSOCKS_METHOD
                             ),
                             shadowsocks_password_override=_openvpn_shadowsocks_password(profile),
                         ),
