@@ -27,7 +27,7 @@ import {
 import { createNodeAgentRuntimeConfig, loadNodeAgentConfigFromEnv } from "./runtime-loop.js";
 import { readSecretFromEnv } from "./secret-input.js";
 import { createTcpDiagnosticListenerPlan, startTcpDiagnosticListener, stopLiveListener } from "./live-listeners.js";
-import { applyXrayConfig, createXrayApplyPlan, ensureManagedXrayProcess } from "./xray-runtime.js";
+import { applyXrayConfig, createXrayApplyPlan, ensureManagedXrayProcess, stopXrayRuntime } from "./xray-runtime.js";
 import { applyHysteria2Config, createHysteria2ApplyPlan, ensureManagedHysteria2Process } from "./hysteria2-runtime.js";
 import {
   applySingBoxShadowsocksConfig,
@@ -82,7 +82,8 @@ const APPLY_FAILURE_CODES = Object.freeze({
   "node-connections.drop": "connection_drop_failed",
   "node-traffic.reset": "node_traffic_reset_failed",
   "ikev2.stop": "ikev2_stop_failed",
-  "naive.stop": "naive_stop_failed"
+  "naive.stop": "naive_stop_failed",
+  "xray.stop": "xray_stop_failed"
 });
 
 const APPLY_DRY_RUN_STATUS = Object.freeze({
@@ -101,7 +102,8 @@ const APPLY_DRY_RUN_STATUS = Object.freeze({
   "node-connections.drop": "connection-drop-dry-run",
   "node-traffic.reset": "node-traffic-reset-dry-run",
   "ikev2.stop": "ikev2-stop-dry-run",
-  "naive.stop": "naive-stop-dry-run"
+  "naive.stop": "naive-stop-dry-run",
+  "xray.stop": "xray-stop-dry-run"
 });
 
 const APPLY_PENDING_STATUS = Object.freeze({
@@ -120,7 +122,8 @@ const APPLY_PENDING_STATUS = Object.freeze({
   "node-connections.drop": "connection-drop-pending",
   "node-traffic.reset": "node-traffic-reset-pending",
   "ikev2.stop": "ikev2-stop-pending",
-  "naive.stop": "naive-stop-pending"
+  "naive.stop": "naive-stop-pending",
+  "xray.stop": "xray-stop-pending"
 });
 
 function readOptionalTrimmed(path) {
@@ -675,6 +678,14 @@ async function applyRuntimeEffects(command, commandResult, input = {}) {
       const policy = policyPlan ? await applyNodePolicy(policyPlan, input) : null;
       return withResultOutputs(commandResult, policy ? { ...wireguard, nodePolicy: policy } : wireguard);
     }
+    if (commandResult.runtimeAction.type === "xray.stop") {
+      const xray = await stopXrayRuntime({
+        dryRun: input.dryRun,
+        env: input.env,
+        execFileImpl: input.execFileImpl
+      });
+      return withResultOutputs(commandResult, xray);
+    }
   } catch (error) {
     const code = APPLY_FAILURE_CODES[commandResult.runtimeAction.type] ?? "live_listener_failed";
     return failedCommandResult(command, error, code);
@@ -962,6 +973,10 @@ export function applyNodeCommand(command, currentState, input = {}) {
             type: "ikev2.stop",
             configDir: envelope.payload.ikev2ConfigDir,
             runtimeDir: envelope.payload.ikev2RuntimeDir
+          });
+        } else if (envelope.payload.adapter === "xray") {
+          runtimeAction = Object.freeze({
+            type: "xray.stop"
           });
         } else if (envelope.payload.adapter === "naiveproxy") {
           runtimeAction = Object.freeze({

@@ -26,6 +26,7 @@ import type {
   NodeCommandCreateRequest,
   NodeBulkActionRequest,
   NodePauseRequest,
+  NodeProtocolSelectionRequest,
   NodeQuarantineRequest,
   NodeReorderRequest,
   NodeResumeRequest,
@@ -205,6 +206,10 @@ export function createHttpLumenApiClient({
       request('/api/v1/nodes/provisioning-jobs', { body: payload, method: 'POST' }),
     createNodeCommand: (nodeId: string, payload: NodeCommandCreateRequest) =>
       request(`/api/v1/nodes/${nodeId}/commands`, { body: payload, method: 'POST' }),
+    getNodeProtocolSelection: (nodeId: string) =>
+      request(`/api/v1/nodes/${nodeId}/protocol-selection`),
+    updateNodeProtocolSelection: (nodeId: string, payload: NodeProtocolSelectionRequest) =>
+      request(`/api/v1/nodes/${nodeId}/protocol-selection`, { body: payload, method: 'PUT' }),
     updateNode: (nodeId: string, payload: NodeUpdateRequest) =>
       request(`/api/v1/nodes/${nodeId}`, { body: payload, method: 'PATCH' }),
     deleteNode: (nodeId: string) => request(`/api/v1/nodes/${nodeId}`, { method: 'DELETE' }),

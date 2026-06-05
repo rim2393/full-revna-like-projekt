@@ -201,6 +201,27 @@ class NodeCommandListResponse(BaseModel):
     items: list[NodeCommandResponse]
 
 
+class NodeProtocolSelectionItem(BaseModel):
+    profile_id: UUID
+    name: str
+    adapter: str
+    status: str
+    enabled: bool
+    runtime_sync: dict[str, object]
+
+
+class NodeProtocolSelectionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    enabled_profile_ids: list[UUID] = Field(default_factory=list)
+
+
+class NodeProtocolSelectionResponse(BaseModel):
+    node_id: UUID
+    items: list[NodeProtocolSelectionItem]
+    queued_commands: list[NodeCommandResponse]
+
+
 class NodeMetricCreateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

@@ -29,6 +29,8 @@ from app.domains.nodes.schemas import (
     NodeMetricResponse,
     NodeOverviewResponse,
     NodePauseRequest,
+    NodeProtocolSelectionRequest,
+    NodeProtocolSelectionResponse,
     NodeQuarantineRequest,
     NodeReorderRequest,
     NodeResponse,
@@ -73,6 +75,10 @@ from app.domains.nodes.service import (
 )
 from app.domains.nodes.service import (
     reorder_nodes as reorder_node_records,
+)
+from app.domains.protocols.service import (
+    list_node_protocol_selection,
+    sync_node_protocol_selection,
 )
 
 router = APIRouter()
@@ -325,6 +331,36 @@ async def read_node_overview(
     session: DatabaseSession,
 ) -> NodeOverviewResponse:
     return await get_node_overview(session, node_id=node_id)
+
+
+@router.get("/{node_id}/protocol-selection", response_model=NodeProtocolSelectionResponse)
+async def read_node_protocol_selection(
+    node_id: UUID,
+    _: NodeManager,
+    session: DatabaseSession,
+) -> NodeProtocolSelectionResponse:
+    items = await list_node_protocol_selection(session, node_id=node_id)
+    return NodeProtocolSelectionResponse(node_id=node_id, items=items, queued_commands=[])
+
+
+@router.put("/{node_id}/protocol-selection", response_model=NodeProtocolSelectionResponse)
+async def update_node_protocol_selection(
+    node_id: UUID,
+    request: NodeProtocolSelectionRequest,
+    _: NodeManager,
+    session: DatabaseSession,
+) -> NodeProtocolSelectionResponse:
+    items, commands = await sync_node_protocol_selection(
+        session,
+        node_id=node_id,
+        enabled_profile_ids=request.enabled_profile_ids,
+    )
+    await session.commit()
+    return NodeProtocolSelectionResponse(
+        node_id=node_id,
+        items=items,
+        queued_commands=[node_command_response(command) for command in commands],
+    )
 
 
 @router.post(

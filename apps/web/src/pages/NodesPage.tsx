@@ -8,6 +8,7 @@ import {
   useNodeCommandsData,
   useNodeMetricsData,
   useNodeOverviewData,
+  useNodeProtocolSelectionData,
   useNodesPageData,
   usePauseNode,
   useQuarantineNode,
@@ -16,6 +17,7 @@ import {
   useRestartAllNodes,
   useRestartNode,
   useResumeNode,
+  useUpdateNodeProtocolSelection,
 } from '../shared/api/resourceHooks'
 import type { NodeCommandRecord, NodeResponse, ProvisioningJobResponse } from '../shared/api/types'
 import { DataTable } from '../shared/components/DataTable'
@@ -418,9 +420,12 @@ export function NodesPage() {
   const [commandType, setCommandType] = useState('capabilities.report')
   const [commandPayload, setCommandPayload] = useState('{}')
   const [commandError, setCommandError] = useState<string | null>(null)
+  const [protocolSelection, setProtocolSelection] = useState<string[]>([])
+  const [protocolSelectionError, setProtocolSelectionError] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
   const [actionResult, setActionResult] = useState<NodeActionResult | null>(null)
   const createCommand = useCreateNodeCommand()
+  const updateNodeProtocols = useUpdateNodeProtocolSelection()
   const pauseNode = usePauseNode()
   const resumeNode = useResumeNode()
   const quarantineNode = useQuarantineNode()
@@ -436,6 +441,7 @@ export function NodesPage() {
   const commandsQuery = useNodeCommandsData(effectiveNodeId)
   const metricsQuery = useNodeMetricsData(effectiveNodeId)
   const overviewQuery = useNodeOverviewData(effectiveNodeId)
+  const protocolSelectionQuery = useNodeProtocolSelectionData(effectiveNodeId)
   const nodeStateSummary = useMemo(
     () => ({
       heartbeatMissing: nodes.filter(hasMissingHeartbeat).length,
@@ -454,7 +460,8 @@ export function NodesPage() {
     }
     const exists = nodes.some((node) => node.id === focusNodeId)
     if (exists) {
-      setSelectedNodeId(focusNodeId)
+      const timer = globalThis.setTimeout(() => setSelectedNodeId(focusNodeId), 0)
+      return () => globalThis.clearTimeout(timer)
     }
   }, [nodes, searchParams])
 
@@ -469,6 +476,15 @@ export function NodesPage() {
     nextSearch.set('focus', selectedNodeId)
     setSearchParams(nextSearch, { replace: true })
   }, [searchParams, selectedNodeId, setSearchParams])
+
+  useEffect(() => {
+    const nextSelection =
+      protocolSelectionQuery.data?.items
+        .filter((item) => item.enabled)
+        .map((item) => item.profile_id) ?? []
+    const timer = globalThis.setTimeout(() => setProtocolSelection(nextSelection), 0)
+    return () => globalThis.clearTimeout(timer)
+  }, [protocolSelectionQuery.data])
 
   const heartbeatStatus = useMemo(() => {
     if (!query.isSuccess) {
@@ -575,6 +591,43 @@ export function NodesPage() {
       await commandsQuery.refetch()
     } catch {
       // Mutation error is rendered below.
+    }
+  }
+
+  function toggleProtocolSelection(profileId: string) {
+    setProtocolSelection((current) =>
+      current.includes(profileId)
+        ? current.filter((item) => item !== profileId)
+        : [...current, profileId],
+    )
+  }
+
+  async function handleProtocolSelectionSubmit() {
+    setProtocolSelectionError(null)
+    setActionResult(null)
+    if (!effectiveNodeId || !selectedNode) {
+      setProtocolSelectionError('Select a node first.')
+      return
+    }
+    try {
+      const response = await updateNodeProtocols.mutateAsync({
+        nodeId: effectiveNodeId,
+        request: { enabled_profile_ids: protocolSelection },
+      })
+      setActionResult({
+        detail: `${response.queued_commands.length} runtime ${pluralize(
+          response.queued_commands.length,
+          'command',
+        )} queued. Node-agent will apply the enabled protocol set from the real backend queue.`,
+        label: 'protocols queued',
+        nodeName: selectedNode.name,
+        tone: 'info',
+      })
+      await commandsQuery.refetch()
+      await protocolSelectionQuery.refetch()
+      await overviewQuery.refetch()
+    } catch (error) {
+      setProtocolSelectionError(getErrorMessage(error))
     }
   }
 
@@ -1008,6 +1061,89 @@ export function NodesPage() {
                 />
               </>
             ) : null}
+            <section className="auth-card" aria-labelledby="node-protocol-selection-title">
+              <div className="panel__header">
+                <div>
+                  <p className="eyebrow">{t('Runtime protocols')}</p>
+                  <h3 id="node-protocol-selection-title">{t('Enabled protocols on this node')}</h3>
+                </div>
+                <StatusBadge>
+                  {`${protocolSelection.length}/${protocolSelectionQuery.data?.items.length ?? 0}`}
+                </StatusBadge>
+              </div>
+              {protocolSelectionQuery.isLoading ? (
+                <LoadingState label="Loading node protocol selection..." />
+              ) : null}
+              {protocolSelectionQuery.isError ? (
+                <ErrorState
+                  title="Node protocol selection unavailable"
+                  error={protocolSelectionQuery.error}
+                />
+              ) : null}
+              {protocolSelectionQuery.data?.items.length === 0 ? (
+                <EmptyState
+                  title="No protocol profiles on this node"
+                  description="Create real protocol profiles for this node before enabling runtime protocols."
+                />
+              ) : null}
+              {protocolSelectionQuery.data?.items.length ? (
+                <>
+                  <div className="settings-list">
+                    {protocolSelectionQuery.data.items.map((item) => {
+                      const enabled = protocolSelection.includes(item.profile_id)
+                      const syncStatus =
+                        typeof item.runtime_sync?.status === 'string'
+                          ? item.runtime_sync.status
+                          : 'never_applied'
+                      return (
+                        <label className="setting-row" key={item.profile_id}>
+                          <span>
+                            <strong>{item.name}</strong>
+                            <small>
+                              {item.adapter} / {t(formatStatus(item.status))} / {t(formatStatus(syncStatus))}
+                            </small>
+                          </span>
+                          <input
+                            type="checkbox"
+                            checked={enabled}
+                            disabled={updateNodeProtocols.isPending}
+                            onChange={() => toggleProtocolSelection(item.profile_id)}
+                          />
+                        </label>
+                      )
+                    })}
+                  </div>
+                  {protocolSelectionError ? (
+                    <p className="auth-card__note" role="alert">
+                      {protocolSelectionError}
+                    </p>
+                  ) : null}
+                  {updateNodeProtocols.isError ? (
+                    <p className="auth-card__note" role="alert">
+                      {getErrorMessage(updateNodeProtocols.error)}
+                    </p>
+                  ) : null}
+                  <div className="inline-actions">
+                    <button
+                      type="button"
+                      className="button button--primary"
+                      disabled={updateNodeProtocols.isPending}
+                      onClick={() => void handleProtocolSelectionSubmit()}
+                    >
+                      {t('Update protocols')}
+                    </button>
+                    <button
+                      type="button"
+                      className="button button--secondary"
+                      disabled={protocolSelectionQuery.isFetching}
+                      onClick={() => void protocolSelectionQuery.refetch()}
+                    >
+                      {t('Refresh')}
+                    </button>
+                  </div>
+                </>
+              ) : null}
+            </section>
             <form className="screen-form" onSubmit={handleCommandSubmit}>
               <label htmlFor="node-command-type">
                 {t('Command type')}

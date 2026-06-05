@@ -1,4 +1,4 @@
-import { closeSync, existsSync, mkdirSync, openSync, readFileSync, writeFileSync } from "node:fs";
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { promisify } from "node:util";
 import { execFile as nodeExecFile, spawn } from "node:child_process";
@@ -281,5 +281,27 @@ export async function applyXrayConfig(plan, input = {}) {
     configPath,
     testCommand: summarizeArgv([testArgv[0], ...testArgv[1]]),
     reloadCommand: summarizeArgv(reloadArgv)
+  });
+}
+
+export async function stopXrayRuntime(input = {}) {
+  const env = input.env ?? {};
+  const configPath = env.LUMEN_XRAY_CONFIG_FILE ?? DEFAULT_XRAY_CONFIG_PATH;
+  const logPath = env.LUMEN_XRAY_LOG_FILE ?? "/var/lib/lumen-node/runtime/xray/xray.log";
+  if (input.dryRun !== false) {
+    return Object.freeze({
+      implementationStatus: "xray-stop-dry-run",
+      configPath,
+      logPath
+    });
+  }
+  await stopManagedXray(input.execFileImpl);
+  for (const path of [configPath, logPath]) {
+    rmSync(path, { force: true });
+  }
+  return Object.freeze({
+    implementationStatus: "xray-stopped",
+    configPath,
+    logPath
   });
 }

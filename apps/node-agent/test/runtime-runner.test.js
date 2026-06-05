@@ -1055,6 +1055,35 @@ test("run once applies Xray config only after writing, testing, and reload", asy
   }
 });
 
+test("outbound remove dispatches Xray stop action", () => {
+  const active = createProvisioningState({
+    nodeId: "node-1",
+    updatedAt: "2026-05-27T00:00:00.000Z"
+  });
+
+  const result = applyNodeCommand(
+    {
+      id: "cmd-xray-remove-1",
+      node_id: "node-1",
+      command_type: COMMAND_TYPES.OUTBOUND_REMOVE,
+      created_at: "2026-05-27T00:02:00.000Z",
+      payload_json: {
+        adapter: "xray",
+        profileIds: ["profile-1"]
+      }
+    },
+    active,
+    {
+      startedAt: "2026-05-27T00:02:01.000Z",
+      finishedAt: "2026-05-27T00:02:02.000Z"
+    }
+  );
+
+  assert.equal(result.status, "succeeded");
+  assert.equal(result.runtimeAction.type, "xray.stop");
+  assert.equal(result.resultJson.outputs.implementationStatus, "xray-stop-pending");
+});
+
 test("xray apply fails when config still contains unresolved refs", () => {
   const active = createProvisioningState({
     nodeId: "node-1",

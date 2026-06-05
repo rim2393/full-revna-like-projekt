@@ -144,6 +144,121 @@ async def test_apply_hysteria2_profile_queues_outbound_apply(route_app: RouteApp
         assert command.payload_json["hysteria2Config"]["auth"]["password"]
 
 
+async def test_node_protocol_selection_updates_profiles_and_queues_runtime_commands(
+    route_app: RouteApp,
+) -> None:
+    async with route_app.sessionmaker() as session:
+        node = Node(
+            name=f"node-selection-{uuid4().hex[:6]}",
+            region="eu",
+            public_address="203.0.113.91",
+            status="active",
+            capabilities={},
+        )
+        session.add(node)
+        await session.flush()
+        xray_profile = ProtocolProfile(
+            id=uuid4(),
+            name=f"selection-vless-{uuid4().hex[:6]}",
+            node_id=node.id,
+            adapter="vless-reality",
+            status="active",
+            config_json={},
+            port_reservations=[{"address": "0.0.0.0", "port": 443, "protocol": "tcp"}],  # noqa: S104
+            credentials_ref="vault://subscriptions/profile/vless",
+        )
+        hysteria_profile = ProtocolProfile(
+            id=uuid4(),
+            name=f"selection-hysteria-{uuid4().hex[:6]}",
+            node_id=node.id,
+            adapter="hysteria2",
+            status="disabled",
+            config_json={},
+            port_reservations=[{"address": "0.0.0.0", "port": 8443, "protocol": "udp"}],  # noqa: S104
+            credentials_ref="vault://subscriptions/profile/hysteria",
+        )
+        user = User(email=f"selection-{uuid4().hex[:8]}@example.test", status="active")
+        license_record = License(
+            license_key_hash=hash_license_key(f"selection-{uuid4()}"),
+            customer_ref="customer-selection",
+            status="active",
+            max_devices=3,
+            metadata_json={},
+        )
+        session.add_all([xray_profile, hysteria_profile, user, license_record])
+        await session.flush()
+        for profile, adapter in (
+            (xray_profile, "vless-reality"),
+            (hysteria_profile, "hysteria2"),
+        ):
+            session.add(
+                Subscription(
+                    public_id=f"lumen_sub_{uuid4().hex}",
+                    user_id=user.id,
+                    license_id=license_record.id,
+                    node_id=node.id,
+                    status="active",
+                    delivery_profile={
+                        "profile_id": str(profile.id),
+                        "protocol": adapter,
+                        "adapter": adapter,
+                    },
+                    config_hash=f"sha256:{adapter}",
+                )
+            )
+        await session.commit()
+        node_id = str(node.id)
+        xray_profile_id = str(xray_profile.id)
+        hysteria_profile_id = str(hysteria_profile.id)
+
+    read_response = await route_app.client.get(f"/api/v1/nodes/{node_id}/protocol-selection")
+    assert read_response.status_code == 200, read_response.text
+    read_items = {item["profile_id"]: item for item in read_response.json()["items"]}
+    assert read_items[xray_profile_id]["enabled"] is True
+    assert read_items[hysteria_profile_id]["enabled"] is False
+
+    enable_response = await route_app.client.put(
+        f"/api/v1/nodes/{node_id}/protocol-selection",
+        json={"enabled_profile_ids": [xray_profile_id, hysteria_profile_id]},
+    )
+    assert enable_response.status_code == 200, enable_response.text
+    enable_body = enable_response.json()
+    assert {item["profile_id"]: item["enabled"] for item in enable_body["items"]} == {
+        xray_profile_id: True,
+        hysteria_profile_id: True,
+    }
+    assert [command["command_type"] for command in enable_body["queued_commands"]] == [
+        "outbound.apply"
+    ]
+    assert enable_body["queued_commands"][0]["payload_json"]["adapter"] == "hysteria2"
+
+    disable_response = await route_app.client.put(
+        f"/api/v1/nodes/{node_id}/protocol-selection",
+        json={"enabled_profile_ids": []},
+    )
+    assert disable_response.status_code == 200, disable_response.text
+    disable_body = disable_response.json()
+    assert {item["profile_id"]: item["enabled"] for item in disable_body["items"]} == {
+        xray_profile_id: False,
+        hysteria_profile_id: False,
+    }
+    queued_payloads = [command["payload_json"] for command in disable_body["queued_commands"]]
+    assert {"adapter": "xray", "profileIds": [xray_profile_id]} in queued_payloads
+    assert {"adapter": "hysteria2", "profileId": hysteria_profile_id} in queued_payloads
+
+    async with route_app.sessionmaker() as session:
+        profiles = {
+            profile.id: profile
+            for profile in (
+                await session.execute(
+                    select(ProtocolProfile).where(ProtocolProfile.node_id == UUID(node_id))
+                )
+            ).scalars()
+        }
+        assert profiles[UUID(xray_profile_id)].status == "disabled"
+        assert profiles[UUID(hysteria_profile_id)].status == "disabled"
+
+
 async def test_profile_runtime_readiness_reports_real_blockers(route_app: RouteApp) -> None:
     ready_profile_id, ready_node_id = await _seed_profile(route_app, "hysteria2")
     blocked_profile_id, _ = await _seed_profile(

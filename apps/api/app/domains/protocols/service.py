@@ -638,6 +638,148 @@ async def apply_profile_to_node(session: AsyncSession, *, profile_id: UUID):
     return command
 
 
+def _profile_selection_item(profile: ProtocolProfile):
+    from app.domains.nodes.schemas import NodeProtocolSelectionItem
+
+    return NodeProtocolSelectionItem(
+        profile_id=profile.id,
+        name=profile.name,
+        adapter=profile.adapter,
+        status=profile.status,
+        enabled=profile.status == "active",
+        runtime_sync=_runtime_sync_from_metadata(profile.metadata_json),
+    )
+
+
+async def list_node_protocol_selection(session: AsyncSession, *, node_id: UUID):
+    from app.domains.nodes.service import get_node
+
+    await get_node(session, node_id=node_id)
+    profiles = (
+        (
+            await session.execute(
+                select(ProtocolProfile)
+                .where(ProtocolProfile.node_id == node_id)
+                .order_by(ProtocolProfile.created_at.asc())
+            )
+        )
+        .scalars()
+        .all()
+    )
+    return [_profile_selection_item(profile) for profile in profiles]
+
+
+async def sync_node_protocol_selection(
+    session: AsyncSession,
+    *,
+    node_id: UUID,
+    enabled_profile_ids: list[UUID],
+):
+    from app.domains.nodes.schemas import NodeCommandCreateRequest
+    from app.domains.nodes.service import enqueue_node_command, get_node
+
+    await get_node(session, node_id=node_id)
+    profiles = list(
+        (
+            await session.execute(
+                select(ProtocolProfile)
+                .where(ProtocolProfile.node_id == node_id)
+                .order_by(ProtocolProfile.created_at.asc())
+            )
+        )
+        .scalars()
+        .all()
+    )
+    profile_by_id = {profile.id: profile for profile in profiles}
+    enabled_ids = set(enabled_profile_ids)
+    unknown_ids = sorted(str(profile_id) for profile_id in enabled_ids.difference(profile_by_id))
+    if unknown_ids:
+        raise APIError(
+            code="node_protocol_selection_profile_mismatch",
+            message="Every enabled profile id must belong to the selected node.",
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            details=unknown_ids,
+        )
+
+    changed_enabled: list[ProtocolProfile] = []
+    changed_disabled: list[ProtocolProfile] = []
+    xray_changed = False
+    for profile in profiles:
+        next_status = "active" if profile.id in enabled_ids else "disabled"
+        if profile.status == next_status:
+            continue
+        profile.status = next_status
+        _mark_profile_runtime_pending(
+            profile,
+            reason="node.protocol_selection",
+            changed_fields=["status"],
+        )
+        if _adapter_family(profile.adapter) == "xray":
+            xray_changed = True
+        elif next_status == "active":
+            changed_enabled.append(profile)
+        else:
+            changed_disabled.append(profile)
+
+    await session.flush()
+
+    commands: list[NodeCommand] = []
+    if xray_changed:
+        active_xray_profiles = [
+            profile
+            for profile in profiles
+            if profile.status == "active" and _adapter_family(profile.adapter) == "xray"
+        ]
+        target_xray_profile = None
+        for profile in active_xray_profiles:
+            if await list_profile_runtime_clients(session, profile=profile):
+                target_xray_profile = profile
+                break
+        if target_xray_profile is None:
+            command = await enqueue_node_command(
+                session,
+                node_id=node_id,
+                request=NodeCommandCreateRequest(
+                    command_type="outbound.remove",
+                    payload_json={
+                        "adapter": "xray",
+                        "profileIds": [
+                            str(profile.id)
+                            for profile in profiles
+                            if _adapter_family(profile.adapter) == "xray"
+                        ],
+                    },
+                ),
+            )
+            commands.append(command)
+            for profile in profiles:
+                if _adapter_family(profile.adapter) == "xray":
+                    _mark_profile_apply_queued(profile, command=command)
+        else:
+            commands.append(await apply_profile_to_node(session, profile_id=target_xray_profile.id))
+
+    for profile in changed_enabled:
+        commands.append(await apply_profile_to_node(session, profile_id=profile.id))
+
+    for profile in changed_disabled:
+        command = await enqueue_node_command(
+            session,
+            node_id=node_id,
+            request=NodeCommandCreateRequest(
+                command_type="outbound.remove",
+                payload_json={
+                    "adapter": profile.adapter,
+                    "profileId": str(profile.id),
+                },
+            ),
+        )
+        commands.append(command)
+        _mark_profile_apply_queued(profile, command=command)
+
+    await session.flush()
+    return [_profile_selection_item(profile) for profile in profiles], commands
+
+
 async def list_profile_inbounds(
     session: AsyncSession,
     *,

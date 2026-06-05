@@ -32,7 +32,6 @@ import type {
   LicenseListResponse,
   LumenApiClient,
   MfaMethod,
-  NodeBulkActionRequest,
   NodeUserIpResponse,
   NodePluginApplyRequest,
   NodePluginCloneRequest,
@@ -46,7 +45,6 @@ import type {
   NodeOverviewResponse,
   NodeRecord,
   NodeResponse,
-  NodeReorderRequest,
   NodeUpdateRequest,
   PortCheckRequest,
   PortCheckResponse,
@@ -771,14 +769,65 @@ export function createDevelopmentLumenApiClient(): LumenApiClient {
     createProvisioningJob: async (request) => buildDevelopmentProvisioningJob(request),
     createNodeCommand: async (nodeId: string, request: NodeCommandCreateRequest) =>
       createDevelopmentNodeCommand(nodeId, request),
+    getNodeProtocolSelection: async (nodeId: string) => ({
+      items: profiles
+        .filter((profile) => profile.node_id === nodeId)
+        .map((profile) => ({
+          adapter: profile.adapter,
+          enabled: profile.status === 'active',
+          name: profile.name,
+          profile_id: profile.id,
+          runtime_sync: profile.runtime_sync ?? { pending_apply: false, status: 'never_applied' },
+          status: profile.status,
+        })),
+      node_id: nodeId,
+      queued_commands: [],
+    }),
+    updateNodeProtocolSelection: async (nodeId: string, request) => {
+      const enabledIds = new Set(request.enabled_profile_ids)
+      const nodeProfiles = profiles.filter((profile) => profile.node_id === nodeId)
+      const queued_commands = []
+      for (const profile of nodeProfiles) {
+        const nextStatus = enabledIds.has(profile.id) ? 'active' : 'disabled'
+        if (profile.status === nextStatus) {
+          continue
+        }
+        profile.status = nextStatus
+        profile.runtime_sync = {
+          last_apply_queued_at: new Date().toISOString(),
+          node_id: nodeId,
+          pending_apply: true,
+          profile_id: profile.id,
+          status: 'apply_queued',
+        }
+        queued_commands.push(
+          createDevelopmentNodeCommand(nodeId, {
+            command_type: nextStatus === 'active' ? 'outbound.apply' : 'outbound.remove',
+            payload_json: { adapter: profile.adapter, profileId: profile.id },
+          }),
+        )
+      }
+      return {
+        items: nodeProfiles.map((profile) => ({
+          adapter: profile.adapter,
+          enabled: profile.status === 'active',
+          name: profile.name,
+          profile_id: profile.id,
+          runtime_sync: profile.runtime_sync ?? { pending_apply: false, status: 'never_applied' },
+          status: profile.status,
+        })),
+        node_id: nodeId,
+        queued_commands,
+      }
+    },
     updateNode: async (nodeId: string, request: NodeUpdateRequest) => {
       const node = asNodeResponse({ ...nodeRecords[0], id: nodeId })
       return { ...node, ...request, id: nodeId }
     },
     deleteNode: async (nodeId: string) =>
       asNodeResponse({ ...nodeRecords[0], id: nodeId, status: 'offline' }),
-    reorderNodes: async (_request: NodeReorderRequest) => asNodeListResponse(),
-    bulkNodes: async (_request: NodeBulkActionRequest) => asNodeListResponse(),
+    reorderNodes: async () => asNodeListResponse(),
+    bulkNodes: async () => asNodeListResponse(),
     restartNode: async (nodeId: string) =>
       createDevelopmentNodeCommand(nodeId, {
         command_type: 'node.restart',
@@ -1696,7 +1745,7 @@ export function createDevelopmentLumenApiClient(): LumenApiClient {
       secret: 'DEVSECRET',
       status: 'pending' as const,
     }),
-    verifyTotpSetup: async (methodId: string, _code: string) => {
+    verifyTotpSetup: async (methodId: string) => {
       mfaMethods.unshift({
         confirmed_at: new Date().toISOString(),
         id: methodId,

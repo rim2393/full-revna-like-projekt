@@ -18,6 +18,7 @@ import type {
   NodePluginUpdateRequest,
   NodeCommandCreateRequest,
   NodePauseRequest,
+  NodeProtocolSelectionRequest,
   NodeQuarantineRequest,
   NodeReorderRequest,
   NodeResumeRequest,
@@ -59,6 +60,8 @@ export const resourceQueryKeys = {
   nodeCommands: (nodeId: string) => ['resource', 'nodes', nodeId, 'commands'] as const,
   nodeMetrics: (nodeId: string) => ['resource', 'nodes', nodeId, 'metrics'] as const,
   nodeOverview: (nodeId: string) => ['resource', 'nodes', nodeId, 'overview'] as const,
+  nodeProtocolSelection: (nodeId: string) =>
+    ['resource', 'nodes', nodeId, 'protocol-selection'] as const,
   profiles: ['resource', 'profiles'] as const,
   profileGlobalInbounds: ['resource', 'profiles', 'inbounds'] as const,
   profileRuntimeReadiness: ['resource', 'profiles', 'runtime-readiness'] as const,
@@ -194,6 +197,46 @@ export function useNodeOverviewData(nodeId: string | undefined) {
     enabled: Boolean(nodeId),
     queryFn: () => apiClient.getNodeOverview(nodeId as string),
     queryKey: resourceQueryKeys.nodeOverview(nodeId ?? ''),
+  })
+}
+
+export function useNodeProtocolSelectionData(nodeId: string | undefined) {
+  const apiClient = useApiClient()
+
+  return useQuery({
+    enabled: Boolean(nodeId),
+    queryFn: () => apiClient.getNodeProtocolSelection(nodeId ?? ''),
+    queryKey: resourceQueryKeys.nodeProtocolSelection(nodeId ?? ''),
+  })
+}
+
+export function useUpdateNodeProtocolSelection() {
+  const apiClient = useApiClient()
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({
+      nodeId,
+      request,
+    }: {
+      nodeId: string
+      request: NodeProtocolSelectionRequest
+    }) => apiClient.updateNodeProtocolSelection(nodeId, request),
+    onSuccess: (response, variables) => {
+      void queryClient.invalidateQueries({
+        queryKey: resourceQueryKeys.nodeProtocolSelection(variables.nodeId),
+      })
+      void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.profiles })
+      void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.profileGlobalInbounds })
+      void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.profileRuntimeReadiness })
+      void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.nodeCommands(variables.nodeId) })
+      for (const item of response.items) {
+        void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.profileInbounds(item.profile_id) })
+        void queryClient.invalidateQueries({
+          queryKey: resourceQueryKeys.profileComputedConfig(item.profile_id),
+        })
+      }
+    },
   })
 }
 

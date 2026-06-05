@@ -303,6 +303,25 @@ export type NodeCommandListResponse = {
   items: NodeCommandRecord[]
 }
 
+export type NodeProtocolSelectionItem = {
+  adapter: string
+  enabled: boolean
+  name: string
+  profile_id: string
+  runtime_sync: RuntimeSyncStatus
+  status: string
+}
+
+export type NodeProtocolSelectionRequest = {
+  enabled_profile_ids: string[]
+}
+
+export type NodeProtocolSelectionResponse = {
+  items: NodeProtocolSelectionItem[]
+  node_id: string
+  queued_commands: NodeCommandRecord[]
+}
+
 export type NodeMetricRecord = {
   created_at: string
   id: string
@@ -1418,6 +1437,11 @@ export type LumenApiClient = {
     nodeId: string,
     request: NodeCommandCreateRequest,
   ) => Promise<NodeCommandRecord>
+  getNodeProtocolSelection: (nodeId: string) => Promise<NodeProtocolSelectionResponse>
+  updateNodeProtocolSelection: (
+    nodeId: string,
+    request: NodeProtocolSelectionRequest,
+  ) => Promise<NodeProtocolSelectionResponse>
   updateNode: (nodeId: string, request: NodeUpdateRequest) => Promise<NodeResponse>
   deleteNode: (nodeId: string) => Promise<NodeResponse>
   reorderNodes: (request: NodeReorderRequest) => Promise<NodeListResponse>
