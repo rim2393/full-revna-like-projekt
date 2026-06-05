@@ -2568,10 +2568,11 @@ async def list_profile_runtime_clients(
             continue
 
         protocol_type = str(delivery.get("protocol") or profile.adapter)
+        credentials_ref = profile.credentials_ref or f"vault://subscriptions/{subscription.public_id}/{protocol_type}"
         credentials = derive_client_credentials(
             settings=settings,
             subscription_id=subscription.public_id,
-            credentials_ref=profile.credentials_ref,
+            credentials_ref=credentials_ref,
             protocol_id=delivery.get("protocol_id") or protocol_type,
             protocol_type=protocol_type,
         )

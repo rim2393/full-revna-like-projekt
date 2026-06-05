@@ -17,6 +17,7 @@ from app.domains.licenses.models import License
 from app.domains.licenses.service import hash_license_key
 from app.domains.nodes.models import Node
 from app.domains.protocols.models import Host, ProtocolProfile
+from app.domains.protocols.service import list_profile_runtime_clients
 from app.domains.subscriptions.schemas import SubscriptionIssueFromProfileRequest
 from app.domains.subscriptions.service import issue_subscription_from_profile
 from app.domains.users.models import User
@@ -216,6 +217,69 @@ async def test_lumen_json_uses_profile_flow_for_profile_backed_vless(
     protocol = native.json()["nodes"][0]["protocols"][0]
     assert protocol["adapter"] == "vless-reality"
     assert protocol["flow"] == "xtls-rprx-vision"
+
+
+async def test_profile_backed_subscription_runtime_clients_use_manifest_credentials_ref_fallback(
+    route_app: RouteTestApp,
+) -> None:
+    user, license_record, node = await _seed(route_app)
+    async with route_app.sessionmaker() as session:
+        profile = ProtocolProfile(
+            name="profile-backed-vless-tcp-no-credentials-ref",
+            node_id=node.id,
+            adapter="vless-tcp",
+            status="active",
+            credentials_ref=None,
+            config_json={"network": "tcp", "security": {"type": "none"}},
+            port_reservations=[],
+            metadata_json={},
+        )
+        session.add(profile)
+        await session.flush()
+        host = Host(
+            name="profile-backed-vless-tcp-host",
+            hostname="node.85-192-60-8.sslip.io",
+            node_id=node.id,
+            protocol_profile_id=profile.id,
+            status="active",
+            tags=[],
+            metadata_json={},
+            port=18449,
+            security="none",
+        )
+        session.add(host)
+        await session.commit()
+
+    async with route_app.sessionmaker() as session:
+        subscription = await issue_subscription_from_profile(
+            session,
+            request=SubscriptionIssueFromProfileRequest(
+                user_id=user.id,
+                license_id=license_record.id,
+                profile_id=profile.id,
+                host_id=host.id,
+                profile_title="Profile backed VLESS TCP",
+                render_targets=["lumen-json"],
+                config_hash="sha256:profile-backed-vless-tcp",
+            ),
+        )
+        await session.commit()
+
+    native = await route_app.client.get(
+        f"/api/v1/subscriptions/public/{subscription.public_id}/render?target=lumen-json",
+    )
+    assert native.status_code == 200, native.text
+    protocol = native.json()["nodes"][0]["protocols"][0]
+
+    async with route_app.sessionmaker() as session:
+        persisted_profile = await session.get(ProtocolProfile, profile.id)
+        assert persisted_profile is not None
+        runtime_clients = await list_profile_runtime_clients(session, profile=persisted_profile)
+
+    assert len(runtime_clients) == 1
+    assert runtime_clients[0]["public_id"] == subscription.public_id
+    assert runtime_clients[0]["uuid"] == protocol["credentials"]["uuid"]
+    assert protocol["credentialsRef"] == f"vault://subscriptions/{subscription.public_id}/vless-tcp"
 
 
 async def test_shadowsocks_subscription_renders_all_client_formats(
