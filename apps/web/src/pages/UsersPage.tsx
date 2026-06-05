@@ -1,6 +1,19 @@
-import { useState, type FormEvent } from 'react'
+import { useMemo, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
-import { Ban, CalendarClock, RefreshCw, RotateCcw, Save, Search, Tags, Trash2, UserPlus, UserMinus } from 'lucide-react'
+import {
+  Ban,
+  CalendarClock,
+  CheckCircle2,
+  Eye,
+  Filter,
+  RefreshCw,
+  RotateCcw,
+  Search,
+  Tags,
+  Trash2,
+  UserMinus,
+  UserPlus,
+} from 'lucide-react'
 import {
   useBulkUsers,
   useCreateUser,
@@ -11,22 +24,20 @@ import {
   useResetUserTraffic,
   useRevokeUser,
   useSquadsPageData,
-  useUpdateUser,
   useUsersPageData,
 } from '../shared/api/resourceHooks'
 import type { UserRecord } from '../shared/api/types'
 import { DataTable } from '../shared/components/DataTable'
 import { EmptyState, ErrorState, LoadingState } from '../shared/components/DataState'
-import {
-  FormError,
-  ScreenForm,
-  SubmitButton,
-} from '../shared/components/ResourceScreen'
+import { FormError, ScreenForm, SubmitButton } from '../shared/components/ResourceScreen'
 import { PageHeader } from '../shared/components/PageHeader'
 import { StatusBadge } from '../shared/components/StatusBadge'
 import { sectionSpecs } from '../shared/data/resourceMeta'
 import { useI18n } from '../shared/i18n/I18nProvider'
-import { toneForStatus } from '../shared/utils/resourceFormat'
+import { formatDateTime, toneForStatus } from '../shared/utils/resourceFormat'
+
+type StatusFilter = 'all' | 'active' | 'disabled' | 'revoked' | 'expired' | 'over_limit'
+type SortMode = 'created_desc' | 'traffic_desc' | 'expires_asc' | 'name_asc'
 
 function formatUserName(user: UserRecord): string {
   return user.display_name || user.username || user.email
@@ -44,13 +55,57 @@ function getErrorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback
 }
 
+function isExpired(user: UserRecord) {
+  return Boolean(user.expires_at && Date.parse(user.expires_at) <= Date.now())
+}
+
+function isOverTrafficLimit(user: UserRecord) {
+  return user.traffic_limit_gb !== null && user.traffic_used_gb >= user.traffic_limit_gb
+}
+
+function userMatchesSearch(user: UserRecord, needle: string) {
+  if (!needle) {
+    return true
+  }
+  const fields = [
+    user.id,
+    user.email,
+    user.username,
+    user.display_name,
+    user.telegram_id,
+    user.role,
+    user.status,
+    ...user.tags,
+    String(user.metadata_json.numeric_id ?? user.metadata_json.id ?? ''),
+  ]
+  return fields.some((field) => String(field ?? '').toLowerCase().includes(needle))
+}
+
+function sortedUsers(users: UserRecord[], sortMode: SortMode) {
+  const items = [...users]
+  switch (sortMode) {
+    case 'traffic_desc':
+      return items.sort((left, right) => right.traffic_used_gb - left.traffic_used_gb)
+    case 'expires_asc':
+      return items.sort((left, right) => {
+        const leftTime = left.expires_at ? Date.parse(left.expires_at) : Number.POSITIVE_INFINITY
+        const rightTime = right.expires_at ? Date.parse(right.expires_at) : Number.POSITIVE_INFINITY
+        return leftTime - rightTime
+      })
+    case 'name_asc':
+      return items.sort((left, right) => formatUserName(left).localeCompare(formatUserName(right)))
+    case 'created_desc':
+    default:
+      return items.sort((left, right) => Date.parse(right.created_at) - Date.parse(left.created_at))
+  }
+}
+
 export function UsersPage() {
   const { t } = useI18n()
   const spec = sectionSpecs.users
   const query = useUsersPageData()
   const squadsQuery = useSquadsPageData()
   const createUser = useCreateUser()
-  const updateUser = useUpdateUser()
   const deleteUser = useDeleteUser()
   const enableUser = useEnableUser()
   const disableUser = useDisableUser()
@@ -60,6 +115,10 @@ export function UsersPage() {
   const lookupUsers = useLookupUsers()
   const users = query.data?.items ?? []
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [focusedUserId, setFocusedUserId] = useState('')
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+  const [sortMode, setSortMode] = useState<SortMode>('created_desc')
   const [lookupQuery, setLookupQuery] = useState('')
   const [email, setEmail] = useState('')
   const [username, setUsername] = useState('')
@@ -72,6 +131,49 @@ export function UsersPage() {
   const [bulkSquadId, setBulkSquadId] = useState('')
   const [formError, setFormError] = useState<string | null>(null)
 
+  const filteredUsers = useMemo(() => {
+    const needle = search.trim().toLowerCase()
+    const statusMatched = users.filter((user) => {
+      if (!userMatchesSearch(user, needle)) {
+        return false
+      }
+      if (statusFilter === 'expired') {
+        return isExpired(user)
+      }
+      if (statusFilter === 'over_limit') {
+        return isOverTrafficLimit(user)
+      }
+      return statusFilter === 'all' || user.status === statusFilter
+    })
+    return sortedUsers(statusMatched, sortMode)
+  }, [search, sortMode, statusFilter, users])
+
+  const focusedUser = useMemo(
+    () => users.find((user) => user.id === focusedUserId) ?? filteredUsers[0],
+    [filteredUsers, focusedUserId, users],
+  )
+
+  const stats = useMemo(() => {
+    const trafficUsed = users.reduce((total, user) => total + user.traffic_used_gb, 0)
+    const trafficLimit = users.reduce(
+      (total, user) => total + (user.traffic_limit_gb === null ? 0 : user.traffic_limit_gb),
+      0,
+    )
+    return {
+      active: users.filter((user) => user.status === 'active').length,
+      disabled: users.filter((user) => user.status === 'disabled').length,
+      expired: users.filter(isExpired).length,
+      overLimit: users.filter(isOverTrafficLimit).length,
+      revoked: users.filter((user) => user.status === 'revoked').length,
+      total: users.length,
+      trafficLimit,
+      trafficUsed,
+    }
+  }, [users])
+
+  const allFilteredSelected =
+    filteredUsers.length > 0 && filteredUsers.every((user) => selectedIds.has(user.id))
+
   function toggleSelected(id: string) {
     setSelectedIds((current) => {
       const next = new Set(current)
@@ -79,6 +181,23 @@ export function UsersPage() {
         next.delete(id)
       } else {
         next.add(id)
+      }
+      return next
+    })
+  }
+
+  function toggleFilteredSelection() {
+    setSelectedIds((current) => {
+      if (allFilteredSelected) {
+        const next = new Set(current)
+        for (const user of filteredUsers) {
+          next.delete(user.id)
+        }
+        return next
+      }
+      const next = new Set(current)
+      for (const user of filteredUsers) {
+        next.add(user.id)
       }
       return next
     })
@@ -97,7 +216,7 @@ export function UsersPage() {
       return
     }
     try {
-      await createUser.mutateAsync({
+      const created = await createUser.mutateAsync({
         device_limit: parsedDeviceLimit,
         display_name: displayName.trim() || null,
         email: email.trim(),
@@ -106,6 +225,7 @@ export function UsersPage() {
         traffic_limit_gb: parsedTrafficLimit,
         username: username.trim() || null,
       })
+      setFocusedUserId(created.id)
       setEmail('')
       setUsername('')
       setDisplayName('')
@@ -188,7 +308,7 @@ export function UsersPage() {
   }
 
   return (
-    <section className="page">
+    <section className="page users-page">
       <PageHeader
         eyebrow={spec.eyebrow}
         title={spec.title}
@@ -216,132 +336,109 @@ export function UsersPage() {
         />
       ) : null}
 
-      <section className="resource-grid">
-        <article className="panel panel--wide">
+      <section className="summary-grid" aria-label={t('Users summary')}>
+        <SummaryTile label={t('Total users')} value={String(stats.total)} detail={`${stats.active} ${t('active')}`} />
+        <SummaryTile label={t('Disabled')} value={String(stats.disabled)} detail={`${stats.revoked} ${t('revoked')}`} />
+        <SummaryTile label={t('Expired')} value={String(stats.expired)} detail={`${stats.overLimit} ${t('over limit')}`} />
+        <SummaryTile
+          label={t('Traffic')}
+          value={`${stats.trafficUsed.toFixed(1)} GB`}
+          detail={stats.trafficLimit > 0 ? `/ ${stats.trafficLimit.toFixed(0)} GB` : t('unlimited')}
+        />
+      </section>
+
+      <section className="users-workspace">
+        <article className="panel panel--wide users-directory">
           <div className="panel__header">
             <div>
               <p className="eyebrow">{t('Identity registry')}</p>
               <h2>{t('User directory')}</h2>
             </div>
-            <StatusBadge>{t('users.count', { count: users.length })}</StatusBadge>
+            <StatusBadge>{`${t('Showing')} ${filteredUsers.length} / ${users.length}`}</StatusBadge>
           </div>
-          <div className="inline-actions">
-            <button
-              type="button"
-              className="button button--secondary"
-              onClick={() => void runBulk('status', 'active')}
-            >
-              <Save size={16} aria-hidden="true" />
-              {t('Enable selected')}
-            </button>
-            <button
-              type="button"
-              className="button button--secondary"
-              onClick={() => void runBulk('status', 'disabled')}
-            >
-              <Ban size={16} aria-hidden="true" />
-              {t('Disable selected')}
-            </button>
-            <button
-              type="button"
-              className="button button--secondary"
-              onClick={() => void runBulk('reset-traffic')}
-            >
-              <RotateCcw size={16} aria-hidden="true" />
-              {t('Reset traffic')}
-            </button>
-            <button
-              type="button"
-              className="button button--secondary"
-              onClick={() => void runBulkWithRequest('revoke')}
-            >
-              <Ban size={16} aria-hidden="true" />
-              {t('Revoke selected')}
-            </button>
-            <button
-              type="button"
-              className="button button--secondary"
-              onClick={() => void runBulkWithRequest('delete')}
-            >
-              <Trash2 size={16} aria-hidden="true" />
-              {t('Delete selected')}
-            </button>
-          </div>
-          <div className="resource-list">
-            <div className="resource-list__item">
-              <span>{t('Selected users')}</span>
-              <small>{selectedIds.size}</small>
-            </div>
-            <label htmlFor="bulk-user-tags">
-              {t('Tags')}
-              <input
-                id="bulk-user-tags"
-                value={bulkTags}
-                onChange={(event) => setBulkTags(event.target.value)}
-                placeholder="vip, trial"
-              />
+
+          <div className="users-toolbar">
+            <label htmlFor="users-search" className="field">
+              {t('Search users')}
+              <span className="topbar__search users-toolbar__search">
+                <Search size={18} aria-hidden="true" />
+                <input
+                  id="users-search"
+                  type="search"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder={t('Email, username, tag, Telegram, UUID')}
+                />
+              </span>
             </label>
-            <button type="button" className="button button--secondary" onClick={() => void runBulkTags()}>
-              <Tags size={16} aria-hidden="true" />
-              {t('Apply tags')}
-            </button>
-            <label htmlFor="bulk-user-expires-at">
-              {t('Expiration')}
-              <input
-                id="bulk-user-expires-at"
-                type="datetime-local"
-                value={bulkExpiresAt}
-                onChange={(event) => setBulkExpiresAt(event.target.value)}
-              />
-            </label>
-            <button type="button" className="button button--secondary" onClick={() => void runBulkExtend()}>
-              <CalendarClock size={16} aria-hidden="true" />
-              {t('Extend selected')}
-            </button>
-            <label htmlFor="bulk-user-traffic-delta">
-              {t('Traffic delta GB')}
-              <input
-                id="bulk-user-traffic-delta"
-                inputMode="decimal"
-                value={bulkTrafficDelta}
-                onChange={(event) => setBulkTrafficDelta(event.target.value)}
-                placeholder="10 or -5"
-              />
-            </label>
-            <button type="button" className="button button--secondary" onClick={() => void runBulkTrafficDelta()}>
-              <RotateCcw size={16} aria-hidden="true" />
-              {t('Apply traffic delta')}
-            </button>
-            <label htmlFor="bulk-user-squad">
-              {t('Squad')}
+            <label htmlFor="users-status-filter" className="field">
+              {t('Status')}
               <select
-                id="bulk-user-squad"
-                value={bulkSquadId}
-                onChange={(event) => setBulkSquadId(event.target.value)}
+                id="users-status-filter"
+                value={statusFilter}
+                onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}
               >
-                <option value="">{t('Select squad')}</option>
-                {(squadsQuery.data?.items ?? []).map((squad) => (
-                  <option key={squad.id} value={squad.id}>
-                    {squad.name}
-                  </option>
-                ))}
+                <option value="all">{t('All statuses')}</option>
+                <option value="active">{t('Active')}</option>
+                <option value="disabled">{t('Disabled')}</option>
+                <option value="revoked">{t('Revoked')}</option>
+                <option value="expired">{t('Expired')}</option>
+                <option value="over_limit">{t('Over traffic limit')}</option>
               </select>
             </label>
-            <div className="inline-actions">
-              <button type="button" className="button button--secondary" onClick={() => void runBulkSquad('squad-add')}>
-                <UserPlus size={16} aria-hidden="true" />
-                {t('Add to squad')}
+            <label htmlFor="users-sort" className="field">
+              {t('Sort')}
+              <select id="users-sort" value={sortMode} onChange={(event) => setSortMode(event.target.value as SortMode)}>
+                <option value="created_desc">{t('Newest first')}</option>
+                <option value="traffic_desc">{t('Traffic used')}</option>
+                <option value="expires_asc">{t('Expiration first')}</option>
+                <option value="name_asc">{t('Name')}</option>
+              </select>
+            </label>
+            <button
+              type="button"
+              className="button button--secondary"
+              disabled={filteredUsers.length === 0}
+              onClick={toggleFilteredSelection}
+            >
+              <Filter size={16} aria-hidden="true" />
+              {allFilteredSelected ? t('Unselect filtered') : t('Select filtered')}
+            </button>
+          </div>
+
+          <div className="users-bulk-panel" aria-label={t('Bulk user actions')}>
+            <div>
+              <span>{t('Selected users')}</span>
+              <strong>{selectedIds.size}</strong>
+            </div>
+            <div className="inline-actions inline-actions--compact">
+              <button type="button" className="button button--secondary" onClick={() => void runBulk('status', 'active')}>
+                <CheckCircle2 size={16} aria-hidden="true" />
+                {t('Enable')}
               </button>
-              <button type="button" className="button button--secondary" onClick={() => void runBulkSquad('squad-remove')}>
-                <UserMinus size={16} aria-hidden="true" />
-                {t('Remove from squad')}
+              <button type="button" className="button button--secondary" onClick={() => void runBulk('status', 'disabled')}>
+                <Ban size={16} aria-hidden="true" />
+                {t('Disable')}
+              </button>
+              <button type="button" className="button button--secondary" onClick={() => void runBulk('reset-traffic')}>
+                <RotateCcw size={16} aria-hidden="true" />
+                {t('Reset traffic')}
+              </button>
+              <button type="button" className="button button--secondary" onClick={() => void runBulkWithRequest('revoke')}>
+                <Ban size={16} aria-hidden="true" />
+                {t('Revoke')}
+              </button>
+              <button type="button" className="button button--secondary" onClick={() => void runBulkWithRequest('delete')}>
+                <Trash2 size={16} aria-hidden="true" />
+                {t('Delete')}
               </button>
             </div>
           </div>
+
           <DataTable
             caption={t('User directory')}
-            columns={['Select', 'User', 'Role', 'Devices', 'Traffic', 'Tags', 'Status', 'Actions']}
-            rows={users.map((user) => ({
+            columns={['Select', 'User', 'Devices', 'Traffic', 'Expires', 'Tags', 'Status', 'Actions']}
+            rows={filteredUsers.map((user) => ({
               cells: [
                 <input
                   aria-label={t('Select {name}', { name: formatUserName(user) })}
@@ -350,17 +447,31 @@ export function UsersPage() {
                   onChange={() => toggleSelected(user.id)}
                 />,
                 <div>
-                  <Link className="text-link" to={`/users/${user.id}`}>
+                  <button
+                    type="button"
+                    className="text-link text-link--button"
+                    onClick={() => setFocusedUserId(user.id)}
+                  >
                     {formatUserName(user)}
-                  </Link>
+                  </button>
                   <p className="table-subtext">{user.email}</p>
                 </div>,
-                user.role,
                 user.device_limit === null ? t('unlimited') : user.device_limit,
                 formatLimit(user, t),
+                user.expires_at ? formatDateTime(user.expires_at) : t('Not set'),
                 user.tags.length > 0 ? user.tags.join(', ') : t('none'),
-                <StatusBadge tone={toneForStatus(user.status)}>{user.status}</StatusBadge>,
-                <div className="inline-actions">
+                <StatusBadge tone={toneForStatus(isExpired(user) ? 'expired' : user.status)}>
+                  {isExpired(user) ? t('expired') : user.status}
+                </StatusBadge>,
+                <div className="inline-actions inline-actions--compact">
+                  <button
+                    type="button"
+                    className="icon-button"
+                    aria-label={t('Open {name}', { name: formatUserName(user) })}
+                    onClick={() => setFocusedUserId(user.id)}
+                  >
+                    <Eye size={16} aria-hidden="true" />
+                  </button>
                   <button
                     type="button"
                     className="icon-button"
@@ -383,181 +494,61 @@ export function UsersPage() {
                   >
                     <RotateCcw size={16} aria-hidden="true" />
                   </button>
-                  <button
-                    type="button"
-                    className="icon-button"
-                    aria-label={t('Revoke {name}', { name: formatUserName(user) })}
-                    disabled={revokeUser.isPending}
-                    onClick={() => void revokeUser.mutateAsync(user.id)}
-                  >
-                    <Ban size={16} aria-hidden="true" />
-                  </button>
-                  <button
-                    type="button"
-                    className="icon-button"
-                    aria-label={t('Delete {name}', { name: formatUserName(user) })}
-                    disabled={deleteUser.isPending}
-                    onClick={() => void deleteUser.mutateAsync(user.id)}
-                  >
-                    <Trash2 size={16} aria-hidden="true" />
-                  </button>
                 </div>,
               ],
               id: user.id,
             }))}
           />
         </article>
-        <ScreenForm onSubmit={handleLookup}>
-          <div>
-            <p className="eyebrow">{t('Lookup')}</p>
-            <h2>{t('Find user')}</h2>
-            <p>{t('Lookup by UUID, short UUID, username, email, numeric ID, Telegram ID, or tag.')}</p>
-          </div>
-          <label htmlFor="user-lookup-query">
-            {t('Lookup query')}
-            <input
-              id="user-lookup-query"
-              value={lookupQuery}
-              onChange={(event) => setLookupQuery(event.target.value)}
-              placeholder="email@example.com, tag:trial, 12345"
-            />
-          </label>
-          <SubmitButton pending={lookupUsers.isPending}>
-            <Search size={16} aria-hidden="true" />
-            {t('Find user')}
-          </SubmitButton>
-          <FormError
-            message={
-              lookupUsers.isError
-                ? getErrorMessage(lookupUsers.error, t('User lookup failed.'))
-                : null
-            }
+
+        <aside className="side-stack users-side">
+          <FocusedUserCard
+            deleteUser={deleteUser}
+            disableUser={disableUser}
+            enableUser={enableUser}
+            resetUserTraffic={resetUserTraffic}
+            revokeUser={revokeUser}
+            t={t}
+            user={focusedUser}
           />
-          {lookupUsers.data ? (
-            <div className="resource-list">
-              <div className="resource-list__item">
-                <span>{t('Lookup strategy')}</span>
-                <small>{lookupUsers.data.strategy}</small>
-              </div>
-              {lookupUsers.data.items.length === 0 ? (
-                <div className="resource-list__item">
-                  <span>{t('No users found')}</span>
-                  <small>{lookupUsers.data.query}</small>
-                </div>
-              ) : (
-                lookupUsers.data.items.map((user) => (
-                  <div className="resource-list__item" key={user.id}>
-                    <span>
-                      <Link className="text-link" to={`/users/${user.id}`}>
-                        {formatUserName(user)}
-                      </Link>
-                    </span>
-                    <small>{user.email}</small>
-                  </div>
-                ))
-              )}
-            </div>
-          ) : null}
-        </ScreenForm>
-        <ScreenForm onSubmit={handleCreate}>
-          <div>
-            <p className="eyebrow">{t('Create user')}</p>
-            <h2>{t('VPN account')}</h2>
-            <p>{t('Limits are stored in the backend and used by subscription delivery.')}</p>
-          </div>
-          <label htmlFor="user-email">
-            {t('Email')}
-            <input
-              id="user-email"
-              required
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-            />
-          </label>
-          <label htmlFor="user-username">
-            {t('Username')}
-            <input
-              id="user-username"
-              value={username}
-              onChange={(event) => setUsername(event.target.value)}
-            />
-          </label>
-          <label htmlFor="user-display-name">
-            {t('Display name')}
-            <input
-              id="user-display-name"
-              value={displayName}
-              onChange={(event) => setDisplayName(event.target.value)}
-            />
-          </label>
-          <label htmlFor="user-traffic-limit">
-            {t('Traffic limit GB')}
-            <input
-              id="user-traffic-limit"
-              inputMode="decimal"
-              value={trafficLimit}
-              onChange={(event) => setTrafficLimit(event.target.value)}
-            />
-          </label>
-          <label htmlFor="user-device-limit">
-            {t('Device limit')}
-            <input
-              id="user-device-limit"
-              inputMode="numeric"
-              value={deviceLimit}
-              onChange={(event) => setDeviceLimit(event.target.value)}
-            />
-          </label>
-          <FormError message={formError} />
-          <FormError
-            message={
-              createUser.isError
-                ? getErrorMessage(createUser.error, t('User could not be created.'))
-                : null
-            }
+          <BulkEditor
+            bulkExpiresAt={bulkExpiresAt}
+            bulkSquadId={bulkSquadId}
+            bulkTags={bulkTags}
+            bulkTrafficDelta={bulkTrafficDelta}
+            runBulkExtend={runBulkExtend}
+            runBulkSquad={runBulkSquad}
+            runBulkTags={runBulkTags}
+            runBulkTrafficDelta={runBulkTrafficDelta}
+            setBulkExpiresAt={setBulkExpiresAt}
+            setBulkSquadId={setBulkSquadId}
+            setBulkTags={setBulkTags}
+            setBulkTrafficDelta={setBulkTrafficDelta}
+            squads={squadsQuery.data?.items ?? []}
+            t={t}
           />
-          <FormError
-            message={
-              updateUser.isError
-                ? getErrorMessage(updateUser.error, t('User could not be updated.'))
-                : null
-            }
+          <LookupCard
+            handleLookup={handleLookup}
+            lookupQuery={lookupQuery}
+            lookupUsers={lookupUsers}
+            setLookupQuery={setLookupQuery}
+            t={t}
           />
-          <FormError
-            message={
-              enableUser.isError
-                ? getErrorMessage(enableUser.error, t('User could not be updated.'))
-                : null
-            }
-          />
-          <FormError
-            message={
-              disableUser.isError
-                ? getErrorMessage(disableUser.error, t('User could not be updated.'))
-                : null
-            }
-          />
-          <FormError
-            message={
-              revokeUser.isError
-                ? getErrorMessage(revokeUser.error, t('User could not be updated.'))
-                : null
-            }
-          />
-          <FormError
-            message={
-              resetUserTraffic.isError
-                ? getErrorMessage(resetUserTraffic.error, t('User could not be updated.'))
-                : null
-            }
-          />
-          <FormError
-            message={
-              deleteUser.isError
-                ? getErrorMessage(deleteUser.error, t('User could not be deleted.'))
-                : null
-            }
+          <CreateUserCard
+            createUser={createUser}
+            deviceLimit={deviceLimit}
+            displayName={displayName}
+            email={email}
+            formError={formError}
+            handleCreate={handleCreate}
+            setDeviceLimit={setDeviceLimit}
+            setDisplayName={setDisplayName}
+            setEmail={setEmail}
+            setTrafficLimit={setTrafficLimit}
+            setUsername={setUsername}
+            t={t}
+            trafficLimit={trafficLimit}
+            username={username}
           />
           <FormError
             message={
@@ -566,9 +557,315 @@ export function UsersPage() {
                 : null
             }
           />
-          <SubmitButton pending={createUser.isPending}>{t('Create user')}</SubmitButton>
-        </ScreenForm>
+        </aside>
       </section>
     </section>
+  )
+}
+
+function SummaryTile({ detail, label, value }: { detail: string; label: string; value: string }) {
+  return (
+    <div>
+      <span>{label}</span>
+      <strong>{value}</strong>
+      <small>{detail}</small>
+    </div>
+  )
+}
+
+function FocusedUserCard({
+  deleteUser,
+  disableUser,
+  enableUser,
+  resetUserTraffic,
+  revokeUser,
+  t,
+  user,
+}: {
+  deleteUser: ReturnType<typeof useDeleteUser>
+  disableUser: ReturnType<typeof useDisableUser>
+  enableUser: ReturnType<typeof useEnableUser>
+  resetUserTraffic: ReturnType<typeof useResetUserTraffic>
+  revokeUser: ReturnType<typeof useRevokeUser>
+  t: (value: string, params?: Record<string, string | number>) => string
+  user: UserRecord | undefined
+}) {
+  if (!user) {
+    return (
+      <article className="panel">
+        <p className="eyebrow">{t('Selection')}</p>
+        <h2>{t('No user selected')}</h2>
+        <p className="empty-inline">{t('Select a user to inspect account controls.')}</p>
+      </article>
+    )
+  }
+
+  return (
+    <article className="panel users-focus-card">
+      <div className="panel__header">
+        <div>
+          <p className="eyebrow">{t('Selected user')}</p>
+          <h2>{formatUserName(user)}</h2>
+        </div>
+        <StatusBadge tone={toneForStatus(user.status)}>{user.status}</StatusBadge>
+      </div>
+      <dl className="profile-facts">
+        <div>
+          <dt>{t('Email')}</dt>
+          <dd>{user.email}</dd>
+        </div>
+        <div>
+          <dt>{t('Traffic')}</dt>
+          <dd>{formatLimit(user, t)}</dd>
+        </div>
+        <div>
+          <dt>{t('Devices')}</dt>
+          <dd>{user.device_limit === null ? t('unlimited') : String(user.device_limit)}</dd>
+        </div>
+        <div>
+          <dt>{t('Expires')}</dt>
+          <dd>{user.expires_at ? formatDateTime(user.expires_at) : t('Not set')}</dd>
+        </div>
+        <div>
+          <dt>{t('Telegram ID')}</dt>
+          <dd>{user.telegram_id ?? t('Not set')}</dd>
+        </div>
+      </dl>
+      <div className="inline-actions">
+        <Link className="button button--primary" to={`/users/${user.id}`}>
+          <Eye size={16} aria-hidden="true" />
+          {t('Open detail')}
+        </Link>
+        <button
+          type="button"
+          className="button button--secondary"
+          onClick={() => void (user.status === 'active' ? disableUser.mutateAsync(user.id) : enableUser.mutateAsync(user.id))}
+        >
+          <Ban size={16} aria-hidden="true" />
+          {user.status === 'active' ? t('Disable') : t('Enable')}
+        </button>
+        <button type="button" className="button button--secondary" onClick={() => void resetUserTraffic.mutateAsync(user.id)}>
+          <RotateCcw size={16} aria-hidden="true" />
+          {t('Reset traffic')}
+        </button>
+        <button type="button" className="button button--secondary" onClick={() => void revokeUser.mutateAsync(user.id)}>
+          <Ban size={16} aria-hidden="true" />
+          {t('Revoke')}
+        </button>
+        <button type="button" className="button button--secondary" onClick={() => void deleteUser.mutateAsync(user.id)}>
+          <Trash2 size={16} aria-hidden="true" />
+          {t('Delete')}
+        </button>
+      </div>
+    </article>
+  )
+}
+
+function BulkEditor({
+  bulkExpiresAt,
+  bulkSquadId,
+  bulkTags,
+  bulkTrafficDelta,
+  runBulkExtend,
+  runBulkSquad,
+  runBulkTags,
+  runBulkTrafficDelta,
+  setBulkExpiresAt,
+  setBulkSquadId,
+  setBulkTags,
+  setBulkTrafficDelta,
+  squads,
+  t,
+}: {
+  bulkExpiresAt: string
+  bulkSquadId: string
+  bulkTags: string
+  bulkTrafficDelta: string
+  runBulkExtend: () => Promise<void>
+  runBulkSquad: (action: 'squad-add' | 'squad-remove') => Promise<void>
+  runBulkTags: () => Promise<void>
+  runBulkTrafficDelta: () => Promise<void>
+  setBulkExpiresAt: (value: string) => void
+  setBulkSquadId: (value: string) => void
+  setBulkTags: (value: string) => void
+  setBulkTrafficDelta: (value: string) => void
+  squads: Array<{ id: string; name: string }>
+  t: (value: string, params?: Record<string, string | number>) => string
+}) {
+  return (
+    <article className="panel">
+      <p className="eyebrow">{t('Bulk operations')}</p>
+      <h2>{t('Policy edits')}</h2>
+      <div className="resource-list users-policy-list">
+        <label htmlFor="bulk-user-tags">
+          {t('Tags')}
+          <input id="bulk-user-tags" value={bulkTags} onChange={(event) => setBulkTags(event.target.value)} placeholder="vip, trial" />
+        </label>
+        <button type="button" className="button button--secondary" onClick={() => void runBulkTags()}>
+          <Tags size={16} aria-hidden="true" />
+          {t('Apply tags')}
+        </button>
+        <label htmlFor="bulk-user-expires-at">
+          {t('Expiration')}
+          <input id="bulk-user-expires-at" type="datetime-local" value={bulkExpiresAt} onChange={(event) => setBulkExpiresAt(event.target.value)} />
+        </label>
+        <button type="button" className="button button--secondary" onClick={() => void runBulkExtend()}>
+          <CalendarClock size={16} aria-hidden="true" />
+          {t('Extend selected')}
+        </button>
+        <label htmlFor="bulk-user-traffic-delta">
+          {t('Traffic delta GB')}
+          <input id="bulk-user-traffic-delta" inputMode="decimal" value={bulkTrafficDelta} onChange={(event) => setBulkTrafficDelta(event.target.value)} placeholder="10 or -5" />
+        </label>
+        <button type="button" className="button button--secondary" onClick={() => void runBulkTrafficDelta()}>
+          <RotateCcw size={16} aria-hidden="true" />
+          {t('Apply traffic delta')}
+        </button>
+        <label htmlFor="bulk-user-squad">
+          {t('Squad')}
+          <select id="bulk-user-squad" value={bulkSquadId} onChange={(event) => setBulkSquadId(event.target.value)}>
+            <option value="">{t('Select squad')}</option>
+            {squads.map((squad) => (
+              <option key={squad.id} value={squad.id}>
+                {squad.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <div className="inline-actions">
+          <button type="button" className="button button--secondary" onClick={() => void runBulkSquad('squad-add')}>
+            <UserPlus size={16} aria-hidden="true" />
+            {t('Add to squad')}
+          </button>
+          <button type="button" className="button button--secondary" onClick={() => void runBulkSquad('squad-remove')}>
+            <UserMinus size={16} aria-hidden="true" />
+            {t('Remove from squad')}
+          </button>
+        </div>
+      </div>
+    </article>
+  )
+}
+
+function LookupCard({
+  handleLookup,
+  lookupQuery,
+  lookupUsers,
+  setLookupQuery,
+  t,
+}: {
+  handleLookup: (event: FormEvent<HTMLFormElement>) => Promise<void>
+  lookupQuery: string
+  lookupUsers: ReturnType<typeof useLookupUsers>
+  setLookupQuery: (value: string) => void
+  t: (value: string, params?: Record<string, string | number>) => string
+}) {
+  return (
+    <ScreenForm onSubmit={handleLookup}>
+      <div>
+        <p className="eyebrow">{t('Lookup')}</p>
+        <h2>{t('Find user')}</h2>
+        <p>{t('Lookup by UUID, short UUID, username, email, numeric ID, Telegram ID, or tag.')}</p>
+      </div>
+      <label htmlFor="user-lookup-query">
+        {t('Lookup query')}
+        <input id="user-lookup-query" value={lookupQuery} onChange={(event) => setLookupQuery(event.target.value)} placeholder="email@example.com, tag:trial, 12345" />
+      </label>
+      <SubmitButton pending={lookupUsers.isPending}>
+        <Search size={16} aria-hidden="true" />
+        {t('Find user')}
+      </SubmitButton>
+      <FormError message={lookupUsers.isError ? getErrorMessage(lookupUsers.error, t('User lookup failed.')) : null} />
+      {lookupUsers.data ? (
+        <div className="resource-list">
+          <div className="resource-list__item">
+            <span>{t('Lookup strategy')}</span>
+            <small>{lookupUsers.data.strategy}</small>
+          </div>
+          {lookupUsers.data.items.length === 0 ? (
+            <div className="resource-list__item">
+              <span>{t('No users found')}</span>
+              <small>{lookupUsers.data.query}</small>
+            </div>
+          ) : (
+            lookupUsers.data.items.map((user) => (
+              <div className="resource-list__item" key={user.id}>
+                <span>
+                  <Link className="text-link" to={`/users/${user.id}`}>
+                    {formatUserName(user)}
+                  </Link>
+                </span>
+                <small>{user.email}</small>
+              </div>
+            ))
+          )}
+        </div>
+      ) : null}
+    </ScreenForm>
+  )
+}
+
+function CreateUserCard({
+  createUser,
+  deviceLimit,
+  displayName,
+  email,
+  formError,
+  handleCreate,
+  setDeviceLimit,
+  setDisplayName,
+  setEmail,
+  setTrafficLimit,
+  setUsername,
+  t,
+  trafficLimit,
+  username,
+}: {
+  createUser: ReturnType<typeof useCreateUser>
+  deviceLimit: string
+  displayName: string
+  email: string
+  formError: string | null
+  handleCreate: (event: FormEvent<HTMLFormElement>) => Promise<void>
+  setDeviceLimit: (value: string) => void
+  setDisplayName: (value: string) => void
+  setEmail: (value: string) => void
+  setTrafficLimit: (value: string) => void
+  setUsername: (value: string) => void
+  t: (value: string, params?: Record<string, string | number>) => string
+  trafficLimit: string
+  username: string
+}) {
+  return (
+    <ScreenForm onSubmit={handleCreate}>
+      <div>
+        <p className="eyebrow">{t('Create user')}</p>
+        <h2>{t('VPN account')}</h2>
+        <p>{t('Limits are stored in the backend and used by subscription delivery.')}</p>
+      </div>
+      <label htmlFor="user-email">
+        {t('Email')}
+        <input id="user-email" required type="email" value={email} onChange={(event) => setEmail(event.target.value)} />
+      </label>
+      <label htmlFor="user-username">
+        {t('Username')}
+        <input id="user-username" value={username} onChange={(event) => setUsername(event.target.value)} />
+      </label>
+      <label htmlFor="user-display-name">
+        {t('Display name')}
+        <input id="user-display-name" value={displayName} onChange={(event) => setDisplayName(event.target.value)} />
+      </label>
+      <label htmlFor="user-traffic-limit">
+        {t('Traffic limit GB')}
+        <input id="user-traffic-limit" inputMode="decimal" value={trafficLimit} onChange={(event) => setTrafficLimit(event.target.value)} />
+      </label>
+      <label htmlFor="user-device-limit">
+        {t('Device limit')}
+        <input id="user-device-limit" inputMode="numeric" value={deviceLimit} onChange={(event) => setDeviceLimit(event.target.value)} />
+      </label>
+      <FormError message={formError} />
+      <FormError message={createUser.isError ? getErrorMessage(createUser.error, t('User could not be created.')) : null} />
+      <SubmitButton pending={createUser.isPending}>{t('Create user')}</SubmitButton>
+    </ScreenForm>
   )
 }
