@@ -194,6 +194,17 @@ h2 {
   border-color: var(--color-line);
 }
 
+.button--danger {
+  color: var(--color-ink-strong);
+  background: rgb(255 118 109 / 12%);
+  border-color: rgb(255 118 109 / 42%);
+}
+
+.button--danger:hover {
+  background: rgb(255 118 109 / 18%);
+  border-color: rgb(255 118 109 / 64%);
+}
+
 .action-cluster,
 .inline-actions {
   display: flex;
@@ -1324,6 +1335,64 @@ h2 {
   margin-top: var(--space-4);
 }
 
+.user-detail-page {
+  max-width: 1480px;
+}
+
+.user-detail-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.34fr);
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.user-editor-panel,
+.user-detail-side,
+.user-detail-lists {
+  min-width: 0;
+}
+
+.user-editor-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+  margin-top: var(--space-4);
+}
+
+.user-editor-grid label {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+  color: var(--color-muted-strong);
+  font-weight: 700;
+}
+
+.user-editor-grid input,
+.user-editor-grid select,
+.user-editor-grid textarea {
+  min-width: 0;
+}
+
+.user-editor-grid__wide,
+.user-editor-grid__actions,
+.user-editor-grid .form-error,
+.user-editor-grid > .status-badge {
+  grid-column: 1 / -1;
+}
+
+.user-editor-grid textarea {
+  resize: vertical;
+  font-family: var(--font-mono);
+  line-height: 1.5;
+}
+
+.user-editor-grid__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
 .workflow-list {
   display: grid;
   gap: var(--space-3);
@@ -1907,7 +1976,9 @@ h2 {
 
   .users-workspace,
   .users-toolbar,
-  .users-bulk-panel {
+  .users-bulk-panel,
+  .user-detail-workspace,
+  .user-editor-grid {
     grid-template-columns: minmax(0, 1fr);
   }
 }

@@ -447,13 +447,14 @@ export function UsersPage() {
                   onChange={() => toggleSelected(user.id)}
                 />,
                 <div>
-                  <button
-                    type="button"
-                    className="text-link text-link--button"
-                    onClick={() => setFocusedUserId(user.id)}
+                  <Link
+                    className="text-link"
+                    to={`/users/${user.id}`}
+                    onMouseEnter={() => setFocusedUserId(user.id)}
+                    onFocus={() => setFocusedUserId(user.id)}
                   >
                     {formatUserName(user)}
-                  </button>
+                  </Link>
                   <p className="table-subtext">{user.email}</p>
                 </div>,
                 user.device_limit === null ? t('unlimited') : user.device_limit,
@@ -464,14 +465,15 @@ export function UsersPage() {
                   {isExpired(user) ? t('expired') : user.status}
                 </StatusBadge>,
                 <div className="inline-actions inline-actions--compact">
-                  <button
-                    type="button"
+                  <Link
                     className="icon-button"
                     aria-label={t('Open {name}', { name: formatUserName(user) })}
-                    onClick={() => setFocusedUserId(user.id)}
+                    to={`/users/${user.id}`}
+                    onMouseEnter={() => setFocusedUserId(user.id)}
+                    onFocus={() => setFocusedUserId(user.id)}
                   >
                     <Eye size={16} aria-hidden="true" />
-                  </button>
+                  </Link>
                   <button
                     type="button"
                     className="icon-button"
