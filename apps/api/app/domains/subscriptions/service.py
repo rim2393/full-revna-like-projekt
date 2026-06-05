@@ -1513,6 +1513,9 @@ def _manifest_security(
         "fingerprint": security.get("fingerprint") or delivery.get("fingerprint"),
         "spiderX": security.get("spiderX") or delivery.get("spider_x"),
         "alpn": _manifest_alpn(security=security, delivery=delivery),
+        "pinnedPeerCertSha256": security.get("pinnedPeerCertSha256")
+        or delivery.get("pinned_peer_cert_sha256")
+        or delivery.get("pinnedPeerCertSha256"),
         "allowInsecure": False,
     }
 

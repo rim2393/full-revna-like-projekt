@@ -1213,7 +1213,11 @@ def xray_stream_settings(protocol: dict[str, Any]) -> dict[str, Any]:
         )
     elif security.get("type") == "tls":
         stream["tlsSettings"] = compact_object(
-            {"serverName": security.get("serverName"), "alpn": security.get("alpn") or None}
+            {
+                "serverName": security.get("serverName"),
+                "alpn": security.get("alpn") or None,
+                "pinnedPeerCertSha256": security.get("pinnedPeerCertSha256"),
+            }
         )
     return stream
 

@@ -582,7 +582,13 @@ async def test_subscription_manifest_route_renders_vless_profile_protocol(
             node_id=node.id,
             adapter="vless-tcp-tls",
             status="active",
-            config_json={"security": {"type": "tls", "serverName": "route.example.net"}},
+            config_json={
+                "security": {
+                    "type": "tls",
+                    "serverName": "route.example.net",
+                    "pinnedPeerCertSha256": "0123456789abcdef",
+                }
+            },
             port_reservations=[
                 {"address": "0.0.0.0", "port": 18081, "protocol": "tcp"},  # noqa: S104
             ],
@@ -656,6 +662,7 @@ async def test_subscription_manifest_route_renders_vless_profile_protocol(
         "network": "public",
     }
     assert protocol["security"]["type"] == "tls"
+    assert protocol["security"]["pinnedPeerCertSha256"] == "0123456789abcdef"
 
     public_manifest_response = await route_app.client.get(
         f"/api/v1/subscriptions/public/{create_response.json()['public_id']}/manifest",
@@ -664,7 +671,9 @@ async def test_subscription_manifest_route_renders_vless_profile_protocol(
     assert public_manifest_response.status_code == 200
     public_manifest = public_manifest_response.json()
     assert public_manifest["subscription"]["id"] == create_response.json()["public_id"]
-    assert public_manifest["nodes"][0]["protocols"][0]["type"] == "vless-tcp-tls"
+    public_protocol = public_manifest["nodes"][0]["protocols"][0]
+    assert public_protocol["type"] == "vless-tcp-tls"
+    assert public_protocol["security"]["pinnedPeerCertSha256"] == "0123456789abcdef"
     node_policy = public_manifest["nodes"][0]["metadata"]["nodePolicy"]
     assert node_policy["plugins"][0]["kind"] == "domain-filter"
     assert node_policy["ipControl"]["maxActiveIps"] == 1
