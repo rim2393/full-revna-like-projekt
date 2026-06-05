@@ -344,6 +344,7 @@ const ru: Record<string, string> = {
   'No settings saved': 'Настройки не сохранены',
   'Settings unavailable': 'Настройки недоступны',
   'Loading settings...': 'Загрузка настроек...',
+  'Refresh settings': 'Обновить настройки',
   'Settings are written as key=value fields; secret-like keys are rejected.':
     'Настройки сохраняются как поля key=value; ключи, похожие на секреты, отклоняются.',
   'Setting saved.': 'Настройка сохранена.',
