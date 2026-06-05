@@ -63,6 +63,7 @@ type HttpClientOptions = {
   baseUrl: string
   fetcher?: typeof fetch
   getSession: () => AuthSession | null
+  setSession?: (session: AuthSession | null) => void
 }
 
 export class LumenApiError extends Error {
@@ -79,10 +80,14 @@ export function createHttpLumenApiClient({
   baseUrl,
   fetcher = fetch,
   getSession,
+  setSession,
 }: HttpClientOptions): LumenApiClient {
+  let refreshPromise: Promise<AuthSession | null> | null = null
+
   async function request<TResponse>(
     path: string,
     options: { body?: unknown; method?: 'DELETE' | 'GET' | 'PATCH' | 'POST' | 'PUT' } = {},
+    retryOnUnauthorized = true,
   ): Promise<TResponse> {
     const session = getSession()
     const headers: Record<string, string> = {
@@ -105,6 +110,18 @@ export function createHttpLumenApiClient({
       body: options.body === undefined ? undefined : JSON.stringify(options.body),
     })
 
+    if (
+      response.status === 401 &&
+      retryOnUnauthorized &&
+      !isAuthBootstrapRequest(path) &&
+      (session?.refreshToken || path !== '/api/v1/auth/refresh')
+    ) {
+      const refreshedSession = await refreshSessionOnce()
+      if (refreshedSession?.accessToken) {
+        return request(path, options, false)
+      }
+    }
+
     if (!response.ok) {
       let message = `API request failed with status ${response.status}`
 
@@ -123,6 +140,32 @@ export function createHttpLumenApiClient({
     }
 
     return (await response.json()) as TResponse
+  }
+
+  async function refreshSessionOnce(): Promise<AuthSession | null> {
+    refreshPromise ??= refreshSession().finally(() => {
+      refreshPromise = null
+    })
+    return refreshPromise
+  }
+
+  async function refreshSession(): Promise<AuthSession | null> {
+    const currentSession = getSession()
+    try {
+      const tokenPair = await request<TokenPairResponse>(
+        '/api/v1/auth/refresh',
+        currentSession?.refreshToken
+          ? { body: { refresh_token: currentSession.refreshToken }, method: 'POST' }
+          : { method: 'POST' },
+        false,
+      )
+      const refreshedSession = await readSessionAfterTokenIssue(tokenPair)
+      setSession?.(refreshedSession)
+      return refreshedSession
+    } catch {
+      setSession?.(null)
+      return null
+    }
   }
 
   return {
@@ -310,7 +353,7 @@ export function createHttpLumenApiClient({
     lookupUsers: (query: string) => request(`/api/v1/users/lookup?query=${encodeURIComponent(query)}`),
     getSession: async () => {
       try {
-        return await request('/api/auth/session')
+        return await request('/api/auth/session', {}, false)
       } catch (error) {
         if (!(error instanceof LumenApiError) || error.status !== 401) {
           throw error
@@ -502,11 +545,39 @@ export function createHttpLumenApiClient({
   }
 
   async function readSessionAfterTokenIssue(tokenPair: TokenPairResponse): Promise<AuthSession> {
-    const session = await request<AuthSession>('/api/auth/session')
+    const response = await fetcher(new URL('/api/auth/session', baseUrl), {
+      credentials: 'include',
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${tokenPair.access_token}`,
+      },
+      method: 'GET',
+    })
+    if (!response.ok) {
+      let message = `API request failed with status ${response.status}`
+      try {
+        const payload = (await response.json()) as { error?: { message?: string } }
+        message = payload.error?.message ?? message
+      } catch {
+        // Keep the status-based fallback when the server does not return JSON.
+      }
+      throw new LumenApiError(message, response.status)
+    }
+    const session = (await response.json()) as AuthSession
     return {
       ...session,
       accessToken: tokenPair.access_token,
       refreshToken: tokenPair.refresh_token,
     }
   }
+}
+
+function isAuthBootstrapRequest(path: string): boolean {
+  return (
+    path === '/api/v1/auth/login' ||
+    path === '/api/v1/auth/refresh' ||
+    path === '/api/v1/auth/mfa/challenge/verify' ||
+    path.startsWith('/api/v1/auth/webauthn/authenticate/') ||
+    path === '/api/v1/auth/oauth/telegram/callback'
+  )
 }

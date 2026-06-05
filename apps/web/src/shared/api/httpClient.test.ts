@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import type { AuthSession } from './types'
 import { createHttpLumenApiClient } from './httpClient'
 
 function jsonResponse(body: unknown, status = 200) {
@@ -10,7 +11,7 @@ function jsonResponse(body: unknown, status = 200) {
 
 describe('createHttpLumenApiClient', () => {
   it('reads the real server session after login instead of fabricating identity', async () => {
-    const fetcher = vi.fn(async (input: URL | RequestInfo, _init?: RequestInit) => {
+    const fetcher = vi.fn(async (input: URL | RequestInfo) => {
       const url = input instanceof URL ? input.pathname : new URL(String(input)).pathname
 
       if (url === '/api/v1/auth/login') {
@@ -59,7 +60,7 @@ describe('createHttpLumenApiClient', () => {
   })
 
   it('restores the operator session by refreshing from the secure cookie', async () => {
-    const fetcher = vi.fn(async (input: URL | RequestInfo, _init?: RequestInit) => {
+    const fetcher = vi.fn(async (input: URL | RequestInfo, init?: RequestInit) => {
       const url = input instanceof URL ? input.pathname : new URL(String(input)).pathname
 
       if (url === '/api/auth/session' && fetcher.mock.calls.length === 1) {
@@ -67,6 +68,7 @@ describe('createHttpLumenApiClient', () => {
       }
 
       if (url === '/api/v1/auth/refresh') {
+        expect(init).toMatchObject({ credentials: 'include', method: 'POST' })
         return jsonResponse({
           access_token: 'lumen_at_refreshed',
           expires_at: '2026-05-28T12:00:00Z',
@@ -100,7 +102,6 @@ describe('createHttpLumenApiClient', () => {
     expect(session?.email).toBe('admin@test.lumentah.tel')
     expect(fetcher).toHaveBeenCalledTimes(3)
     expect(new URL(String(fetcher.mock.calls[1][0])).pathname).toBe('/api/v1/auth/refresh')
-    expect(fetcher.mock.calls[1][1]).toMatchObject({ credentials: 'include', method: 'POST' })
   })
 
   it('queues profile apply through the production profile endpoint', async () => {
@@ -140,6 +141,90 @@ describe('createHttpLumenApiClient', () => {
       node_id: 'node-live',
       status: 'queued',
     })
+  })
+
+  it('refreshes an expired access token and retries the original request once', async () => {
+    let currentSession: AuthSession = {
+      accessToken: 'lumen_at_expired',
+      email: 'admin@test.lumentah.tel',
+      expiresAt: '2026-05-28T12:00:00Z',
+      name: 'Admin',
+      refreshToken: 'lumen_rt_session',
+      role: 'admin' as const,
+      scopes: ['user:manage'],
+      userId: 'admin',
+    }
+    const setSession = vi.fn((session: AuthSession | null) => {
+      if (session) {
+        currentSession = {
+          accessToken: session.accessToken ?? '',
+          email: session.email,
+          expiresAt: session.expiresAt,
+          name: session.name,
+          refreshToken: session.refreshToken ?? '',
+          role: session.role,
+          scopes: session.scopes,
+          userId: session.userId,
+        }
+      }
+    })
+    const fetcher = vi.fn(async (input: URL | RequestInfo, init?: RequestInit) => {
+      const url = input instanceof URL ? input.pathname : new URL(String(input)).pathname
+
+      if (url === '/api/v1/users' && fetcher.mock.calls.length === 1) {
+        expect(init?.headers).toMatchObject({ Authorization: 'Bearer lumen_at_expired' })
+        return jsonResponse(
+          { error: { message: 'A valid API key is required.' } },
+          401,
+        )
+      }
+
+      if (url === '/api/v1/auth/refresh') {
+        expect(init?.method).toBe('POST')
+        expect(init?.body).toBe(JSON.stringify({ refresh_token: 'lumen_rt_session' }))
+        return jsonResponse({
+          access_token: 'lumen_at_refreshed',
+          expires_at: '2026-05-28T12:10:00Z',
+          refresh_token: 'lumen_rt_rotated',
+          token_type: 'Bearer',
+        })
+      }
+
+      if (url === '/api/auth/session') {
+        expect(init?.headers).toMatchObject({ Authorization: 'Bearer lumen_at_refreshed' })
+        return jsonResponse({
+          email: 'admin@test.lumentah.tel',
+          expiresAt: '2026-05-28T12:10:00Z',
+          name: 'Admin',
+          role: 'admin',
+          scopes: ['user:manage'],
+          userId: 'admin',
+        })
+      }
+
+      if (url === '/api/v1/users') {
+        expect(init?.headers).toMatchObject({ Authorization: 'Bearer lumen_at_refreshed' })
+        return jsonResponse({ items: [] })
+      }
+
+      throw new Error(`Unexpected request: ${url}`)
+    })
+
+    const client = createHttpLumenApiClient({
+      baseUrl: 'https://panel.example.test',
+      fetcher,
+      getSession: () => currentSession,
+      setSession,
+    })
+
+    await expect(client.listUsers()).resolves.toEqual({ items: [] })
+    expect(setSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        accessToken: 'lumen_at_refreshed',
+        refreshToken: 'lumen_rt_rotated',
+      }),
+    )
+    expect(fetcher).toHaveBeenCalledTimes(4)
   })
 
   it('uses production subscription admin endpoints for lookup clone devices and delete', async () => {

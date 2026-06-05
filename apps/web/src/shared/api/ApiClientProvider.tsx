@@ -9,7 +9,7 @@ type ApiClientProviderProps = PropsWithChildren<{
 }>
 
 export function ApiClientProvider({ children, client }: ApiClientProviderProps) {
-  const { session } = useAuthSession()
+  const { session, setSession } = useAuthSession()
 
   const resolvedClient = useMemo(() => {
     if (client) {
@@ -34,8 +34,9 @@ export function ApiClientProvider({ children, client }: ApiClientProviderProps) 
     return createHttpLumenApiClient({
       baseUrl,
       getSession: () => session,
+      setSession,
     })
-  }, [client, session])
+  }, [client, session, setSession])
 
   return <ApiClientContext.Provider value={resolvedClient}>{children}</ApiClientContext.Provider>
 }
