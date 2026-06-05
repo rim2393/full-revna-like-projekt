@@ -435,7 +435,15 @@ def _public_request_url_with_query(request: Request, **query_params: str) -> str
 
 
 def _public_subscription_page_url(request: Request, public_id: str) -> str:
-    url = request.url.replace(path=f"/sub/{quote(public_id, safe='')}", query="")
+    query_items = [
+        (key, value)
+        for key, value in request.query_params.multi_items()
+        if key in {"device_id", "hwid"}
+    ]
+    url = request.url.replace(
+        path=f"/sub/{quote(public_id, safe='')}",
+        query=urlencode(query_items),
+    )
     return _public_url_from_request_url(request, url)
 
 

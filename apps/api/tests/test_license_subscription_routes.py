@@ -256,7 +256,10 @@ async def test_subscription_routes_create_list_and_get(
     assert browser_page_response.headers["x-lumen-subscription-page"] == "browser"
     assert "Добавить подписку" in browser_page_response.text
     assert "https://panel.example.test" in browser_page_response.text
-    assert f"https://panel.example.test/sub/{created['public_id']}" in browser_page_response.text
+    assert (
+        f"https://panel.example.test/sub/{created['public_id']}?hwid=route-browser-device"
+        in browser_page_response.text
+    )
     assert (
         'href="https://panel.example.test/api/v1/subscriptions/public/'
         in browser_page_response.text
@@ -270,12 +273,14 @@ async def test_subscription_routes_create_list_and_get(
         in browser_page_response.text
     )
     assert "happ://add" not in browser_page_response.text
-    assert qr_payloads == [f"https://panel.example.test/sub/{created['public_id']}"]
+    assert qr_payloads == [
+        f"https://panel.example.test/sub/{created['public_id']}?hwid=route-browser-device"
+    ]
     assert 'src="data:image/svg+xml,' not in browser_page_response.text
     assert "QR subscription" in browser_page_response.text
 
     short_raw_response = await route_app.client.get(
-        f"/sub/{created['public_id']}",
+        f"/sub/{created['public_id']}?hwid=route-browser-device",
         headers={"Accept": "application/octet-stream"},
     )
     assert short_raw_response.status_code == 200
