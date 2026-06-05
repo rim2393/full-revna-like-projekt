@@ -431,6 +431,7 @@ async def build_subscription_manifest(
                             "port": endpoint_port,
                             "transport": _override_string(host_overrides, "transport")
                             or delivery.get("transport")
+                            or _profile_transport(profile)
                             or _host_transport(host)
                             or _default_transport(protocol_type),
                             "network": delivery.get("network") or "public",
@@ -1451,6 +1452,7 @@ async def _build_manifest_protocol_entry(
             "port": endpoint_port,
             "transport": _override_string(host_overrides, "transport")
             or delivery.get("transport")
+            or _profile_transport(profile)
             or _host_transport(host)
             or _default_transport(protocol_type),
             "network": delivery.get("network") or "public",
@@ -1631,6 +1633,26 @@ def _host_transport(host: Host | None) -> str | None:
         return None
     if host.xhttp_json:
         return "xhttp"
+    return None
+
+
+def _profile_transport(profile: ProtocolProfile | None) -> str | None:
+    allowed = {
+        "tcp",
+        "udp",
+        "ws",
+        "grpc",
+        "httpupgrade",
+        "xhttp",
+        "splithttp",
+        "quic",
+        "h2",
+        "http",
+    }
+    for key in ("transport", "network"):
+        value = _profile_config_string(profile, key)
+        if value is not None and value.lower() in allowed:
+            return value.lower()
     return None
 
 

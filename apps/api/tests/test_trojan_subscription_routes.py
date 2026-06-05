@@ -219,6 +219,68 @@ async def test_lumen_json_uses_profile_flow_for_profile_backed_vless(
     assert protocol["flow"] == "xtls-rprx-vision"
 
 
+async def test_profile_transport_overrides_host_xhttp_metadata_for_happ(
+    route_app: RouteTestApp,
+) -> None:
+    user, license_record, node = await _seed(route_app)
+    async with route_app.sessionmaker() as session:
+        profile = ProtocolProfile(
+            name="profile-backed-vless-grpc-tls",
+            node_id=node.id,
+            adapter="vless-grpc-tls",
+            status="active",
+            credentials_ref="vault://nodes/test/vless-grpc",
+            config_json={
+                "port": "18464",
+                "network": "grpc",
+                "serviceName": "lumenGrpc",
+                "security": {"type": "tls", "serverName": "node.85-192-60-8.sslip.io"},
+            },
+            port_reservations=[],
+            metadata_json={},
+        )
+        session.add(profile)
+        await session.flush()
+        host = Host(
+            name="profile-backed-vless-grpc-host",
+            hostname="node.85-192-60-8.sslip.io",
+            node_id=node.id,
+            protocol_profile_id=profile.id,
+            status="active",
+            tags=[],
+            metadata_json={},
+            port=18464,
+            security="tls",
+            sni="node.85-192-60-8.sslip.io",
+            xhttp_json={"path": "/xhttp", "mode": "auto"},
+        )
+        session.add(host)
+        await session.commit()
+
+    async with route_app.sessionmaker() as session:
+        subscription = await issue_subscription_from_profile(
+            session,
+            request=SubscriptionIssueFromProfileRequest(
+                user_id=user.id,
+                license_id=license_record.id,
+                profile_id=profile.id,
+                host_id=host.id,
+                profile_title="Profile backed VLESS gRPC",
+                render_targets=["happ"],
+                config_hash="sha256:profile-backed-vless-grpc",
+            ),
+        )
+        await session.commit()
+
+    raw = await route_app.client.get(
+        f"/api/v1/subscriptions/public/{subscription.public_id}/render?target=happ",
+    )
+    assert raw.status_code == 200, raw.text
+    assert "type=grpc" in raw.text
+    assert "serviceName=lumenGrpc" in raw.text
+    assert "type=xhttp" not in raw.text
+
+
 async def test_profile_backed_subscription_runtime_clients_use_manifest_credentials_ref_fallback(
     route_app: RouteTestApp,
 ) -> None:
