@@ -35,6 +35,28 @@ textarea {
   letter-spacing: 0;
 }
 
+select {
+  color-scheme: dark;
+}
+
+select option,
+select optgroup {
+  color: var(--color-ink);
+  background: #20251f;
+}
+
+select option:checked,
+select option:hover,
+select option:focus {
+  color: #07120d;
+  background: var(--color-accent);
+}
+
+select option:disabled {
+  color: var(--color-muted);
+  background: #20251f;
+}
+
 button {
   cursor: pointer;
 }
