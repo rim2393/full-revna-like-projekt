@@ -457,6 +457,12 @@ def _public_subscription_page_url(request: Request, public_id: str) -> str:
     return _public_url_from_request_url(request, url)
 
 
+def _subscription_import_url(subscription_url: str, render_target: str) -> str:
+    if render_target == "happ":
+        return f"happ://add/{quote(subscription_url, safe='')}"
+    return subscription_url
+
+
 def _public_url_from_request_url(request: Request, url: object) -> str:
     scheme = (request.headers.get("x-forwarded-proto") or "").split(",", 1)[0].strip()
     host = (
@@ -623,7 +629,7 @@ def _subscription_browser_page(
         else "\u041d\u0435 \u043e\u0433\u0440\u0430\u043d\u0438\u0447\u0435\u043d\u043e"
     )
     escaped_raw = html_escape(subscription_url, quote=True)
-    add_link = subscription_url
+    add_link = _subscription_import_url(subscription_url, render_target)
     tabs_html = _subscription_target_tabs(request, render_target)
     qr_svg = _subscription_qr_svg(subscription_url)
     client_label = {
