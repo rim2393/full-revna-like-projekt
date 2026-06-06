@@ -189,6 +189,16 @@ Last audited: 2026-06-01 21:28 Europe/Moscow.
   `aes-256-gcm`, matching the live Xray Shadowsocks inbound on TCP `18446`.
   A temporary Xray client inside the node-agent container connected through the
   live Shadowsocks inbound and received HTTP 204 from an external endpoint.
+- Live prod evidence for release
+  `main-415455871aa3e4ca205b46ecd9872d4199da451f`: official signed
+  publish/deploy workflow `27057014986` completed successfully. Public
+  subscription browser pages now use the real short raw client endpoint for
+  HApp import, QR and copy payloads instead of using the HTML page URL as the
+  application payload. Live `https://sub.lumentech.tel/sub/.../happ?hwid=...`
+  evidence: `Добавить подписку` has a `happ://add/https%3A%2F%2Fsub.lumentech.tel%2Fsub%2F...%2Fhapp%3Fhwid%3D...%26raw%3D1`
+  href, QR SVG is present with a viewBox, copy URL is `/sub/.../happ?...&raw=1`,
+  the raw endpoint returns real `text/plain` protocol output, and no internal
+  `/api/v1/subscriptions/public/` URL leaks into the public HTML.
 - Alembic heads: single head `0009_node_management_parity` after this slice.
 
 ## Fixes Applied During Audit

@@ -174,6 +174,21 @@ deployed before being marked done.
   node plugin registry/action surface, and
   `https://sub.lumentech.tel/sub/.../happ` still has QR SVG/path with Raw on the
   short public `/sub/.../happ?...&raw=1` endpoint and no public API URL leak.
+- 2026-06-06: RSP-001 public subscription import click regression fixed and
+  released through the official image build and installer deploy path at
+  product commit `4154558`. The browser portal no longer uses the HTML page URL
+  as the Happ import/QR/copy payload. The visible `Добавить подписку` action,
+  QR payload and copy URL now point at the real short public raw client endpoint
+  `/sub/{public_id}/happ?...&raw=1`; the brand link remains the browser page.
+  Local gates passed: `python -m pytest tests/test_license_subscription_routes.py -q`
+  (`24 passed`), scoped ruff, release guard, production reality guard and
+  `git diff --check`. GitHub `Quality gates`, GitHub `Build release images`,
+  and installer deploy run `27057014986` succeeded. Live evidence on
+  `https://sub.lumentech.tel/sub/.../happ?hwid=happ-test-device-01`: the
+  HApp button href is `happ://add/https%3A%2F%2Fsub.lumentech.tel%2Fsub%2F...%2Fhapp%3Fhwid%3D...%26raw%3D1`,
+  QR SVG has `viewBox="0 0 399 399"`, copy URL is the same raw endpoint, the
+  raw endpoint returns real `text/plain` proxy output, and no
+  `/api/v1/subscriptions/public/` leak is present in public HTML.
 - 2026-06-06: RSP-003 Profiles first pass started after live audit showed
   46 real profiles and a 7000px-tall screen with a cramped inventory table.
   Changes keep all existing real API actions, widen the inventory column,
