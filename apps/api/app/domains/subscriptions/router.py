@@ -905,6 +905,7 @@ def _subscription_browser_page(
     }}
     .install-grid {{
       display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(260px, 300px);
       gap: 16px;
       margin-top: 16px;
     }}
@@ -935,6 +936,7 @@ def _subscription_browser_page(
       display: grid;
       align-content: start;
       gap: 14px;
+      align-self: start;
       padding: 18px;
       background: rgb(20 29 43 / 84%);
       border: 1px solid var(--line);
@@ -1010,6 +1012,10 @@ def _subscription_browser_page(
     @media (max-width: 920px) {{
       .metrics {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }}
     }}
+    @media (max-width: 760px) {{
+      .install-grid {{ grid-template-columns: 1fr; }}
+      .qr-panel {{ max-width: 360px; width: 100%; margin: 0 auto; }}
+    }}
     @media (max-width: 620px) {{
       main {{ width: min(100% - 18px, 760px); padding-top: 10px; }}
       .topbar {{ align-items: flex-start; flex-direction: column; border-radius: var(--radius-lg); }}
@@ -1036,7 +1042,7 @@ def _subscription_browser_page(
         <span class="brand-mark" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4v16"/><path d="M18 4v16"/><path d="M9 7h6"/><path d="M9 17h6"/></svg>
         </span>
-        <span class="brand-text"><strong>{escaped_title}</strong><span>subscription control surface</span></span>
+        <span class="brand-text"><strong>{escaped_title}</strong><span>VPN subscription</span></span>
       </a>
       <nav class="top-actions" aria-label="Support links">
         <a class="button" href="https://t.me/lumentech" rel="noreferrer">
