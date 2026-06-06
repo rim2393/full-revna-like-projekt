@@ -369,6 +369,45 @@ describe('Control plane resource screens', () => {
     await waitFor(() => expect(clearUserDevices).toHaveBeenCalledWith('usr_devices'))
   })
 
+  it('renders user detail editor with production form semantics', async () => {
+    const owner: UserRecord = {
+      created_at: '2026-05-27T00:00:00Z',
+      device_limit: 2,
+      display_name: 'Semantic Owner',
+      email: 'semantic@lumen.local',
+      expires_at: null,
+      id: 'usr_semantic',
+      metadata_json: { numeric_id: 78 },
+      role: 'user',
+      status: 'active',
+      tags: ['qa'],
+      telegram_id: '12345',
+      traffic_limit_gb: 100,
+      traffic_used_gb: 1,
+      updated_at: '2026-05-27T00:00:00Z',
+      username: 'semantic',
+    }
+    const apiClient: LumenApiClient = {
+      ...createDevelopmentLumenApiClient(),
+      getUserDetail: async () => ({
+        accessible_nodes: [],
+        devices: [],
+        request_history: [],
+        subscriptions: [],
+        user: owner,
+      }),
+    }
+
+    renderWithRouter('/users/usr_semantic', { apiClient, initialSession: developmentSession })
+
+    expect(await screen.findByLabelText(/email/i)).toHaveAttribute('autocomplete', 'email')
+    expect(screen.getByLabelText(/username/i)).toHaveAttribute('name', 'username')
+    expect(screen.getByLabelText(/display name/i)).toHaveAttribute('autocomplete', 'name')
+    expect(screen.getByLabelText(/telegram id/i)).toHaveAttribute('inputmode', 'numeric')
+    expect(screen.getByLabelText(/new password/i)).toHaveAttribute('autocomplete', 'new-password')
+    expect(screen.getByLabelText(/user metadata json/i)).toHaveAttribute('name', 'metadata_json')
+  })
+
   it('wires HWID inspector device actions to backend requests', async () => {
     const user = userEvent.setup()
     const owner: UserRecord = {

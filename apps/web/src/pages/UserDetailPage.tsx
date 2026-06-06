@@ -382,7 +382,10 @@ export function UserDetailPage() {
             <label htmlFor="detail-user-email">
               {t('Email')}
               <input
+                autoComplete="email"
+                enterKeyHint="next"
                 id="detail-user-email"
+                name="email"
                 required
                 type="email"
                 value={editor.email}
@@ -392,7 +395,10 @@ export function UserDetailPage() {
             <label htmlFor="detail-user-username">
               {t('Username')}
               <input
+                autoComplete="username"
+                enterKeyHint="next"
                 id="detail-user-username"
+                name="username"
                 value={editor.username}
                 onChange={(event) => setEditor({ ...editor, username: event.target.value })}
               />
@@ -400,7 +406,10 @@ export function UserDetailPage() {
             <label htmlFor="detail-user-display-name">
               {t('Display name')}
               <input
+                autoComplete="name"
+                enterKeyHint="next"
                 id="detail-user-display-name"
+                name="display_name"
                 value={editor.displayName}
                 onChange={(event) => setEditor({ ...editor, displayName: event.target.value })}
               />
@@ -408,7 +417,10 @@ export function UserDetailPage() {
             <label htmlFor="detail-user-telegram">
               {t('Telegram ID')}
               <input
+                enterKeyHint="next"
                 id="detail-user-telegram"
+                inputMode="numeric"
+                name="telegram_id"
                 value={editor.telegramId}
                 onChange={(event) => setEditor({ ...editor, telegramId: event.target.value })}
               />
@@ -417,6 +429,7 @@ export function UserDetailPage() {
               {t('Role')}
               <select
                 id="detail-user-role"
+                name="role"
                 value={editor.role}
                 onChange={(event) => setEditor({ ...editor, role: event.target.value as UserEditorState['role'] })}
               >
@@ -430,6 +443,7 @@ export function UserDetailPage() {
               {t('Status')}
               <select
                 id="detail-user-status"
+                name="status"
                 value={editor.status}
                 onChange={(event) => setEditor({ ...editor, status: event.target.value })}
               >
@@ -442,8 +456,10 @@ export function UserDetailPage() {
             <label htmlFor="detail-user-traffic-used">
               {t('Traffic used GB')}
               <input
+                enterKeyHint="next"
                 id="detail-user-traffic-used"
                 inputMode="decimal"
+                name="traffic_used_gb"
                 value={editor.trafficUsed}
                 onChange={(event) => setEditor({ ...editor, trafficUsed: event.target.value })}
               />
@@ -451,8 +467,10 @@ export function UserDetailPage() {
             <label htmlFor="detail-user-traffic-limit">
               {t('Traffic limit GB')}
               <input
+                enterKeyHint="next"
                 id="detail-user-traffic-limit"
                 inputMode="decimal"
+                name="traffic_limit_gb"
                 value={editor.trafficLimit}
                 onChange={(event) => setEditor({ ...editor, trafficLimit: event.target.value })}
                 placeholder={t('unlimited')}
@@ -461,8 +479,10 @@ export function UserDetailPage() {
             <label htmlFor="detail-user-device-limit">
               {t('Device limit')}
               <input
+                enterKeyHint="next"
                 id="detail-user-device-limit"
                 inputMode="numeric"
+                name="device_limit"
                 value={editor.deviceLimit}
                 onChange={(event) => setEditor({ ...editor, deviceLimit: event.target.value })}
                 placeholder={t('unlimited')}
@@ -471,7 +491,9 @@ export function UserDetailPage() {
             <label htmlFor="detail-user-expires">
               {t('Expiration')}
               <input
+                enterKeyHint="next"
                 id="detail-user-expires"
+                name="expires_at"
                 type="datetime-local"
                 value={editor.expiresAt}
                 onChange={(event) => setEditor({ ...editor, expiresAt: event.target.value })}
@@ -480,8 +502,11 @@ export function UserDetailPage() {
             <label htmlFor="detail-user-password">
               {t('New password')}
               <input
+                autoComplete="new-password"
+                enterKeyHint="next"
                 id="detail-user-password"
                 minLength={8}
+                name="password"
                 type="password"
                 value={editor.password}
                 onChange={(event) => setEditor({ ...editor, password: event.target.value })}
@@ -491,7 +516,9 @@ export function UserDetailPage() {
             <label htmlFor="detail-user-tags" className="user-editor-grid__wide">
               {t('Tags')}
               <input
+                enterKeyHint="next"
                 id="detail-user-tags"
+                name="tags"
                 value={editor.tags}
                 onChange={(event) => setEditor({ ...editor, tags: event.target.value })}
                 placeholder="vip, trial"
@@ -500,7 +527,9 @@ export function UserDetailPage() {
             <label htmlFor="detail-user-metadata" className="user-editor-grid__wide">
               {t('User metadata JSON')}
               <textarea
+                enterKeyHint="done"
                 id="detail-user-metadata"
+                name="metadata_json"
                 rows={10}
                 spellCheck={false}
                 value={editor.metadataJson}

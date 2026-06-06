@@ -2762,7 +2762,6 @@ h2 {
   .users-workspace,
   .users-toolbar,
   .users-bulk-panel,
-  .user-detail-workspace,
   .user-editor-grid {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -2781,6 +2780,13 @@ h2 {
 
   .tools-snippet-editor .form-grid__wide {
     grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 860px) {
+  .user-detail-workspace,
+  .user-editor-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
