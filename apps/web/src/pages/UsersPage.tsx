@@ -1,5 +1,5 @@
 import { useMemo, useState, type FormEvent } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   Ban,
   CalendarClock,
@@ -106,6 +106,7 @@ function sortedUsers(users: UserRecord[], sortMode: SortMode) {
 
 export function UsersPage() {
   const { t } = useI18n()
+  const navigate = useNavigate()
   const spec = sectionSpecs.users
   const query = useUsersPageData()
   const squadsQuery = useSquadsPageData()
@@ -481,6 +482,7 @@ export function UsersPage() {
             caption={t('User directory')}
             columns={['Select', 'User', 'Devices', 'Traffic', 'Expires', 'Tags', 'Status', 'Actions']}
             rows={filteredUsers.map((user) => ({
+              ariaLabel: t('Open {name}', { name: formatUserName(user) }),
               className: user.id === focusedUser?.id ? 'data-table__row--selected' : undefined,
               cells: [
                 <input
@@ -546,6 +548,10 @@ export function UsersPage() {
                 </div>,
               ],
               id: user.id,
+              onClick: () => {
+                setFocusedUserId(user.id)
+                navigate(`/users/${user.id}`)
+              },
             }))}
           />
         </article>
