@@ -2398,6 +2398,120 @@ h2 {
   background: linear-gradient(180deg, transparent, var(--color-surface) 28%);
 }
 
+.hosts-page .resource-grid {
+  grid-template-columns: minmax(0, 1.42fr) minmax(340px, 0.58fr);
+  align-items: start;
+}
+
+.hosts-inventory-panel {
+  overflow: hidden;
+}
+
+.hosts-inventory-panel .data-table-wrap {
+  max-height: min(720px, calc(100vh - 230px));
+  overflow: auto;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+}
+
+.hosts-inventory-panel .data-table {
+  min-width: 1460px;
+  table-layout: fixed;
+}
+
+.hosts-inventory-panel .data-table th,
+.hosts-inventory-panel .data-table td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.hosts-inventory-panel .data-table th:nth-child(1),
+.hosts-inventory-panel .data-table td:nth-child(1) {
+  width: 58px;
+  text-align: center;
+}
+
+.hosts-inventory-panel .data-table th:nth-child(2),
+.hosts-inventory-panel .data-table td:nth-child(2),
+.hosts-inventory-panel .data-table th:nth-child(3),
+.hosts-inventory-panel .data-table td:nth-child(3) {
+  width: 190px;
+}
+
+.hosts-inventory-panel .data-table th:nth-child(7),
+.hosts-inventory-panel .data-table td:nth-child(7) {
+  width: 250px;
+}
+
+.hosts-inventory-panel .data-table th:nth-child(11),
+.hosts-inventory-panel .data-table td:nth-child(11) {
+  width: 174px;
+}
+
+.hosts-inventory-panel .data-table__row--selected {
+  background: rgb(83 224 173 / 9%);
+  box-shadow: inset 3px 0 0 var(--color-accent);
+}
+
+.hosts-inventory-panel .inline-actions {
+  min-width: 0;
+  flex-wrap: nowrap;
+}
+
+.hosts-side {
+  position: sticky;
+  top: calc(var(--space-6) + 72px);
+  align-self: start;
+}
+
+.hosts-side .auth-card {
+  width: min(100%, 640px);
+}
+
+.hosts-side .auth-card label,
+.hosts-side .panel label {
+  display: grid;
+  grid-template-columns: minmax(116px, 0.38fr) minmax(0, 1fr);
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.hosts-side .auth-card input,
+.hosts-side .auth-card select,
+.hosts-side .panel input,
+.hosts-side .panel select {
+  min-width: 0;
+}
+
+.hosts-side .checkbox-line {
+  grid-template-columns: auto minmax(0, 1fr) !important;
+  justify-content: start;
+}
+
+.hosts-side .panel .inline-actions {
+  min-width: 0;
+}
+
+.host-advanced-json {
+  margin-top: var(--space-2);
+  padding: var(--space-3);
+}
+
+.host-advanced-json[open] {
+  display: grid;
+  gap: var(--space-3);
+  max-height: min(520px, calc(100vh - 260px));
+  overflow: auto;
+}
+
+.host-advanced-json textarea {
+  min-height: 108px;
+  font-family: 'SFMono-Regular', Menlo, Consolas, Monaco, 'Liberation Mono', 'Courier New', monospace;
+  font-size: 0.84rem;
+}
+
 .auth-card--wide {
   width: min(100%, 640px);
 }
@@ -2453,6 +2567,14 @@ h2 {
 
   .profiles-layout {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .hosts-page .resource-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .hosts-side {
+    position: static;
   }
 
   .settings-summary-grid,

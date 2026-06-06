@@ -25,6 +25,12 @@ import { sectionSpecs } from '../shared/data/resourceMeta'
 import { useI18n } from '../shared/i18n/I18nProvider'
 import { toneForStatus } from '../shared/utils/resourceFormat'
 
+type HostBulkExtra = Omit<Parameters<ReturnType<typeof useBulkHosts>['mutateAsync']>[0]['request'], 'ids'>
+
+type HostDeleteTarget =
+  | { kind: 'single'; host: HostRecord }
+  | { count: number; ids: string[]; kind: 'bulk' }
+
 export function HostsPage() {
   const { t } = useI18n()
   const query = useHostsPageData()
@@ -53,6 +59,7 @@ export function HostsPage() {
   const [hidden, setHidden] = useState(false)
   const [subscriptionExcluded, setSubscriptionExcluded] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<HostDeleteTarget | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [selectedHostId, setSelectedHostId] = useState('')
   const selectedHost = useMemo(
@@ -106,9 +113,13 @@ export function HostsPage() {
     })
   }
 
-  async function runBulk(action: string, extra: Omit<Parameters<typeof bulkHosts.mutateAsync>[0]['request'], 'ids'> = {}) {
+  async function runBulk(action: string, extra: HostBulkExtra = {}) {
     if (selectedIds.size === 0) {
       setFormError(t('Select at least one host first.'))
+      return
+    }
+    if (action === 'delete') {
+      setPendingDelete({ count: selectedIds.size, ids: Array.from(selectedIds), kind: 'bulk' })
       return
     }
     setFormError(null)
@@ -125,9 +136,32 @@ export function HostsPage() {
     }
   }
 
+  async function confirmDelete() {
+    if (!pendingDelete) {
+      return
+    }
+    setFormError(null)
+    try {
+      if (pendingDelete.kind === 'single') {
+        await deleteHost.mutateAsync(pendingDelete.host.id)
+      } else {
+        await bulkHosts.mutateAsync({
+          action: 'delete',
+          request: { ids: pendingDelete.ids },
+        })
+        setSelectedIds(new Set())
+      }
+      setPendingDelete(null)
+      await query.refetch()
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : t('Host could not be deleted.'))
+    }
+  }
+
   return (
     <ResourceScreen
       caption="Host inventory"
+      className="hosts-page"
       columns={['Select', 'Name', 'Hostname', 'Node', 'Profile', 'Squad', 'Endpoint', 'Tags', 'Runtime', 'Status', 'Actions']}
       createForm={
         <ScreenForm onSubmit={handleSubmit}>
@@ -236,10 +270,10 @@ export function HostsPage() {
           host.name,
           host.hostname,
           nodes.find((node) => node.id === host.node_id)?.name ?? host.node_id,
-          profiles.find((profile) => profile.id === host.protocol_profile_id)?.name ?? 'None',
-          squads.find((squad) => squad.id === host.squad_id)?.name ?? 'None',
+          profiles.find((profile) => profile.id === host.protocol_profile_id)?.name ?? t('None'),
+          squads.find((squad) => squad.id === host.squad_id)?.name ?? t('None'),
           `${host.address ?? host.hostname}${host.port ? `:${host.port}` : ''}${host.path ?? ''}`,
-          host.tags.join(', ') || 'None',
+          host.tags.join(', ') || t('None'),
           <RuntimeSyncBadge status={runtimeSyncStatus(host)} />,
           <StatusBadge tone={toneForStatus(host.status)}>{host.status}</StatusBadge>,
           <div className="inline-actions">
@@ -304,17 +338,24 @@ export function HostsPage() {
                 type="button"
                 className="icon-button"
                 aria-label={t('Delete {name}', { name: host.name })}
-                onClick={() => void deleteHost.mutateAsync(host.id)}
+                onClick={() => setPendingDelete({ host, kind: 'single' })}
               >
                 <Trash2 size={16} aria-hidden="true" />
               </button>
             </HostActionTooltip>
           </div>,
         ],
+        className: selectedHost?.id === host.id ? 'data-table__row--selected' : undefined,
         id: host.id,
       })}
       rightPanel={
-        <div className="side-stack">
+        <div className="side-stack hosts-side">
+          <HostDeleteConfirm
+            pending={deleteHost.isPending || bulkHosts.isPending}
+            target={pendingDelete}
+            onCancel={() => setPendingDelete(null)}
+            onConfirm={() => void confirmDelete()}
+          />
           <HostBulkPanel
             onBulk={runBulk}
             onReorder={() => void reorderHosts.mutateAsync(hosts.map((host) => host.id).reverse())}
@@ -343,6 +384,7 @@ export function HostsPage() {
         </div>
       }
       spec={sectionSpecs.hosts}
+      tablePanelClassName="hosts-inventory-panel"
       tableEyebrow="Ingress hosts"
       tableTitle="Host routing"
     />
@@ -395,7 +437,7 @@ function HostBulkPanel({
         </button>
       </div>
       <label htmlFor="bulk-inbound-tag">
-        inbound_tag
+        {t('Inbound tag')}
         <input id="bulk-inbound-tag" value={inboundTag} onChange={(event) => setInboundTag(event.target.value)} />
       </label>
       <button type="button" className="button button--secondary" onClick={() => void onBulk('set-inbound', { inbound_tag: inboundTag })}>
@@ -520,48 +562,48 @@ function HostEditor({
         <p>{t('Edit public endpoint, routing bindings, inbound tag, port and metadata.')}</p>
       </div>
       <label htmlFor="editor-host-name">
-        Name
+        {t('Name')}
         <input id="editor-host-name" value={draft.name ?? ''} onChange={(event) => setDraft({ ...draft, name: event.target.value })} />
       </label>
       <label htmlFor="editor-host-hostname">
-        Hostname
+        {t('Hostname')}
         <input id="editor-host-hostname" value={draft.hostname ?? ''} onChange={(event) => setDraft({ ...draft, hostname: event.target.value })} />
       </label>
       <label htmlFor="editor-host-node">
-        Node
+        {t('Node')}
         <select id="editor-host-node" value={draft.node_id ?? ''} onChange={(event) => setDraft({ ...draft, node_id: event.target.value })}>
           <option value="">{t('Select node')}</option>
           {nodes.map((node) => <option key={node.id} value={node.id}>{node.name}</option>)}
         </select>
       </label>
       <label htmlFor="editor-host-profile">
-        Profile
+        {t('Profile')}
         <select id="editor-host-profile" value={draft.protocol_profile_id ?? ''} onChange={(event) => setDraft({ ...draft, protocol_profile_id: event.target.value || null })}>
-          <option value="">None</option>
+          <option value="">{t('None')}</option>
           {profiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.name}</option>)}
         </select>
       </label>
       <label htmlFor="editor-host-squad">
-        Squad
+        {t('Squad')}
         <select id="editor-host-squad" value={draft.squad_id ?? ''} onChange={(event) => setDraft({ ...draft, squad_id: event.target.value || null })}>
-          <option value="">None</option>
+          <option value="">{t('None')}</option>
           {squads.map((squad) => <option key={squad.id} value={squad.id}>{squad.name}</option>)}
         </select>
       </label>
       <label htmlFor="editor-host-address">
-        Address
+        {t('Address')}
         <input id="editor-host-address" value={draft.address ?? ''} onChange={(event) => setDraft({ ...draft, address: event.target.value || null })} />
       </label>
       <label htmlFor="editor-host-port">
-        Port
+        {t('Port')}
         <input id="editor-host-port" inputMode="numeric" value={draft.port ?? ''} onChange={(event) => setDraft({ ...draft, port: event.target.value ? Number(event.target.value) : null })} />
       </label>
       <label htmlFor="editor-host-inbound">
-        inbound_tag
+        {t('Inbound tag')}
         <input id="editor-host-inbound" value={draft.inbound_tag ?? ''} onChange={(event) => setDraft({ ...draft, inbound_tag: event.target.value || null })} />
       </label>
       <label htmlFor="editor-host-path">
-        Path
+        {t('Path')}
         <input id="editor-host-path" value={draft.path ?? ''} onChange={(event) => setDraft({ ...draft, path: event.target.value || null })} />
       </label>
       <label htmlFor="editor-host-sni">
@@ -569,20 +611,20 @@ function HostEditor({
         <input id="editor-host-sni" value={draft.sni ?? ''} onChange={(event) => setDraft({ ...draft, sni: event.target.value || null })} />
       </label>
       <label htmlFor="editor-host-security">
-        Security
+        {t('Security')}
         <select id="editor-host-security" value={draft.security ?? ''} onChange={(event) => setDraft({ ...draft, security: event.target.value || null })}>
-          <option value="">Profile default</option>
+          <option value="">{t('Profile default')}</option>
           <option value="none">none</option>
           <option value="tls">tls</option>
           <option value="reality">reality</option>
         </select>
       </label>
       <label htmlFor="editor-host-final-mask">
-        Final mask
+        {t('Final mask')}
         <input id="editor-host-final-mask" value={draft.final_mask ?? ''} onChange={(event) => setDraft({ ...draft, final_mask: event.target.value || null })} />
       </label>
       <label htmlFor="editor-host-mihomo-x25519">
-        Mihomo X25519 public key
+        {t('Mihomo X25519 public key')}
         <input
           id="editor-host-mihomo-x25519"
           value={draft.mihomo_x25519_public_key ?? ''}
@@ -591,7 +633,7 @@ function HostEditor({
       </label>
       <label className="checkbox-line" htmlFor="editor-host-hidden">
         <input id="editor-host-hidden" type="checkbox" checked={Boolean(draft.hidden)} onChange={(event) => setDraft({ ...draft, hidden: event.target.checked })} />
-        Hidden from operators
+        {t('Hidden from operators')}
       </label>
       <label className="checkbox-line" htmlFor="editor-host-subscription-excluded">
         <input
@@ -600,51 +642,97 @@ function HostEditor({
           checked={Boolean(draft.subscription_excluded)}
           onChange={(event) => setDraft({ ...draft, subscription_excluded: event.target.checked })}
         />
-        Exclude from subscriptions
+        {t('Exclude from subscriptions')}
       </label>
       <label className="checkbox-line" htmlFor="editor-host-shuffle">
         <input id="editor-host-shuffle" type="checkbox" checked={Boolean(draft.shuffle_host)} onChange={(event) => setDraft({ ...draft, shuffle_host: event.target.checked })} />
-        Shuffle host
+        {t('Shuffle host')}
       </label>
       <label htmlFor="editor-host-excluded-squads">
-        Excluded internal squad IDs
+        {t('Excluded internal squad IDs')}
         <input id="editor-host-excluded-squads" value={excludedSquads} onChange={(event) => setExcludedSquads(event.target.value)} />
       </label>
       <label htmlFor="editor-host-remark">
-        Remark
+        {t('Remark')}
         <input id="editor-host-remark" value={draft.remark ?? ''} onChange={(event) => setDraft({ ...draft, remark: event.target.value || null })} />
       </label>
       <label htmlFor="editor-host-tags">
-        Tags
+        {t('Tags')}
         <input
           id="editor-host-tags"
           value={(draft.tags ?? []).join(', ')}
           onChange={(event) => setDraft({ ...draft, tags: event.target.value.split(',').map((tag) => tag.trim()).filter(Boolean) })}
         />
       </label>
-      <label htmlFor="editor-host-metadata">
-        metadata_json
-        <textarea id="editor-host-metadata" rows={5} value={metadataJson} onChange={(event) => setMetadataJson(event.target.value)} />
-      </label>
-      <label htmlFor="editor-host-xray-template">
-        xray_template_json
-        <textarea id="editor-host-xray-template" rows={5} value={xrayTemplateJson} onChange={(event) => setXrayTemplateJson(event.target.value)} />
-      </label>
-      <label htmlFor="editor-host-mux">
-        mux_json
-        <textarea id="editor-host-mux" rows={4} value={muxJson} onChange={(event) => setMuxJson(event.target.value)} />
-      </label>
-      <label htmlFor="editor-host-sockopt">
-        sockopt_json
-        <textarea id="editor-host-sockopt" rows={4} value={sockoptJson} onChange={(event) => setSockoptJson(event.target.value)} />
-      </label>
-      <label htmlFor="editor-host-xhttp">
-        xhttp_json
-        <textarea id="editor-host-xhttp" rows={4} value={xhttpJson} onChange={(event) => setXhttpJson(event.target.value)} />
-      </label>
+      <details className="details-card host-advanced-json">
+        <summary>{t('Advanced JSON')}</summary>
+        <label htmlFor="editor-host-metadata">
+          {t('metadata_json')}
+          <textarea id="editor-host-metadata" rows={5} value={metadataJson} onChange={(event) => setMetadataJson(event.target.value)} />
+        </label>
+        <label htmlFor="editor-host-xray-template">
+          {t('xray_template_json')}
+          <textarea id="editor-host-xray-template" rows={5} value={xrayTemplateJson} onChange={(event) => setXrayTemplateJson(event.target.value)} />
+        </label>
+        <label htmlFor="editor-host-mux">
+          {t('mux_json')}
+          <textarea id="editor-host-mux" rows={4} value={muxJson} onChange={(event) => setMuxJson(event.target.value)} />
+        </label>
+        <label htmlFor="editor-host-sockopt">
+          {t('sockopt_json')}
+          <textarea id="editor-host-sockopt" rows={4} value={sockoptJson} onChange={(event) => setSockoptJson(event.target.value)} />
+        </label>
+        <label htmlFor="editor-host-xhttp">
+          {t('xhttp_json')}
+          <textarea id="editor-host-xhttp" rows={4} value={xhttpJson} onChange={(event) => setXhttpJson(event.target.value)} />
+        </label>
+      </details>
       <FormError message={error} />
-      <SubmitButton pending={pending || !host}>Save host</SubmitButton>
+      <SubmitButton pending={pending || !host}>{t('Save host')}</SubmitButton>
     </ScreenForm>
+  )
+}
+
+function HostDeleteConfirm({
+  onCancel,
+  onConfirm,
+  pending,
+  target,
+}: {
+  onCancel: () => void
+  onConfirm: () => void
+  pending: boolean
+  target: HostDeleteTarget | null
+}) {
+  const { t } = useI18n()
+  if (!target) {
+    return null
+  }
+  const title =
+    target.kind === 'single'
+      ? t('Delete host {name}', { name: target.host.name })
+      : t('Delete selected hosts')
+  const description =
+    target.kind === 'single'
+      ? t('This will remove the real host through the production API.')
+      : t('This will remove {count} real hosts through the production API.', { count: target.count })
+
+  return (
+    <section className="danger-confirm-inline" role="alertdialog" aria-modal="false" aria-label={title}>
+      <div>
+        <p className="eyebrow">{t('Danger action')}</p>
+        <h3>{title}</h3>
+        <p>{description}</p>
+      </div>
+      <div className="inline-actions inline-actions--compact">
+        <button type="button" className="button button--secondary" disabled={pending} onClick={onCancel}>
+          {t('Cancel')}
+        </button>
+        <button type="button" className="button button--danger" disabled={pending} onClick={onConfirm}>
+          {t('Delete')}
+        </button>
+      </div>
+    </section>
   )
 }
 

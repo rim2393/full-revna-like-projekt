@@ -171,3 +171,20 @@ deployed before being marked done.
   wider web contract tests so they stay deterministic under the EN/RU i18n
   shell. Local gates: `npx vitest run --no-file-parallelism --reporter=dot`
   (`54 passed`) and `npm run build` passed.
+- 2026-06-06: RSP-004 Hosts first compact/function hardening pass prepared.
+  Live audit before the change showed 18 real host rows, a about 6659px-tall
+  page, a 2697px inventory panel, right-side workflow panels pushed below the
+  table, and raw labels such as `None`, `Profile default`, and `inbound_tag`.
+  The pass keeps existing production hooks and API behavior, adds scoped
+  `ResourceScreen` class hooks, gives Hosts a bounded fixed-layout inventory
+  table, sticky side stack, selected-row treatment, dark readable tooltip
+  surface, translated host editor labels, collapsed advanced JSON for
+  `metadata_json`/`xray_template_json`/`mux_json`/`sockopt_json`/`xhttp_json`,
+  and inline production API confirmations for single and bulk host deletion.
+  Added focused `HostsPage` tests for real update JSON, single delete confirm,
+  and bulk delete confirm. Local gates: `npx vitest run src/pages/HostsPage.test.tsx --reporter=verbose`
+  (`3 passed`), `npx vitest run --no-file-parallelism --reporter=dot`
+  (`57 passed`), `npm run build`, `python scripts/validate_release_guard.py`,
+  `python scripts/validate_production_reality.py`, and `git diff --check`
+  passed. Live deploy/evidence is still required before RSP-004 is marked
+  released.

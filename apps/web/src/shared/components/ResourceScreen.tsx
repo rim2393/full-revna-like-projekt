@@ -10,6 +10,7 @@ import { useI18n } from '../i18n/I18nProvider'
 type ResourceScreenProps<TItem> = {
   actions?: ReactNode
   caption: string
+  className?: string
   columns: string[]
   createForm?: ReactNode
   emptyDescription: string
@@ -23,6 +24,7 @@ type ResourceScreenProps<TItem> = {
   loadingLabel: string
   onRefresh?: () => void
   renderRow: (item: TItem) => { cells: ReactNode[]; id: string }
+  tablePanelClassName?: string
   rightPanel?: ReactNode
   sourceLabel?: string
   spec: SectionSpec
@@ -59,6 +61,7 @@ export function FormError({ message }: { message: string | null }) {
 export function ResourceScreen<TItem>({
   actions,
   caption,
+  className,
   columns,
   createForm,
   emptyDescription,
@@ -72,6 +75,7 @@ export function ResourceScreen<TItem>({
   loadingLabel,
   onRefresh,
   renderRow,
+  tablePanelClassName,
   rightPanel,
   sourceLabel = 'api-ready',
   spec,
@@ -81,7 +85,7 @@ export function ResourceScreen<TItem>({
   const { t } = useI18n()
 
   return (
-    <section className="page">
+    <section className={className ? `page ${className}` : 'page'}>
       <PageHeader
         eyebrow={spec.eyebrow}
         title={spec.title}
@@ -116,12 +120,12 @@ export function ResourceScreen<TItem>({
 
       {isSuccess && items.length > 0 ? (
         <section className="resource-grid">
-          <article className="panel panel--wide">
+          <article className={tablePanelClassName ? `panel panel--wide ${tablePanelClassName}` : 'panel panel--wide'}>
             <div className="panel__header">
               <div>
-              <p className="eyebrow">{t(tableEyebrow)}</p>
-              <h2>{t(tableTitle)}</h2>
-            </div>
+                <p className="eyebrow">{t(tableEyebrow)}</p>
+                <h2>{t(tableTitle)}</h2>
+              </div>
               <StatusBadge>{sourceLabel}</StatusBadge>
             </div>
             <DataTable caption={caption} columns={columns} rows={items.map(renderRow)} />
