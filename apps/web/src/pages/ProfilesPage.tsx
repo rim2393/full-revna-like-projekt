@@ -2238,7 +2238,7 @@ function GlobalInboundRegistry({
   t: (value: string, params?: Record<string, string | number>) => string
 }) {
   return (
-    <article className="panel panel--wide">
+    <article className="panel profiles-registry-panel">
       <div className="panel__header">
         <div>
           <p className="eyebrow">
@@ -2295,22 +2295,26 @@ function GlobalInboundRegistry({
               inbound.transport,
               inbound.security,
               String(inbound.hosts.length),
-              <button
-                type="button"
-                className="button button--secondary"
-                onClick={() => onSelectProfile(inbound.profile_id)}
-              >
-                <Eye size={14} aria-hidden="true" />
-                {t('Profile')}
-              </button>,
-              <button
-                type="button"
-                className="button button--secondary"
-                onClick={() => onGoToNode(inbound.node_id)}
-              >
-                <Server size={14} aria-hidden="true" />
-                {t('Node')}
-              </button>,
+              <div className="inline-actions inline-actions--compact">
+                <button
+                  type="button"
+                  className="button button--secondary"
+                  onClick={() => onSelectProfile(inbound.profile_id)}
+                  title={t('Profile')}
+                >
+                  <Eye size={14} aria-hidden="true" />
+                  {t('Profile')}
+                </button>
+                <button
+                  type="button"
+                  className="button button--secondary"
+                  onClick={() => onGoToNode(inbound.node_id)}
+                  title={t('Node')}
+                >
+                  <Server size={14} aria-hidden="true" />
+                  {t('Node')}
+                </button>
+              </div>,
             ],
           }))}
         />

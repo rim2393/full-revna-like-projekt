@@ -87,3 +87,10 @@ admin Users/Profile/Hosts.
   make the side workflow/detail column sticky, highlight the selected profile
   row, and compress per-row actions into titled icon buttons. Local web
   `npm run build` passed.
+- 2026-06-06: RSP-003 Profiles compact-layout correction prepared after live
+  deploy evidence showed the first pass increased page height to about 10343px.
+  Root cause: profile rows wrapped long real values and the right-side inbound
+  registry used `panel--wide`, which created an implicit two-column side grid.
+  Fix keeps real actions, uses fixed table layouts with ellipsis, scopes the
+  side column to one track, bounds the inbound registry table, and corrects the
+  registry actions into one actions cell. Local web `npm run build` passed.

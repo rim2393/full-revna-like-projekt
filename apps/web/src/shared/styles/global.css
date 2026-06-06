@@ -1646,7 +1646,9 @@ h2 {
 }
 
 .profile-inventory .data-table {
-  min-width: 1280px;
+  width: 1640px;
+  min-width: 1640px;
+  table-layout: fixed;
 }
 
 .profile-inventory .data-table caption {
@@ -1663,7 +1665,59 @@ h2 {
 
 .profile-inventory .data-table th,
 .profile-inventory .data-table td {
+  max-width: 0;
   padding: 9px var(--space-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.profile-inventory .data-table th:nth-child(1) {
+  width: 44px;
+}
+
+.profile-inventory .data-table th:nth-child(2) {
+  width: 210px;
+}
+
+.profile-inventory .data-table th:nth-child(3) {
+  width: 150px;
+}
+
+.profile-inventory .data-table th:nth-child(4) {
+  width: 120px;
+}
+
+.profile-inventory .data-table th:nth-child(5) {
+  width: 160px;
+}
+
+.profile-inventory .data-table th:nth-child(6),
+.profile-inventory .data-table th:nth-child(7),
+.profile-inventory .data-table th:nth-child(8),
+.profile-inventory .data-table th:nth-child(10),
+.profile-inventory .data-table th:nth-child(11),
+.profile-inventory .data-table th:nth-child(12) {
+  width: 110px;
+}
+
+.profile-inventory .data-table th:nth-child(9) {
+  width: 180px;
+}
+
+.profile-inventory .data-table th:nth-child(13) {
+  width: 420px;
+}
+
+.profile-inventory .data-table td > code,
+.profile-inventory .table-link-button,
+.profile-inventory .text-link--button,
+.profile-inventory .status-chip {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .profile-inventory .data-table tbody tr {
@@ -1683,6 +1737,10 @@ h2 {
   min-width: max-content;
 }
 
+.profile-inventory .data-table td:last-child {
+  overflow: visible;
+}
+
 .profile-inventory .data-table td:last-child .button {
   width: 34px;
   min-width: 34px;
@@ -1698,9 +1756,86 @@ h2 {
 }
 
 .profiles-side {
+  grid-template-columns: minmax(0, 1fr);
   position: sticky;
   top: calc(var(--space-5) + 76px);
   align-self: start;
+}
+
+.profiles-side > .panel {
+  min-width: 0;
+}
+
+.profiles-registry-panel .data-table {
+  width: 980px;
+  min-width: 980px;
+  table-layout: fixed;
+}
+
+.profiles-registry-panel .data-table-wrap {
+  max-height: min(520px, calc(100vh - 190px));
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  overflow: auto;
+}
+
+.profiles-registry-panel .data-table th,
+.profiles-registry-panel .data-table td {
+  max-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.profiles-registry-panel .data-table th:nth-child(1) {
+  width: 150px;
+}
+
+.profiles-registry-panel .data-table th:nth-child(2) {
+  width: 210px;
+}
+
+.profiles-registry-panel .data-table th:nth-child(3) {
+  width: 120px;
+}
+
+.profiles-registry-panel .data-table th:nth-child(4),
+.profiles-registry-panel .data-table th:nth-child(6),
+.profiles-registry-panel .data-table th:nth-child(7),
+.profiles-registry-panel .data-table th:nth-child(8) {
+  width: 95px;
+}
+
+.profiles-registry-panel .data-table th:nth-child(5),
+.profiles-registry-panel .data-table th:nth-child(9) {
+  width: 70px;
+}
+
+.profiles-registry-panel .data-table th:nth-child(10) {
+  width: 150px;
+}
+
+.profiles-registry-panel .data-table td:last-child {
+  overflow: visible;
+}
+
+.profiles-registry-panel .data-table td:last-child .inline-actions--compact {
+  flex-wrap: nowrap;
+}
+
+.profiles-registry-panel .data-table td:last-child .button {
+  width: 34px;
+  min-width: 34px;
+  min-height: 34px;
+  padding: 0;
+  overflow: hidden;
+  font-size: 0;
+}
+
+.profiles-registry-panel .data-table td:last-child .button svg {
+  width: 15px;
+  height: 15px;
 }
 
 .profile-toolbar {
