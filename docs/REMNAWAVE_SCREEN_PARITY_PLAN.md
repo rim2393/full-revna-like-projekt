@@ -130,3 +130,11 @@ admin Users/Profile/Hosts.
   move into a collapsed `Advanced JSON` section by default, matching the
   operator expectation that common profile edits do not require scrolling
   through raw JSON. RU label added. Local web `npm run build` passed.
+- 2026-06-06: RSP-003 profile editor advanced JSON pass released through
+  official image build and installer deploy at commit `fb3b089`. Live
+  `https://panel.lumentech.tel/profiles` create-editor evidence: form height
+  dropped from about 1836px to 1296px, all 18 real fields remain mounted,
+  `Расширенный JSON` is collapsed by default at 50px, the section opens to
+  470px with both JSON textareas and the real `Build JSON from protocol
+  fields` button present, sticky save/cancel bar remains visible, and no
+  internal `http://api:8000` URL leaks.
