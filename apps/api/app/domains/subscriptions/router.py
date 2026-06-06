@@ -509,7 +509,14 @@ def _public_subscription_short_target_url(
 
 
 def _subscription_qr_svg(value: str) -> str:
-    return segno.make(value, error="q").svg_inline(scale=7, border=4)
+    qr = segno.make(value, error="q")
+    width, height = qr.symbol_size(scale=7, border=4)
+    svg = qr.svg_inline(scale=7, border=4)
+    return svg.replace(
+        "<svg ",
+        f'<svg viewBox="0 0 {width} {height}" preserveAspectRatio="xMidYMid meet" ',
+        1,
+    )
 
 
 def _subscription_device_binding_page(

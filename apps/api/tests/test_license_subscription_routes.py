@@ -313,6 +313,14 @@ async def test_subscription_routes_create_list_and_get(
     assert "vless://" in raw_browser_response.text
 
 
+def test_subscription_qr_svg_has_scaling_viewbox() -> None:
+    svg = subscriptions_router._subscription_qr_svg("https://example.test/sub/demo?hwid=device")
+
+    assert 'viewBox="0 0 ' in svg
+    assert 'preserveAspectRatio="xMidYMid meet"' in svg
+    assert 'class="segno"' in svg
+
+
 async def test_subscription_route_issues_real_subscription_from_profile(
     route_app: RouteTestApp,
 ) -> None:
