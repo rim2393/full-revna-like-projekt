@@ -2381,7 +2381,7 @@ function ProfileEditor({
   const builderConfig = buildProfileConfigFromForm(form, selectedAdapterCapabilities)
 
   return (
-    <form className="auth-card auth-card--wide" onSubmit={onSubmit}>
+    <form className="auth-card auth-card--wide profile-editor-panel" onSubmit={onSubmit}>
       <div>
         <p className="eyebrow">{editing ? t('Edit profile') : t('Create profile')}</p>
         <h2>{editing ? t('Edit profile') : t('Create profile')}</h2>

@@ -118,3 +118,10 @@ admin Users/Profile/Hosts.
   fact rows are stable at 46px, open inbound section is bounded, 46 real
   profile rows still load, selected row remains present, and no internal
   `http://api:8000` URL leaks.
+- 2026-06-06: RSP-003 profile editor compact pass prepared after live create
+  editor audit showed the inline real editor at about 1836px high with 18 real
+  fields. Fix adds scoped `.profile-editor-panel` styling only: compact
+  key/control rows, smaller header copy, bounded JSON textareas, compact
+  adapter capability cards, and sticky save/cancel actions. Submit, port
+  validation, protocol JSON builder and API persistence are unchanged. Local
+  web `npm run build` passed.
