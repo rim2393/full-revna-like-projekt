@@ -629,7 +629,10 @@ def _subscription_browser_page(
         else "\u041d\u0435 \u043e\u0433\u0440\u0430\u043d\u0438\u0447\u0435\u043d\u043e"
     )
     escaped_raw = html_escape(subscription_url, quote=True)
+    raw_subscription_url = _public_request_url_with_query(request, raw="1")
+    escaped_raw_subscription_url = html_escape(raw_subscription_url, quote=True)
     add_link = _subscription_import_url(subscription_url, render_target)
+    escaped_add_link = html_escape(add_link, quote=True)
     tabs_html = _subscription_target_tabs(request, render_target)
     qr_svg = _subscription_qr_svg(subscription_url)
     client_label = {
@@ -771,6 +774,10 @@ def _subscription_browser_page(
       box-shadow: inset 0 1px 0 rgb(255 255 255 / 12%);
     }}
     .button svg {{ width: 17px; height: 17px; flex: 0 0 auto; }}
+    .button[aria-disabled="true"] {{
+      pointer-events: none;
+      opacity: .72;
+    }}
     .page-head {{
       display: grid;
       gap: 8px;
@@ -1009,6 +1016,16 @@ def _subscription_browser_page(
       text-overflow: ellipsis;
       white-space: nowrap;
     }}
+    .import-status {{
+      min-height: 20px;
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: .82rem;
+      font-weight: 700;
+    }}
+    .import-status[data-state="opening"] {{ color: var(--accent); }}
+    .import-status[data-state="fallback"] {{ color: var(--warning); }}
+    .import-status[data-state="copied"] {{ color: var(--success); }}
     @media (max-width: 920px) {{
       .metrics {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }}
     }}
@@ -1049,7 +1066,7 @@ def _subscription_browser_page(
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
           Telegram
         </a>
-        <a class="button" href="{escaped_raw}">
+        <a class="button" href="{escaped_raw_subscription_url}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.1 0l2-2a5 5 0 0 0-7.1-7.1l-1.2 1.2"/><path d="M14 11a5 5 0 0 0-7.1 0l-2 2a5 5 0 0 0 7.1 7.1l1.2-1.2"/></svg>
           Raw
         </a>
@@ -1107,15 +1124,20 @@ def _subscription_browser_page(
               <h3>\u0418\u043c\u043f\u043e\u0440\u0442</h3>
               <p class="muted">\u041e\u0442\u043a\u0440\u043e\u0439\u0442\u0435 deep link \u0438\u043b\u0438 \u043e\u0442\u0441\u043a\u0430\u043d\u0438\u0440\u0443\u0439\u0442\u0435 QR. \u0414\u043b\u044f \u0440\u0443\u0447\u043d\u043e\u0433\u043e \u043f\u0443\u0442\u0438 \u0441\u043a\u043e\u043f\u0438\u0440\u0443\u0439\u0442\u0435 raw URL.</p>
               <div class="step-actions">
-                <a class="button primary" href="{html_escape(add_link, quote=True)}">
+                <a class="button primary" href="{escaped_add_link}" data-client-link data-client="{html_escape(client_label, quote=True)}">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
                   \u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u043f\u043e\u0434\u043f\u0438\u0441\u043a\u0443
                 </a>
-                <button class="button" type="button" data-url="{escaped_raw}" onclick="navigator.clipboard.writeText(this.dataset.url)">
+                <a class="button" href="{escaped_raw_subscription_url}">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M8 13h8"/><path d="M8 17h5"/></svg>
+                  Raw
+                </a>
+                <button class="button" type="button" data-url="{escaped_raw}" data-copy-url>
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><rect x="3" y="3" width="13" height="13" rx="2"/></svg>
                   \u0421\u043a\u043e\u043f\u0438\u0440\u043e\u0432\u0430\u0442\u044c
                 </button>
               </div>
+              <p class="import-status" data-import-status>\u0415\u0441\u043b\u0438 \u043a\u043b\u0438\u0435\u043d\u0442 \u043d\u0435 \u043e\u0442\u043a\u0440\u044b\u043b\u0441\u044f, \u0438\u0441\u043f\u043e\u043b\u044c\u0437\u0443\u0439\u0442\u0435 QR \u0438\u043b\u0438 Raw.</p>
             </div>
           </article>
         </div>
@@ -1127,7 +1149,7 @@ def _subscription_browser_page(
           <div class="qr" role="img" aria-label="QR subscription">{qr_svg}</div>
           <div class="qr-actions">
             <div class="qr-status" title="{escaped_raw}"><span>\u0421\u0441\u044b\u043b\u043a\u0430 \u0433\u043e\u0442\u043e\u0432\u0430 \u0434\u043b\u044f QR</span></div>
-            <button class="button" type="button" data-url="{escaped_raw}" onclick="navigator.clipboard.writeText(this.dataset.url)">
+            <button class="button" type="button" data-url="{escaped_raw}" data-copy-url>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><rect x="3" y="3" width="13" height="13" rx="2"/></svg>
               \u0421\u043a\u043e\u043f\u0438\u0440\u043e\u0432\u0430\u0442\u044c
             </button>
@@ -1136,6 +1158,38 @@ def _subscription_browser_page(
       </div>
     </section>
   </main>
+  <script>
+    (() => {{
+      const status = document.querySelector('[data-import-status]');
+      const setStatus = (message, state) => {{
+        if (!status) return;
+        status.textContent = message;
+        status.dataset.state = state;
+      }};
+      document.querySelectorAll('[data-copy-url]').forEach((button) => {{
+        button.addEventListener('click', async () => {{
+          const value = button.dataset.url || '';
+          try {{
+            await navigator.clipboard.writeText(value);
+            setStatus('\u0421\u0441\u044b\u043b\u043a\u0430 \u0441\u043a\u043e\u043f\u0438\u0440\u043e\u0432\u0430\u043d\u0430. \u0412\u0441\u0442\u0430\u0432\u044c\u0442\u0435 \u0435\u0451 \u0432 \u043a\u043b\u0438\u0435\u043d\u0442 \u0432\u0440\u0443\u0447\u043d\u0443\u044e.', 'copied');
+          }} catch {{
+            setStatus('\u0411\u0440\u0430\u0443\u0437\u0435\u0440 \u043d\u0435 \u0434\u0430\u043b \u0441\u043a\u043e\u043f\u0438\u0440\u043e\u0432\u0430\u0442\u044c. \u041e\u0442\u043a\u0440\u043e\u0439\u0442\u0435 Raw \u0438 \u0441\u043a\u043e\u043f\u0438\u0440\u0443\u0439\u0442\u0435 URL.', 'fallback');
+          }}
+        }});
+      }});
+      document.querySelectorAll('[data-client-link]').forEach((link) => {{
+        link.addEventListener('click', () => {{
+          const client = link.dataset.client || '\u043a\u043b\u0438\u0435\u043d\u0442';
+          setStatus(`\u041e\u0442\u043a\u0440\u044b\u0432\u0430\u044e ${{client}}. \u0415\u0441\u043b\u0438 \u043d\u0435 \u043e\u0442\u043a\u0440\u044b\u043b\u0441\u044f, \u043e\u0442\u0441\u043a\u0430\u043d\u0438\u0440\u0443\u0439\u0442\u0435 QR \u0438\u043b\u0438 \u043d\u0430\u0436\u043c\u0438\u0442\u0435 Raw.`, 'opening');
+          window.setTimeout(() => {{
+            if (document.visibilityState === 'visible') {{
+              setStatus(`\u0415\u0441\u043b\u0438 ${{client}} \u043d\u0435 \u043e\u0442\u043a\u0440\u044b\u043b\u0441\u044f, \u043d\u0430\u0436\u043c\u0438\u0442\u0435 Raw \u0438\u043b\u0438 \u0441\u043a\u0430\u043d\u0438\u0440\u0443\u0439\u0442\u0435 QR.`, 'fallback');
+            }}
+          }}, 1600);
+        }});
+      }});
+    }})();
+  </script>
 </body>
 </html>
 """

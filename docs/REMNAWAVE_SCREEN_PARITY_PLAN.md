@@ -50,3 +50,20 @@ admin Users/Profile/Hosts.
 - 2026-06-06: Created this plan after live feedback that functional API parity
   is not sufficient and current visual subscription/admin UI does not meet
   Remnawave-like expectations.
+- 2026-06-06: RSP-001 first production pass released through the official
+  signed deploy path. Commits `d323b70` and `3a3aeda` restyled the public
+  subscription browser page into a narrower Remnawave-like customer portal and
+  fixed desktop install layout to two columns. Local gates passed:
+  `pytest tests/test_license_subscription_routes.py -q` (`23 passed`),
+  `ruff check app/domains/subscriptions/router.py tests/test_license_subscription_routes.py`,
+  GitHub `Quality gates`, GitHub `Build release images`, and installer deploy.
+  Live browser evidence on `https://sub.lumentech.tel/sub/.../happ`: page
+  renders at 760px width, install grid is `378px 300px`, QR is present and
+  compact, `Добавить подписку` is a `happ://add/...` link, copy/QR URL is public
+  `https://sub.lumentech.tel/...`, and no internal `http://api:8000` URL leaks.
+- 2026-06-06: RSP-001 browser interaction hardening added before moving to
+  admin screen parity. The public page now exposes a visible import status,
+  clipboard buttons bound through real JS handlers, and a separate `raw=1`
+  fallback URL so browser deep-link failures are visible instead of looking
+  like a dead button. Regression gate: subscription route pytest (`23 passed`)
+  and ruff on the changed API/test files.

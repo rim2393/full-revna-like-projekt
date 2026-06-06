@@ -278,6 +278,11 @@ async def test_subscription_routes_create_list_and_get(
     assert "width: min(760px, calc(100% - 28px))" in browser_page_response.text
     assert ".qr { padding: 20px; }" in browser_page_response.text
     assert "happ://add/https%3A%2F%2Fpanel.example.test%2Fsub%2F" in browser_page_response.text
+    assert "data-client-link" in browser_page_response.text
+    assert "data-import-status" in browser_page_response.text
+    assert "data-copy-url" in browser_page_response.text
+    assert "raw=1" in browser_page_response.text
+    assert "Если клиент не открылся" in browser_page_response.text
     assert qr_payloads == [
         f"https://panel.example.test/sub/{created['public_id']}?hwid=route-browser-device"
     ]
