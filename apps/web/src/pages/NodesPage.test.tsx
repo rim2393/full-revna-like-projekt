@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { createDevelopmentLumenApiClient } from '../shared/api/developmentClient'
@@ -272,6 +272,50 @@ describe('NodesPage backend wiring', () => {
     await waitFor(() => expect(restartNode).toHaveBeenCalledWith('node-action'))
     expect(await screen.findByText(/Last node action/i)).toBeInTheDocument()
     expect(screen.getByText(/node.restart queued as cmd_restart_1/i)).toBeInTheDocument()
+  })
+
+  it('requires inline confirmation before deleting a real node', async () => {
+    const user = userEvent.setup()
+    const deleteNode = vi.fn(async (nodeId: string) => ({
+      capabilities: {},
+      id: nodeId,
+      last_seen_at: '2026-05-27T09:30:00Z',
+      name: 'edge-delete',
+      public_address: '203.0.113.30',
+      region: 'eu',
+      sort_order: 0,
+      status: 'deleted' as const,
+    }))
+    const nodes: NodeResponse[] = [
+      {
+        capabilities: {},
+        id: 'node-delete',
+        last_seen_at: '2026-05-27T09:30:00Z',
+        name: 'edge-delete',
+        public_address: '203.0.113.30',
+        region: 'eu',
+        sort_order: 0,
+        status: 'active',
+      },
+    ]
+    const apiClient = createTestClient({
+      deleteNode,
+      listNodeCommands: async () => ({ items: [] }),
+      listNodeMetrics: async () => ({ items: [] }),
+      listNodes: async () => ({ items: nodes }),
+    })
+
+    renderWithRouter('/nodes', { apiClient, initialSession: developmentSession })
+
+    expect(await screen.findByText('edge-delete')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /^delete$/i }))
+    expect(deleteNode).not.toHaveBeenCalled()
+    const dialog = await screen.findByRole('alertdialog', { name: /delete node edge-delete/i })
+    expect(dialog).toHaveTextContent(/live API/i)
+    await user.click(within(dialog).getByRole('button', { name: /^delete$/i }))
+
+    await waitFor(() => expect(deleteNode).toHaveBeenCalledWith('node-delete'))
+    expect(screen.getByText('deleted', { selector: '.status-badge' })).toBeInTheDocument()
   })
 
   it('creates a provisioning job with credentials_ref only and safe token templates', async () => {

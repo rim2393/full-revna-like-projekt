@@ -288,6 +288,8 @@ async def test_subscription_routes_create_list_and_get(
         in browser_page_response.text
     )
     assert "data-client-link" in browser_page_response.text
+    assert "data-raw-url" in browser_page_response.text
+    assert "window.location.href = link.href" in browser_page_response.text
     assert "data-import-status" in browser_page_response.text
     assert "data-copy-url" in browser_page_response.text
     assert "raw=1" in browser_page_response.text

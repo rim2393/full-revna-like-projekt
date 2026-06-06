@@ -130,6 +130,27 @@ describe('Control plane resource screens', () => {
     )
   })
 
+  it('requires inline confirmation before deleting a real subscription', async () => {
+    const user = userEvent.setup()
+    const baseClient = createDevelopmentLumenApiClient()
+    const deleteSubscription = vi.fn(async () => undefined)
+    const apiClient: LumenApiClient = {
+      ...baseClient,
+      deleteSubscription,
+    }
+
+    renderWithRouter('/subscription', { apiClient, initialSession: developmentSession })
+
+    expect(await screen.findByRole('table', { name: /subscription inventory/i })).toBeInTheDocument()
+    await user.click(screen.getAllByRole('button', { name: /^delete$/i })[0])
+    expect(deleteSubscription).not.toHaveBeenCalled()
+    const dialog = await screen.findByRole('alertdialog', { name: /delete subscription/i })
+    expect(dialog).toHaveTextContent(/live API/i)
+    await user.click(within(dialog).getByRole('button', { name: /^delete$/i }))
+
+    await waitFor(() => expect(deleteSubscription).toHaveBeenCalledTimes(1))
+  })
+
   it('renders dashboard traffic and user risks from the real user API shape', async () => {
     const users: UserRecord[] = [
       {

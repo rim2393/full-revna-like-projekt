@@ -407,6 +407,42 @@ function ProvisioningJobPanel({
   )
 }
 
+function NodeDeleteConfirm({
+  node,
+  onCancel,
+  onConfirm,
+  pending,
+}: {
+  node: NodeResponse
+  onCancel: () => void
+  onConfirm: () => void
+  pending: boolean
+}) {
+  const { t } = useI18n()
+  return (
+    <section
+      className="danger-confirm-inline"
+      role="alertdialog"
+      aria-modal="false"
+      aria-label={t('Delete node {name}', { name: node.name })}
+    >
+      <div>
+        <p className="eyebrow">{t('Production API confirmation')}</p>
+        <h3>{t('Delete node {name}', { name: node.name })}</h3>
+        <p>{t('This real node will be marked deleted through the live API and removed from active service after the control command is queued.')}</p>
+      </div>
+      <div className="inline-actions inline-actions--compact">
+        <button type="button" className="button button--secondary" disabled={pending} onClick={onCancel}>
+          {t('Cancel')}
+        </button>
+        <button type="button" className="button button--danger" disabled={pending} onClick={onConfirm}>
+          {pending ? t('Deleting...') : t('Delete')}
+        </button>
+      </div>
+    </section>
+  )
+}
+
 export function NodesPage() {
   const { t } = useI18n()
   const spec = sectionSpecs.nodes
@@ -424,6 +460,7 @@ export function NodesPage() {
   const [protocolSelectionError, setProtocolSelectionError] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
   const [actionResult, setActionResult] = useState<NodeActionResult | null>(null)
+  const [pendingDeleteNode, setPendingDeleteNode] = useState<NodeResponse | null>(null)
   const createCommand = useCreateNodeCommand()
   const updateNodeProtocols = useUpdateNodeProtocolSelection()
   const pauseNode = usePauseNode()
@@ -754,6 +791,28 @@ export function NodesPage() {
               </div>
               <StatusBadge>{t('{count} nodes', { count: nodes.length })}</StatusBadge>
             </div>
+            {pendingDeleteNode ? (
+              <NodeDeleteConfirm
+                node={pendingDeleteNode}
+                pending={deleteNode.isPending}
+                onCancel={() => setPendingDeleteNode(null)}
+                onConfirm={() => {
+                  void runNodeAction(
+                    'Delete node',
+                    pendingDeleteNode,
+                    () => deleteNode.mutateAsync(pendingDeleteNode.id),
+                    (updatedNode) =>
+                      nodeActionResultFromNode(
+                        'deleted',
+                        updatedNode,
+                        'Node was marked deleted and a pause command was queued before removal from active service.',
+                      ),
+                  ).then(() => {
+                    setPendingDeleteNode(null)
+                  })
+                }}
+              />
+            ) : null}
             <DataTable
               caption="Node provisioning and heartbeat inventory"
               columns={[
@@ -957,21 +1016,7 @@ export function NodesPage() {
                         type="button"
                         className="button button--secondary"
                         disabled={hasPendingControl || deleteNode.isPending}
-                        onClick={() => {
-                          if (globalThis.confirm(t('Delete node confirmation', { name: node.name }))) {
-                            void runNodeAction(
-                              'Delete node',
-                              node,
-                              () => deleteNode.mutateAsync(node.id),
-                              (updatedNode) =>
-                                nodeActionResultFromNode(
-                                  'deleted',
-                                  updatedNode,
-                                  'Node was marked deleted and a pause command was queued before removal from active service.',
-                                ),
-                            )
-                          }
-                        }}
+                        onClick={() => setPendingDeleteNode(node)}
                       >
                         {t('Delete')}
                       </button>
