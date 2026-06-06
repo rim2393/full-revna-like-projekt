@@ -220,6 +220,13 @@ Last audited: 2026-06-01 21:28 Europe/Moscow.
   user editor form semantics are present (`email` autocomplete, `username`
   name, Telegram numeric input mode, new-password autocomplete,
   `metadata_json` name), and no API-key error is visible.
+- Live prod evidence for release
+  `main-eb60ca43550fb3e5df19c250a29dc3752b0bb2f7`: official signed
+  publish/deploy workflow `27057593252` completed successfully. Tools user-IP
+  and node-user-IP tables no longer format row separators with visible mojibake
+  `В·`; source now uses the real middle dot. Live panel JS asset
+  `/assets/index-DSOse94a.js` contains neither `В·` nor escaped
+  `\u0412\u00b7`.
 - Alembic heads: single head `0009_node_management_parity` after this slice.
 
 ## Fixes Applied During Audit

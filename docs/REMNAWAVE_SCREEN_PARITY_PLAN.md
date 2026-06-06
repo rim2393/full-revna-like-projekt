@@ -221,6 +221,18 @@ deployed before being marked done.
   form attrs are present (`email` autocomplete, `username` name,
   `telegram` numeric input mode, `new-password` autocomplete,
   `metadata_json` name), and no API-key error is visible.
+- 2026-06-06: RSP-009 Tools visible mojibake separator fixed and released
+  through the official image build and installer deploy path at product commit
+  `eb60ca4`. User IP and node-user-IP table rows now use a real middle dot
+  separator instead of the visible mojibake `В·`. Local gates passed:
+  `npx vitest run src/pages/ControlPlaneScreens.test.tsx --reporter=dot`
+  (`28 passed`), `npm run build`, release guard, production reality guard and
+  `git diff --check`. GitHub `Quality gates`, GitHub `Build release images`,
+  and installer deploy run `27057593252` succeeded. Live
+  `https://panel.lumentech.tel/` evidence: deployed JS asset
+  `/assets/index-DSOse94a.js` contains neither `В·` nor escaped
+  `\u0412\u00b7`, so the Tools tables can no longer render that corrupted
+  separator from the production bundle.
 - 2026-06-06: RSP-003 Profiles first pass started after live audit showed
   46 real profiles and a 7000px-tall screen with a cramped inventory table.
   Changes keep all existing real API actions, widen the inventory column,
