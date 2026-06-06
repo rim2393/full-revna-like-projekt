@@ -188,3 +188,17 @@ deployed before being marked done.
   `python scripts/validate_production_reality.py`, and `git diff --check`
   passed. Live deploy/evidence is still required before RSP-004 is marked
   released.
+- 2026-06-06: RSP-004 Hosts compact/function pass released through the
+  official image build and installer deploy path at commits `67035b5` and
+  correction `0cf7ba2`. The first live deploy showed the table still spanning
+  both grid columns because global `.panel--wide { grid-column: span 2; }`
+  overrode the Hosts layout; correction scoped `.hosts-inventory-panel` back
+  to `grid-column: auto`. Final live evidence on
+  `https://panel.lumentech.tel/hosts`: 18 real host rows, grid columns
+  `850px 347px`, inventory panel at `left=20 top=324 width=851 height=790`,
+  side stack at `left=887 top=324 width=347`, table wrapper bounded at about
+  `682px` high with horizontal scroll, `Advanced JSON` collapsed by default,
+  selected host row present, no raw `inbound_tag` / `Profile default` /
+  standalone `None` text, no internal `http://api:8000` leak, and clicking a
+  real host delete action opens an inline production API confirmation that can
+  be cancelled without deleting.
