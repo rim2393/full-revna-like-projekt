@@ -33,6 +33,24 @@ import { formatDateTime, formatRecord, toneForStatus } from '../shared/utils/res
 
 type ToolId = 'hwid' | 'top-users' | 'user-ips' | 'srh' | 'sessions' | 'torrent' | 'happ' | 'utilities' | 'snippets'
 
+type PendingToolAction =
+  | { deviceId: string; kind: 'delete-device'; label: string; userId: string }
+  | { kind: 'clear-devices'; label: string; userId: string }
+  | {
+      kind: 'drop-connections'
+      label: string
+      request: {
+        ip: string
+        node_id: string
+        reason: string
+        subscription_id: string | null
+        user_id: string | null
+      }
+    }
+  | { kind: 'revoke-session'; label: string; sessionId: string }
+  | { kind: 'truncate-torrent'; label: string }
+  | { kind: 'delete-snippet'; label: string; snippetId: string }
+
 const tools: Array<{
   detail: string
   icon: typeof Fingerprint
@@ -105,9 +123,9 @@ export function ToolsPage() {
   const [hwidFilter, setHwidFilter] = useState('')
   const [ipFilter, setIpFilter] = useState('')
   const [torrentFilter, setTorrentFilter] = useState('')
-  const [torrentTruncateArmed, setTorrentTruncateArmed] = useState(false)
   const [topUsersMetric, setTopUsersMetric] = useState('traffic_used')
   const [latestDropCommand, setLatestDropCommand] = useState<NodeCommandRecord | null>(null)
+  const [pendingAction, setPendingAction] = useState<PendingToolAction | null>(null)
   const [happBuildError, setHappBuildError] = useState<string | null>(null)
   const [happBuildForm, setHappBuildForm] = useState({
     cryptoMethod: 'v4',
@@ -217,6 +235,49 @@ export function ToolsPage() {
     URL.revokeObjectURL(url)
   }
 
+  function confirmPendingAction() {
+    if (!pendingAction) {
+      return
+    }
+    if (pendingAction.kind === 'delete-device') {
+      void deleteDevice
+        .mutateAsync({
+          deviceId: pendingAction.deviceId,
+          userId: pendingAction.userId,
+        })
+        .then(() => setPendingAction(null))
+      return
+    }
+    if (pendingAction.kind === 'clear-devices') {
+      void clearDevices.mutateAsync(pendingAction.userId).then(() => setPendingAction(null))
+      return
+    }
+    if (pendingAction.kind === 'drop-connections') {
+      void dropConnections.mutateAsync(pendingAction.request).then((response) => {
+        setLatestDropCommand(response.command)
+        setPendingAction(null)
+      })
+      return
+    }
+    if (pendingAction.kind === 'revoke-session') {
+      void revokeToolSession.mutateAsync(pendingAction.sessionId).then(() => setPendingAction(null))
+      return
+    }
+    if (pendingAction.kind === 'truncate-torrent') {
+      void truncateTorrentReports.mutateAsync().then(() => setPendingAction(null))
+      return
+    }
+    void deleteSnippet.mutateAsync(pendingAction.snippetId).then(() => setPendingAction(null))
+  }
+
+  const pendingActionBusy =
+    deleteDevice.isPending ||
+    clearDevices.isPending ||
+    dropConnections.isPending ||
+    revokeToolSession.isPending ||
+    truncateTorrentReports.isPending ||
+    deleteSnippet.isPending
+
   const activeTable = useMemo(() => {
     if (activeTool === 'hwid') {
       return {
@@ -248,8 +309,10 @@ export function ToolsPage() {
                   aria-label={`Delete device ${device.id} for ${item.email}`}
                   disabled={deleteDevice.isPending}
                   onClick={() =>
-                    void deleteDevice.mutateAsync({
+                    setPendingAction({
                       deviceId: device.id,
+                      kind: 'delete-device',
+                      label: `${device.label} for ${item.email}`,
                       userId: item.user_id,
                     })
                   }
@@ -262,7 +325,13 @@ export function ToolsPage() {
                   type="button"
                   className="button button--secondary"
                   disabled={clearDevices.isPending}
-                  onClick={() => void clearDevices.mutateAsync(item.user_id)}
+                  onClick={() =>
+                    setPendingAction({
+                      kind: 'clear-devices',
+                      label: item.email ?? item.user_id,
+                      userId: item.user_id,
+                    })
+                  }
                 >
                   Clear all
                 </button>
@@ -312,15 +381,17 @@ export function ToolsPage() {
                 aria-label={`Drop connections for ${item.ip} on ${item.node_ids[0]}`}
                 disabled={dropConnections.isPending}
                 onClick={() =>
-                  void dropConnections
-                    .mutateAsync({
+                  setPendingAction({
+                    kind: 'drop-connections',
+                    label: `${item.ip} on ${item.node_ids[0]}`,
+                    request: {
                       ip: item.ip,
                       node_id: item.node_ids[0],
                       reason: 'operator requested connection drop from tools user IPs',
                       subscription_id: item.subscription_ids[0] ?? null,
                       user_id: item.user_id,
-                    })
-                    .then((response) => setLatestDropCommand(response.command))
+                    },
+                  })
                 }
               >
                 <Ban size={16} aria-hidden="true" />
@@ -369,7 +440,13 @@ export function ToolsPage() {
               type="button"
               className="button button--secondary"
               disabled={item.status !== 'active' || item.is_current || revokeToolSession.isPending}
-              onClick={() => void revokeToolSession.mutateAsync(item.id)}
+              onClick={() =>
+                setPendingAction({
+                  kind: 'revoke-session',
+                  label: item.email ?? item.user_id,
+                  sessionId: item.id,
+                })
+              }
               title={
                 item.is_current
                   ? 'Current browser session cannot be revoked from this row'
@@ -430,7 +507,13 @@ export function ToolsPage() {
                 className="icon-button"
                 aria-label={`Delete snippet ${item.name}`}
                 disabled={deleteSnippet.isPending}
-                onClick={() => void deleteSnippet.mutateAsync(item.id)}
+                onClick={() =>
+                  setPendingAction({
+                    kind: 'delete-snippet',
+                    label: item.name,
+                    snippetId: item.id,
+                  })
+                }
               >
                 <Trash2 size={16} aria-hidden="true" />
               </button>
@@ -509,7 +592,7 @@ export function ToolsPage() {
   ])
 
   return (
-    <section className="page">
+    <section className="page tools-page">
       <PageHeader
         eyebrow="Operational tools"
         title="Tools"
@@ -538,15 +621,14 @@ export function ToolsPage() {
                     truncateTorrentReports.isPending ||
                     (torrentQuery.data?.items.length ?? 0) === 0
                   }
-                  onClick={() => {
-                    if (!torrentTruncateArmed) {
-                      setTorrentTruncateArmed(true)
-                      return
-                    }
-                    void truncateTorrentReports.mutateAsync().then(() => setTorrentTruncateArmed(false))
-                  }}
+                  onClick={() =>
+                    setPendingAction({
+                      kind: 'truncate-torrent',
+                      label: `${torrentQuery.data?.total ?? 0} torrent reports`,
+                    })
+                  }
                 >
-                  {torrentTruncateArmed ? 'Confirm truncate' : 'Truncate'}
+                  Truncate
                 </button>
               ) : null}
               {activeTool === 'utilities' ? (
@@ -622,7 +704,6 @@ export function ToolsPage() {
                     value={torrentFilter}
                     onChange={(event) => {
                       setTorrentFilter(event.target.value)
-                      setTorrentTruncateArmed(false)
                     }}
                   />
                 </label>
@@ -775,6 +856,40 @@ export function ToolsPage() {
                 )
               })}
             </div>
+            {pendingAction ? (
+              <section
+                className="danger-confirm-inline tools-confirm-panel"
+                role="alertdialog"
+                aria-modal="false"
+                aria-label={`Confirm ${pendingAction.kind} ${pendingAction.label}`}
+              >
+                <div>
+                  <p className="eyebrow">Production API confirmation</p>
+                  <h3>Confirm {pendingAction.kind.replaceAll('-', ' ')}</h3>
+                  <p>
+                    This action will call the real tools API for <strong>{pendingAction.label}</strong>.
+                  </p>
+                </div>
+                <div className="inline-actions inline-actions--compact">
+                  <button
+                    type="button"
+                    className="button button--secondary"
+                    disabled={pendingActionBusy}
+                    onClick={() => setPendingAction(null)}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="button button--danger"
+                    disabled={pendingActionBusy}
+                    onClick={confirmPendingAction}
+                  >
+                    {pendingActionBusy ? 'Working...' : 'Confirm'}
+                  </button>
+                </div>
+              </section>
+            ) : null}
             {isLoading ? <LoadingState label="Loading tools context..." /> : null}
             {error ? <ErrorState title={`${activeTable.title} unavailable`} error={error} /> : null}
             {!isLoading && !error && activeTable.rows.length > 0 ? (
@@ -808,15 +923,17 @@ export function ToolsPage() {
                           aria-label={`Drop connections for ${item.ip} on ${item.node_name ?? item.node_id}`}
                           disabled={dropConnections.isPending}
                           onClick={() =>
-                            void dropConnections
-                              .mutateAsync({
+                            setPendingAction({
+                              kind: 'drop-connections',
+                              label: `${item.ip} on ${item.node_name ?? item.node_id}`,
+                              request: {
                                 ip: item.ip,
                                 node_id: item.node_id,
                                 reason: 'operator requested connection drop from tools node user IPs',
                                 subscription_id: item.subscription_ids[0] ?? null,
                                 user_id: item.user_id,
-                              })
-                              .then((response) => setLatestDropCommand(response.command))
+                              },
+                            })
                           }
                         >
                           <Ban size={16} aria-hidden="true" />

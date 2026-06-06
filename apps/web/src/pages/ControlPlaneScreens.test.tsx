@@ -685,10 +685,14 @@ describe('Control plane resource screens', () => {
         name: /delete device phone for device-owner@lumen.local/i,
       }),
     )
+    expect(deleteUserDevice).not.toHaveBeenCalled()
+    await user.click(within(await screen.findByRole('alertdialog', { name: /confirm delete-device phone for device-owner@lumen.local/i })).getByRole('button', { name: /^confirm$/i }))
     await waitFor(() =>
       expect(deleteUserDevice).toHaveBeenCalledWith('usr_hwid_tools', 'phone'),
     )
     await user.click(screen.getByRole('button', { name: /^clear all$/i }))
+    expect(clearUserDevices).not.toHaveBeenCalled()
+    await user.click(within(await screen.findByRole('alertdialog', { name: /confirm clear-devices device-owner@lumen.local/i })).getByRole('button', { name: /^confirm$/i }))
     await waitFor(() => expect(clearUserDevices).toHaveBeenCalledWith('usr_hwid_tools'))
     await user.click(screen.getByRole('button', { name: /top users/i }))
     expect(await screen.findByText(/device-owner · device-owner@lumen.local/i)).toBeInTheDocument()
@@ -700,6 +704,8 @@ describe('Control plane resource screens', () => {
     await user.click(
       screen.getByRole('button', { name: /drop connections for 203\.0\.113\.44 on node-live/i }),
     )
+    expect(dropConnections).not.toHaveBeenCalled()
+    await user.click(within(await screen.findByRole('alertdialog', { name: /confirm drop-connections 203\.0\.113\.44 on node-live/i })).getByRole('button', { name: /^confirm$/i }))
     await waitFor(() =>
       expect(dropConnections).toHaveBeenCalledWith({
         ip: '203.0.113.44',
@@ -775,6 +781,8 @@ describe('Control plane resource screens', () => {
 
     await user.click(await screen.findByRole('button', { name: /session browser/i }))
     await user.click(screen.getByRole('button', { name: /^revoke$/i }))
+    expect(revokeToolSession).not.toHaveBeenCalled()
+    await user.click(within(await screen.findByRole('alertdialog', { name: /confirm revoke-session operator@lumen.local/i })).getByRole('button', { name: /^confirm$/i }))
     await waitFor(() => expect(revokeToolSession).toHaveBeenCalledWith('session-operator'))
   })
 
@@ -821,7 +829,7 @@ describe('Control plane resource screens', () => {
     expect(await screen.findByText('torrent / btih:test')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: /^truncate$/i }))
     expect(truncateTorrentReports).not.toHaveBeenCalled()
-    await user.click(screen.getByRole('button', { name: /^confirm truncate$/i }))
+    await user.click(within(await screen.findByRole('alertdialog', { name: /confirm truncate-torrent 1 torrent reports/i })).getByRole('button', { name: /^confirm$/i }))
     await waitFor(() => expect(truncateTorrentReports).toHaveBeenCalledTimes(1))
   })
 
@@ -924,6 +932,8 @@ describe('Control plane resource screens', () => {
       }),
     )
     await user.click(screen.getByRole('button', { name: /delete snippet xray status/i }))
+    expect(deleteToolSnippet).not.toHaveBeenCalled()
+    await user.click(within(await screen.findByRole('alertdialog', { name: /confirm delete-snippet xray status/i })).getByRole('button', { name: /^confirm$/i }))
     await waitFor(() => expect(deleteToolSnippet).toHaveBeenCalledWith('snippet-1'))
   })
 
