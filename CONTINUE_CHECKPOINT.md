@@ -264,6 +264,24 @@ Last audited: 2026-06-01 21:28 Europe/Moscow.
   `advanced-json-panel`; JS contains no `window.confirm`,
   `globalThis.confirm`, or `.confirm(`; `/api/v1/health/ready` returned
   status 200 with API dependency ok.
+- Live prod evidence for release
+  `main-df400f30dadd3fa5bf1e71a1796144fdfea50abb`: official signed
+  publish/deploy workflow `27059270056` completed successfully. Subscription
+  page config operations now use real typed API forms with collapsed
+  renderer/config JSON, stable field names for browser/password-manager
+  semantics, bounded tables/code panels, and inline production API
+  confirmation before deleting a real subscription page config. Local gates
+  passed: focused `ControlPlaneScreens.test.tsx` Vitest (`30 passed`),
+  TypeScript build, web production build, release guard, production reality
+  guard, and `git diff --check`. Product GitHub runs succeeded:
+  `Quality gates` `27058770673` and `Build release images` `27058770657`.
+  Live evidence: `/api/v1/health/ready` returned `ok`; `/subscription-page`
+  returned assets `/assets/index-uodQ-W-q.js` and
+  `/assets/index-CEE70ukC.css`; JS contains `Delete subscription page config`,
+  `Renderer JSON`, `Config JSON`, and `Selected config JSON`; CSS contains
+  `subscription-public-page` and `subscription-config-confirm`; JS contains
+  no `window.confirm`, `globalThis.confirm`, or `.confirm(` native browser
+  confirmation calls.
 - Alembic heads: single head `0009_node_management_parity` after this slice.
 
 ## Fixes Applied During Audit
@@ -281,8 +299,9 @@ Last audited: 2026-06-01 21:28 Europe/Moscow.
 ## Next Suggested Work
 
 1. Continue Remnawave parity UI pages only against live API state; no fake
-   counters or static placeholder rows. The next practical page slice is
-   Subscriptions/Subscription page configs, then Settings and Tools.
+   counters or static placeholder rows. The next practical page slices are
+   Settings and Tools, then the remaining dense admin surfaces that still
+   have slow loading, weak responsive behavior, or incomplete inline actions.
 2. For each admin page slice, replace remaining native/browser-only UX with
    real inline controls, add focused tests, run build/guards, push, wait
    product workflows, deploy by official installer workflow, and record live

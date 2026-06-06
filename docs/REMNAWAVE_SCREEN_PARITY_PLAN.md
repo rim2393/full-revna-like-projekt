@@ -405,3 +405,26 @@ deployed before being marked done.
   native browser confirmation calls; and
   `https://panel.lumentech.tel/api/v1/health/ready` returns status 200 with
   `{"status":"ok","dependencies":{"api":"ok"}}`.
+- 2026-06-06: RSP-007 Subscription page config operations released through
+  the official image build and installer deploy path at product commit
+  `df400f3` and installer workflow `27059270056`. The `/subscription-page`
+  operator surface now keeps delivery and subpage config operations on real
+  typed API calls, collapses advanced renderer/config JSON by default, gives
+  JSON textareas stable form names, bounds dense config/subscription tables,
+  and replaces immediate config deletion with an inline production API
+  confirmation panel. Local gates passed:
+  `npx vitest run src/pages/ControlPlaneScreens.test.tsx --reporter=dot`
+  (`30 passed`), `npx tsc -b --pretty false`, `npm run build`,
+  `python scripts/validate_release_guard.py`,
+  `python scripts/validate_production_reality.py`, `git diff --check`, and
+  source grep found no native browser confirmation calls in page/shared code.
+  Product GitHub runs succeeded: `Quality gates` `27058770673` and
+  `Build release images` `27058770657`. Live evidence after deploy:
+  `https://panel.lumentech.tel/api/v1/health/ready` returned `ok`; panel
+  `/subscription-page` returned assets `/assets/index-uodQ-W-q.js` and
+  `/assets/index-CEE70ukC.css`; the JS asset contains
+  `Delete subscription page config`, `Renderer JSON`, `Config JSON`, and
+  `Selected config JSON`; the CSS asset contains `subscription-public-page`
+  and `subscription-config-confirm`; and the live JS asset contains no
+  `window.confirm`, `globalThis.confirm`, or `.confirm(` native browser
+  confirmation calls.
