@@ -141,6 +141,23 @@ deployed before being marked done.
   raw `Open`/`internal`/`external` row text is gone, action aria labels are
   Russian, and deleting `bear` opens an inline Russian confirmation before any
   API call. Cancel closes the dialog and leaves all 4 rows intact.
+- 2026-06-06: RSP-001 public subscription portal link regression fixed and
+  released through the official image build and installer deploy path at
+  product commit `7bfb675`. Root cause: the browser portal generated Raw and
+  client-tab links pointing at `/api/v1/subscriptions/public/...` on the public
+  `sub.lumentech.tel` host, where the edge service returns fallback HTML.
+  The portal now emits only short public `/sub/{public_id}/{target}` URLs for
+  customer-visible Raw and client tabs while keeping backend API render URLs
+  unchanged for admin/API records. Local gates passed:
+  `python -m pytest tests/test_license_subscription_routes.py -q` (`23 passed`),
+  `ruff check app/domains/subscriptions/router.py tests/test_license_subscription_routes.py`,
+  release guard, production reality guard, and `git diff --check`. Live
+  evidence on `https://sub.lumentech.tel/sub/.../happ`: no
+  `/api/v1/subscriptions/public/` leak in the HTML, no edge fallback text,
+  QR SVG/path is present, Happ import link is public, Raw points to
+  `/sub/.../happ?...&raw=1`, Hiddify/Sing-box/Amnezia tabs point to
+  `/sub/.../{target}`, and the short raw endpoint returns real `text/plain`
+  proxy subscription output instead of fallback HTML.
 - 2026-06-06: RSP-003 Profiles first pass started after live audit showed
   46 real profiles and a 7000px-tall screen with a cramped inventory table.
   Changes keep all existing real API actions, widen the inventory column,
