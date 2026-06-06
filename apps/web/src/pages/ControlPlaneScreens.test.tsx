@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { createDevelopmentLumenApiClient } from '../shared/api/developmentClient'
@@ -192,8 +192,10 @@ describe('Control plane resource screens', () => {
     expect((await screen.findAllByText('Lifecycle User')).length).toBeGreaterThan(0)
     await user.click(screen.getByRole('button', { name: /(toggle status|переключить статус) lifecycle user/i }))
     await user.click(screen.getByRole('button', { name: /(reset traffic|сбросить трафик) lifecycle user/i }))
+    await user.click(within(screen.getByRole('alertdialog', { name: /reset traffic for lifecycle user/i })).getByRole('button', { name: /^reset traffic$/i }))
     const lifecycleRevokeButtons = screen.getAllByRole('button', { name: /^revoke$/i })
     await user.click(lifecycleRevokeButtons[lifecycleRevokeButtons.length - 1])
+    await user.click(within(screen.getByRole('alertdialog', { name: /revoke user lifecycle user/i })).getByRole('button', { name: /^revoke$/i }))
 
     await waitFor(() => expect(disableUser).toHaveBeenCalledWith('usr_lifecycle'))
     await waitFor(() => expect(resetUserTraffic).toHaveBeenCalledWith('usr_lifecycle'))
@@ -254,6 +256,7 @@ describe('Control plane resource screens', () => {
     await user.selectOptions(screen.getByLabelText(/^(squad|сквад)$/i), 'squad_bulk')
     await user.click(screen.getByRole('button', { name: /(add to squad|добавить в сквад)/i }))
     await user.click(screen.getAllByRole('button', { name: /^revoke$/i })[0])
+    await user.click(within(screen.getByRole('alertdialog', { name: /revoke selected users/i })).getByRole('button', { name: /^revoke$/i }))
 
     await waitFor(() => expect(bulkUsers).toHaveBeenCalledTimes(4))
     expect(bulkUsers.mock.calls[0]).toEqual([

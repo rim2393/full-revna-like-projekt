@@ -569,6 +569,7 @@ const ru: Record<string, string> = {
   'User could not be deleted.': 'Не удалось удалить пользователя.',
   'User lookup failed.': 'Поиск пользователя не удался.',
   'User could not be updated.': 'Не удалось обновить пользователя.',
+  'User action failed.': 'Не удалось выполнить действие с пользователем.',
   'User directory': 'Каталог пользователей',
   'Search users': 'Поиск пользователей',
   Revoked: 'Отозванные',

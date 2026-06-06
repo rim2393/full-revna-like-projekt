@@ -83,6 +83,15 @@ deployed before being marked done.
   карточку`, `Сортировка`, `превысили лимит`), no old `Open detail` /
   `Policy edits` / standalone `Sort` text remains, and no internal
   `http://api:8000` URL leaks.
+- 2026-06-06: RSP-002 Users continuation prepared after live audit showed the
+  directory still spanning the whole content width and several dangerous
+  actions relying on old immediate-click behavior. Changes keep the data
+  production-backed, bound the Users directory table, place side workflow
+  panels next to it, and require inline confirmation before real delete,
+  revoke, reset-traffic, and destructive bulk API calls. Local gates passed:
+  targeted Users vitest, full web vitest (`59 passed`), production build,
+  release guard, production reality guard, and `git diff --check`. Live
+  deploy/evidence is required before this continuation is marked released.
 - 2026-06-06: RSP-003 Profiles first pass started after live audit showed
   46 real profiles and a 7000px-tall screen with a cramped inventory table.
   Changes keep all existing real API actions, widen the inventory column,

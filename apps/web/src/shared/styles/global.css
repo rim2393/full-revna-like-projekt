@@ -1291,6 +1291,11 @@ h2 {
   min-width: 0;
 }
 
+.users-directory {
+  grid-column: auto;
+  overflow: hidden;
+}
+
 .users-toolbar {
   display: grid;
   grid-template-columns: minmax(260px, 1fr) minmax(180px, 220px) minmax(180px, 220px) auto;
@@ -1352,13 +1357,16 @@ h2 {
 }
 
 .users-directory .data-table-wrap {
+  max-height: min(760px, calc(100vh - 210px));
+  overflow: auto;
   margin-top: var(--space-4);
   border: 1px solid var(--color-line);
   border-radius: var(--radius-sm);
 }
 
 .users-directory .data-table {
-  min-width: 1080px;
+  min-width: 1180px;
+  table-layout: fixed;
 }
 
 .users-directory .data-table caption {
@@ -1376,6 +1384,26 @@ h2 {
 .users-directory .data-table th,
 .users-directory .data-table td {
   padding: 10px var(--space-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.users-directory .data-table th:nth-child(1),
+.users-directory .data-table td:nth-child(1) {
+  width: 58px;
+  text-align: center;
+}
+
+.users-directory .data-table th:nth-child(2),
+.users-directory .data-table td:nth-child(2) {
+  width: 260px;
+}
+
+.users-directory .data-table th:nth-child(8),
+.users-directory .data-table td:nth-child(8) {
+  width: 150px;
 }
 
 .users-directory .data-table tbody tr {

@@ -38,6 +38,10 @@ import { formatDateTime, toneForStatus } from '../shared/utils/resourceFormat'
 
 type StatusFilter = 'all' | 'active' | 'disabled' | 'revoked' | 'expired' | 'over_limit'
 type SortMode = 'created_desc' | 'traffic_desc' | 'expires_asc' | 'name_asc'
+type UserDangerAction = 'delete' | 'reset-traffic' | 'revoke'
+type UserDangerTarget =
+  | { action: UserDangerAction; kind: 'bulk'; count: number; ids: string[] }
+  | { action: UserDangerAction; kind: 'single'; user: UserRecord }
 
 function formatUserName(user: UserRecord): string {
   return user.display_name || user.username || user.email
@@ -130,6 +134,7 @@ export function UsersPage() {
   const [bulkTrafficDelta, setBulkTrafficDelta] = useState('')
   const [bulkSquadId, setBulkSquadId] = useState('')
   const [formError, setFormError] = useState<string | null>(null)
+  const [pendingDanger, setPendingDanger] = useState<UserDangerTarget | null>(null)
 
   const filteredUsers = useMemo(() => {
     const needle = search.trim().toLowerCase()
@@ -252,16 +257,13 @@ export function UsersPage() {
       setFormError(t('Select at least one user first.'))
       return
     }
-    if (
-      action === 'delete' &&
-      !globalThis.confirm(t('Delete selected users confirmation', { count: selectedIds.size }))
-    ) {
-      return
-    }
-    if (
-      action === 'revoke' &&
-      !globalThis.confirm(t('Revoke selected users confirmation', { count: selectedIds.size }))
-    ) {
+    if (action === 'delete' || action === 'revoke' || action === 'reset-traffic') {
+      setPendingDanger({
+        action: action as UserDangerAction,
+        count: selectedIds.size,
+        ids: Array.from(selectedIds),
+        kind: 'bulk',
+      })
       return
     }
     setFormError(null)
@@ -271,6 +273,34 @@ export function UsersPage() {
     })
     if (action === 'delete') {
       setSelectedIds(new Set())
+    }
+  }
+
+  async function confirmDanger() {
+    if (!pendingDanger) {
+      return
+    }
+    setFormError(null)
+    try {
+      if (pendingDanger.kind === 'bulk') {
+        await bulkUsers.mutateAsync({
+          action: pendingDanger.action,
+          request: { user_ids: pendingDanger.ids },
+        })
+        if (pendingDanger.action === 'delete') {
+          setSelectedIds(new Set())
+        }
+      } else if (pendingDanger.action === 'delete') {
+        await deleteUser.mutateAsync(pendingDanger.user.id)
+      } else if (pendingDanger.action === 'revoke') {
+        await revokeUser.mutateAsync(pendingDanger.user.id)
+      } else {
+        await resetUserTraffic.mutateAsync(pendingDanger.user.id)
+      }
+      setPendingDanger(null)
+      await query.refetch()
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : t('User action failed.'))
     }
   }
 
@@ -509,7 +539,7 @@ export function UsersPage() {
                     aria-label={t('Reset traffic {name}', { name: formatUserName(user) })}
                     title={t('Reset traffic')}
                     disabled={resetUserTraffic.isPending}
-                    onClick={() => void resetUserTraffic.mutateAsync(user.id)}
+                    onClick={() => setPendingDanger({ action: 'reset-traffic', kind: 'single', user })}
                   >
                     <RotateCcw size={16} aria-hidden="true" />
                   </button>
@@ -521,12 +551,16 @@ export function UsersPage() {
         </article>
 
         <aside className="side-stack users-side">
+          <UserDangerConfirm
+            pending={bulkUsers.isPending || deleteUser.isPending || resetUserTraffic.isPending || revokeUser.isPending}
+            target={pendingDanger}
+            onCancel={() => setPendingDanger(null)}
+            onConfirm={() => void confirmDanger()}
+          />
           <FocusedUserCard
-            deleteUser={deleteUser}
             disableUser={disableUser}
             enableUser={enableUser}
-            resetUserTraffic={resetUserTraffic}
-            revokeUser={revokeUser}
+            onDanger={setPendingDanger}
             t={t}
             user={focusedUser}
           />
@@ -582,6 +616,66 @@ export function UsersPage() {
   )
 }
 
+function UserDangerConfirm({
+  onCancel,
+  onConfirm,
+  pending,
+  target,
+}: {
+  onCancel: () => void
+  onConfirm: () => void
+  pending: boolean
+  target: UserDangerTarget | null
+}) {
+  const { t } = useI18n()
+  if (!target) {
+    return null
+  }
+  const name = target.kind === 'single' ? formatUserName(target.user) : String(target.count)
+  const titleKey =
+    target.action === 'delete'
+      ? target.kind === 'single'
+        ? 'Delete user {name}'
+        : 'Delete selected users'
+      : target.action === 'revoke'
+        ? target.kind === 'single'
+          ? 'Revoke user {name}'
+          : 'Revoke selected users'
+        : target.kind === 'single'
+          ? 'Reset traffic for {name}'
+          : 'Reset traffic for selected users'
+  const descriptionKey =
+    target.action === 'delete'
+      ? target.kind === 'single'
+        ? 'This will remove the real user through the production API.'
+        : 'This will remove {count} real users through the production API.'
+      : target.action === 'revoke'
+        ? target.kind === 'single'
+          ? 'This will revoke the real user through the production API.'
+          : 'This will revoke {count} real users through the production API.'
+        : target.kind === 'single'
+          ? 'This will reset real traffic counters through the production API.'
+          : 'This will reset traffic counters for {count} real users through the production API.'
+
+  return (
+    <section className="danger-confirm-inline" role="alertdialog" aria-modal="false" aria-label={t(titleKey, { count: name, name })}>
+      <div>
+        <p className="eyebrow">{t('Danger action')}</p>
+        <h3>{t(titleKey, { count: name, name })}</h3>
+        <p>{t(descriptionKey, { count: name, name })}</p>
+      </div>
+      <div className="inline-actions inline-actions--compact">
+        <button type="button" className="button button--secondary" disabled={pending} onClick={onCancel}>
+          {t('Cancel')}
+        </button>
+        <button type="button" className="button button--danger" disabled={pending} onClick={onConfirm}>
+          {target.action === 'reset-traffic' ? t('Reset traffic') : target.action === 'revoke' ? t('Revoke') : t('Delete')}
+        </button>
+      </div>
+    </section>
+  )
+}
+
 function SummaryTile({ detail, label, value }: { detail: string; label: string; value: string }) {
   return (
     <div>
@@ -593,43 +687,18 @@ function SummaryTile({ detail, label, value }: { detail: string; label: string; 
 }
 
 function FocusedUserCard({
-  deleteUser,
   disableUser,
   enableUser,
-  resetUserTraffic,
-  revokeUser,
+  onDanger,
   t,
   user,
 }: {
-  deleteUser: ReturnType<typeof useDeleteUser>
   disableUser: ReturnType<typeof useDisableUser>
   enableUser: ReturnType<typeof useEnableUser>
-  resetUserTraffic: ReturnType<typeof useResetUserTraffic>
-  revokeUser: ReturnType<typeof useRevokeUser>
+  onDanger: (target: UserDangerTarget) => void
   t: (value: string, params?: Record<string, string | number>) => string
   user: UserRecord | undefined
 }) {
-  async function revokeFocusedUser(user: UserRecord) {
-    if (!globalThis.confirm(t('Revoke user confirmation', { name: formatUserName(user) }))) {
-      return
-    }
-    await revokeUser.mutateAsync(user.id)
-  }
-
-  async function deleteFocusedUser(user: UserRecord) {
-    if (!globalThis.confirm(t('Delete user confirmation', { name: formatUserName(user) }))) {
-      return
-    }
-    await deleteUser.mutateAsync(user.id)
-  }
-
-  async function resetFocusedUserTraffic(user: UserRecord) {
-    if (!globalThis.confirm(t('Reset user traffic confirmation', { name: formatUserName(user) }))) {
-      return
-    }
-    await resetUserTraffic.mutateAsync(user.id)
-  }
-
   if (!user) {
     return (
       <article className="panel">
@@ -684,15 +753,15 @@ function FocusedUserCard({
           <Ban size={16} aria-hidden="true" />
           {user.status === 'active' ? t('Disable') : t('Enable')}
         </button>
-        <button type="button" className="button button--secondary" onClick={() => void resetFocusedUserTraffic(user)}>
+        <button type="button" className="button button--secondary" onClick={() => onDanger({ action: 'reset-traffic', kind: 'single', user })}>
           <RotateCcw size={16} aria-hidden="true" />
           {t('Reset traffic')}
         </button>
-        <button type="button" className="button button--secondary" onClick={() => void revokeFocusedUser(user)}>
+        <button type="button" className="button button--secondary" onClick={() => onDanger({ action: 'revoke', kind: 'single', user })}>
           <Ban size={16} aria-hidden="true" />
           {t('Revoke')}
         </button>
-        <button type="button" className="button button--danger" onClick={() => void deleteFocusedUser(user)}>
+        <button type="button" className="button button--danger" onClick={() => onDanger({ action: 'delete', kind: 'single', user })}>
           <Trash2 size={16} aria-hidden="true" />
           {t('Delete')}
         </button>
