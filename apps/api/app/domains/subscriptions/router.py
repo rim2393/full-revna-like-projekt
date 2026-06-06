@@ -847,18 +847,40 @@ def _subscription_browser_page(
       max-width: 336px;
       height: auto;
     }}
-    .raw {{
-      max-height: 96px;
-      padding: 12px;
-      overflow: auto;
-      overflow-wrap: anywhere;
-      color: var(--muted);
-      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      font-size: .76rem;
-      line-height: 1.5;
-      background: rgb(0 0 0 / 22%);
+    .qr-actions {{
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: center;
+      min-width: 0;
+    }}
+    .qr-status {{
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      min-width: 0;
+      min-height: 40px;
+      padding: 0 12px;
+      color: var(--ink);
+      font-size: .82rem;
+      font-weight: 800;
+      background: rgb(0 0 0 / 18%);
       border: 1px solid var(--line);
       border-radius: var(--radius-sm);
+    }}
+    .qr-status::before {{
+      flex: 0 0 auto;
+      width: 8px;
+      height: 8px;
+      content: "";
+      background: var(--accent);
+      border-radius: 999px;
+      box-shadow: 0 0 16px rgb(83 224 173 / 62%);
+    }}
+    .qr-status span {{
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }}
     @media (max-width: 920px) {{
       .page-head, .install-grid {{ grid-template-columns: 1fr; }}
@@ -875,6 +897,7 @@ def _subscription_browser_page(
       h1 {{ font-size: 1.7rem; }}
       .install-grid {{ gap: 12px; }}
       .qr-panel {{ padding: 14px; }}
+      .qr-actions {{ grid-template-columns: 1fr; }}
     }}
     @media (prefers-reduced-motion: reduce) {{
       *, *::before, *::after {{ scroll-behavior: auto !important; transition: none !important; }}
@@ -971,7 +994,13 @@ def _subscription_browser_page(
             <span>{html_escape(client_label)}</span>
           </div>
           <div class="qr" role="img" aria-label="QR subscription">{qr_svg}</div>
-          <p class="raw">{escaped_raw}</p>
+          <div class="qr-actions">
+            <div class="qr-status" title="{escaped_raw}"><span>\u0421\u0441\u044b\u043b\u043a\u0430 \u0433\u043e\u0442\u043e\u0432\u0430 \u0434\u043b\u044f QR</span></div>
+            <button class="button" type="button" data-url="{escaped_raw}" onclick="navigator.clipboard.writeText(this.dataset.url)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><rect x="3" y="3" width="13" height="13" rx="2"/></svg>
+              \u0421\u043a\u043e\u043f\u0438\u0440\u043e\u0432\u0430\u0442\u044c
+            </button>
+          </div>
         </aside>
       </div>
     </section>

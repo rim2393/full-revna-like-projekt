@@ -272,6 +272,9 @@ async def test_subscription_routes_create_list_and_get(
         '<div class="qr" role="img" aria-label="QR subscription"><svg'
         in browser_page_response.text
     )
+    assert '<p class="raw">' not in browser_page_response.text
+    assert "qr-status" in browser_page_response.text
+    assert "Ссылка готова для QR" in browser_page_response.text
     assert "happ://add" not in browser_page_response.text
     assert qr_payloads == [
         f"https://panel.example.test/sub/{created['public_id']}?hwid=route-browser-device"
