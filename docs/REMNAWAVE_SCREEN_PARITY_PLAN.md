@@ -110,3 +110,11 @@ admin Users/Profile/Hosts.
   handlers stay in place, action buttons become titled icons, facts become
   compact key/value rows with ellipsis, and opened tables/JSON blocks get
   bounded scroll. Local web `npm run build` passed.
+- 2026-06-06: RSP-003 selected-profile detail compact pass released through
+  official image build and installer deploy at commit `5fe1355`. Live
+  evidence on `https://panel.lumentech.tel/profiles`: selected detail panel
+  height dropped from about 1251px to 912px, action strip dropped from 232px
+  to 36px, seven real actions remain present as 34px titled icon buttons,
+  fact rows are stable at 46px, open inbound section is bounded, 46 real
+  profile rows still load, selected row remains present, and no internal
+  `http://api:8000` URL leaks.
