@@ -2271,6 +2271,27 @@ h2 {
   cursor: pointer;
 }
 
+.tools-snippet-editor {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.tools-snippet-editor .form-grid {
+  grid-template-columns: minmax(180px, 0.8fr) minmax(140px, 0.55fr) minmax(260px, 1.6fr);
+  align-items: end;
+}
+
+.tools-snippet-editor .form-grid__wide {
+  grid-column: auto;
+}
+
+.tools-snippet-editor textarea {
+  min-height: 74px;
+  max-height: 180px;
+  font-family: var(--font-mono);
+  font-size: 0.88rem;
+}
+
 .auth-shell {
   display: grid;
   grid-template-columns: minmax(320px, 0.9fr) minmax(360px, 1.1fr);
@@ -2743,6 +2764,14 @@ h2 {
 
   .profiles-side {
     position: static;
+  }
+
+  .tools-snippet-editor .form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .tools-snippet-editor .form-grid__wide {
+    grid-column: 1 / -1;
   }
 }
 

@@ -125,15 +125,15 @@ export function ToolsPage() {
     subscriptionUrl: '',
   })
   const summaryQuery = useToolSummaryData()
-  const hwidQuery = useHwidInspectorData(hwidFilter)
-  const topUsersQuery = useTopUsersData(topUsersMetric, 50)
-  const userIpsQuery = useUserIpsData(ipFilter, 200)
-  const nodeUserIpsQuery = useNodeUserIpsData(ipFilter, 200)
-  const srhQuery = useSrhInspectorData()
-  const sessionsQuery = useSessionInspectorData()
-  const torrentQuery = useTorrentReportsData(torrentFilter, 200)
-  const happQuery = useHappRoutingData()
-  const snippetsQuery = useToolSnippetsData()
+  const hwidQuery = useHwidInspectorData(hwidFilter, activeTool === 'hwid')
+  const topUsersQuery = useTopUsersData(topUsersMetric, 50, activeTool === 'top-users')
+  const userIpsQuery = useUserIpsData(ipFilter, 200, activeTool === 'user-ips')
+  const nodeUserIpsQuery = useNodeUserIpsData(ipFilter, 200, activeTool === 'user-ips')
+  const srhQuery = useSrhInspectorData(activeTool === 'srh')
+  const sessionsQuery = useSessionInspectorData(activeTool === 'sessions')
+  const torrentQuery = useTorrentReportsData(torrentFilter, 200, activeTool === 'torrent')
+  const happQuery = useHappRoutingData(activeTool === 'happ')
+  const snippetsQuery = useToolSnippetsData(activeTool === 'snippets')
   const buildHappRouting = useBuildHappRouting()
   const deleteDevice = useDeleteUserDevice()
   const clearDevices = useClearUserDevices()
@@ -927,7 +927,7 @@ export function ToolsPage() {
               </div>
             ) : null}
             {activeTool === 'snippets' ? (
-              <div className="details-card">
+              <div className="details-card tools-snippet-editor">
                 <h3>Snippet editor</h3>
                 <div className="form-grid">
                   <label>

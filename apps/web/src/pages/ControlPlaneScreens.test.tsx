@@ -83,6 +83,26 @@ describe('Control plane resource screens', () => {
     cleanup()
   })
 
+  it('keeps inactive tools endpoints from breaking the active tool tab', async () => {
+    const apiClient: LumenApiClient = {
+      ...createDevelopmentLumenApiClient(),
+      inspectHappRouting: vi.fn(async () => {
+        throw new Error('inactive HApp endpoint should not block HWID tab')
+      }),
+      inspectSessions: vi.fn(async () => {
+        throw new Error('inactive sessions endpoint should not block HWID tab')
+      }),
+      inspectTorrentReports: vi.fn(async () => {
+        throw new Error('inactive torrent endpoint should not block HWID tab')
+      }),
+    }
+
+    renderWithRouter('/tools', { apiClient, initialSession: developmentSession })
+
+    expect(await screen.findByRole('table', { name: /operational tools/i })).toBeInTheDocument()
+    expect(screen.queryByText(/tools unavailable/i)).not.toBeInTheDocument()
+  })
+
   it('creates subscriptions with a real listed license and backend public render metadata', async () => {
     const user = userEvent.setup()
     const baseClient = createDevelopmentLumenApiClient()

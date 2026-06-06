@@ -66,6 +66,19 @@ function command(overrides: Partial<NodeCommandRecord>): NodeCommandRecord {
 }
 
 describe('NodePluginsPage', () => {
+  it('renders through the Remnawave-style /nodes/plugins compatibility route', async () => {
+    const apiClient = createTestClient({
+      listNodePlugins: async () => ({
+        items: [plugin({ id: 'plugin-route', name: 'Route alias plugin', sort_order: 0 })],
+      }),
+      listNodes: async () => ({ items: [] }),
+    })
+
+    renderWithRouter('/nodes/plugins', { apiClient, initialSession: developmentSession })
+
+    expect(await screen.findByText('Route alias plugin')).toBeInTheDocument()
+  })
+
   it('wires clone, reorder and apply controls to the real API contract', async () => {
     const cloneNodePlugin = vi.fn(async () =>
       plugin({ id: 'plugin-copy', name: 'Torrent filter copy', sort_order: 20 }),
