@@ -854,6 +854,37 @@ describe('Control plane resource screens', () => {
     })
   })
 
+  it('requires inline confirmation before deleting a real squad', async () => {
+    const user = userEvent.setup()
+    const deleteSquad = vi.fn(async (_squadId: string) => undefined)
+    const apiClient: LumenApiClient = {
+      ...createDevelopmentLumenApiClient(),
+      deleteSquad,
+      listSquads: async () => ({
+        items: [
+          {
+            id: 'squad_delete',
+            kind: 'internal',
+            metadata_json: { channel: 'qa' },
+            name: 'Delete candidate',
+            status: 'active',
+          },
+        ],
+      }),
+    }
+
+    renderWithRouter('/squads', { apiClient, initialSession: developmentSession })
+
+    expect(await screen.findByText('Delete candidate')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /delete delete candidate|удалить delete candidate/i }))
+    expect(deleteSquad).not.toHaveBeenCalled()
+    const dialog = screen.getByRole('alertdialog', { name: /delete squad delete candidate|удалить сквад delete candidate/i })
+    expect(dialog).toHaveTextContent(/live API|боевой API/i)
+    await user.click(within(dialog).getByRole('button', { name: /^delete$|^удалить$/i }))
+
+    await waitFor(() => expect(deleteSquad).toHaveBeenCalledWith('squad_delete'))
+  })
+
   it('saves external squad subscription delivery overrides through the typed API contract', async () => {
     const user = userEvent.setup()
     const squad = {

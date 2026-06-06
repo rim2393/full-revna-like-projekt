@@ -122,6 +122,16 @@ deployed before being marked done.
   bounded to a `560px` internal scroll area, and real device delete / clear
   all devices open Russian inline confirmations before API calls. Cancel closes
   both dialogs and leaves all 103 visible table rows intact.
+- 2026-06-06: RSP-006 Squads first parity pass prepared after live audit showed
+  English `Open` cells and English aria actions, full-width squad inventory,
+  side workflow panels below the table, and immediate delete API calls. Changes
+  keep squads API-backed, bound the inventory table with internal scroll, align
+  side workflow panels beside the table, localize visible/accessible labels,
+  replace `Open` cells with `Select to inspect`, and require inline
+  confirmation before deleting a real squad. Local gates passed: targeted
+  Squads/productionReality vitest, full web vitest (`60 passed`), production
+  build, release guard, production reality guard, and `git diff --check`.
+  Live deploy/evidence is required before this pass is marked released.
 - 2026-06-06: RSP-003 Profiles first pass started after live audit showed
   46 real profiles and a 7000px-tall screen with a cramped inventory table.
   Changes keep all existing real API actions, widen the inventory column,

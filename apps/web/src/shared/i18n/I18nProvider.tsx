@@ -264,6 +264,17 @@ const ru: Record<string, string> = {
     'Создайте внутренние или внешние группы доступа до назначения профилей и хостов.',
   'Squads unavailable': 'Сквады недоступны',
   'Loading squads...': 'Загрузка сквадов...',
+  'Squad could not be created.': 'Не удалось создать сквад.',
+  'Squad could not be saved.': 'Не удалось сохранить сквад.',
+  internal: 'внутренний',
+  external: 'внешний',
+  'Select to inspect': 'Выберите для просмотра',
+  'Delete squad {name}': 'Удалить сквад {name}',
+  'This real squad and its delivery bindings will be removed through the live API.':
+    'Этот реальный сквад и его привязки доставки будут удалены через боевой API.',
+  'Remove {name}': 'Убрать {name}',
+  'Detach profile {name}': 'Отвязать профиль {name}',
+  'Detach host {name}': 'Отвязать хост {name}',
   'Group users and nodes into operational lanes with staged policy changes.':
     'Группируйте пользователей и ноды в операционные группы с поэтапными изменениями политик.',
   'Create squad': 'Создать сквад',

@@ -27,6 +27,11 @@ import { sectionSpecs } from '../shared/data/resourceMeta'
 import { useI18n } from '../shared/i18n/I18nProvider'
 import { formatRecord, parseKeyValueInput, toneForStatus } from '../shared/utils/resourceFormat'
 
+type PendingSquadDelete = {
+  id: string
+  name: string
+}
+
 export function SquadsPage() {
   const { t } = useI18n()
   const query = useSquadsPageData()
@@ -50,6 +55,7 @@ export function SquadsPage() {
   const [matrixProfileId, setMatrixProfileId] = useState('')
   const [matrixHostId, setMatrixHostId] = useState('')
   const [kindFilter, setKindFilter] = useState<'all' | 'internal' | 'external'>('all')
+  const [pendingDelete, setPendingDelete] = useState<PendingSquadDelete | null>(null)
   const squads = query.data?.items ?? []
   const users = usersQuery.data?.items ?? []
   const profiles = profilesQuery.data?.items ?? []
@@ -82,7 +88,7 @@ export function SquadsPage() {
       })
       setName('')
     } catch (error) {
-      setFormError(error instanceof Error ? error.message : 'Squad could not be created.')
+      setFormError(error instanceof Error ? error.message : t('Squad could not be created.'))
     }
   }
 
@@ -136,8 +142,21 @@ export function SquadsPage() {
     await detailQuery.refetch()
   }
 
+  async function confirmDeleteSquad() {
+    if (!pendingDelete) {
+      return
+    }
+    await deleteSquad.mutateAsync(pendingDelete.id)
+    if (selectedSquadId === pendingDelete.id) {
+      setSelectedSquadId('')
+    }
+    setPendingDelete(null)
+    await query.refetch()
+  }
+
   return (
     <ResourceScreen
+      className="squads-page"
       caption="Squad inventory"
       columns={['Name', 'Kind', 'Users', 'Profiles', 'Hosts', 'Metadata', 'Status', 'Actions']}
       createForm={
@@ -163,8 +182,8 @@ export function SquadsPage() {
               value={kind}
               onChange={(event) => setKind(event.target.value as 'internal' | 'external')}
             >
-              <option value="internal">internal</option>
-              <option value="external">external</option>
+              <option value="internal">{t('internal')}</option>
+              <option value="external">{t('external')}</option>
             </select>
           </label>
           <label htmlFor="squad-metadata">
@@ -179,15 +198,15 @@ export function SquadsPage() {
           <SubmitButton pending={createSquad.isPending}>{t('Create squad')}</SubmitButton>
         </ScreenForm>
       }
-      emptyDescription="Create internal or external access lanes before assigning profiles and hosts."
-      emptyTitle="No squads created"
+      emptyDescription={t('Create internal or external access lanes before assigning profiles and hosts.')}
+      emptyTitle={t('No squads created')}
       error={query.error}
-      errorTitle="Squads unavailable"
+      errorTitle={t('Squads unavailable')}
       isError={query.isError}
       isLoading={query.isLoading}
       isSuccess={query.isSuccess}
       items={visibleSquads}
-      loadingLabel="Loading squads..."
+      loadingLabel={t('Loading squads...')}
       onRefresh={() => void query.refetch()}
       renderRow={(squad) => {
         const userCount = Array.isArray(squad.metadata_json.user_ids)
@@ -197,17 +216,17 @@ export function SquadsPage() {
         return {
           cells: [
             squad.name,
-            squad.kind,
+            t(squad.kind),
             String(userCount),
-            isSelected ? String(detailQuery.data?.profiles.length ?? 0) : 'Open',
-            isSelected ? String(detailQuery.data?.hosts.length ?? 0) : 'Open',
+            isSelected ? String(detailQuery.data?.profiles.length ?? 0) : t('Select to inspect'),
+            isSelected ? String(detailQuery.data?.hosts.length ?? 0) : t('Select to inspect'),
             formatRecord(squad.metadata_json),
             <StatusBadge tone={toneForStatus(squad.status)}>{squad.status}</StatusBadge>,
             <div className="inline-actions">
               <button
                 type="button"
                 className="icon-button"
-                aria-label={`Open ${squad.name}`}
+                aria-label={t('Open {name}', { name: squad.name })}
                 onClick={() => setSelectedSquadId(squad.id)}
               >
                 <Save size={16} aria-hidden="true" />
@@ -215,7 +234,7 @@ export function SquadsPage() {
               <button
                 type="button"
                 className="icon-button"
-                aria-label={`${squad.status === 'active' ? 'Disable' : 'Enable'} ${squad.name}`}
+                aria-label={t(squad.status === 'active' ? 'Disable {name}' : 'Enable {name}', { name: squad.name })}
                 onClick={() =>
                   void updateSquad.mutateAsync({
                     id: squad.id,
@@ -228,8 +247,8 @@ export function SquadsPage() {
               <button
                 type="button"
                 className="icon-button"
-                aria-label={`Delete ${squad.name}`}
-                onClick={() => void deleteSquad.mutateAsync(squad.id)}
+                aria-label={t('Delete {name}', { name: squad.name })}
+                onClick={() => setPendingDelete({ id: squad.id, name: squad.name })}
               >
                 <Trash2 size={16} aria-hidden="true" />
               </button>
@@ -239,7 +258,13 @@ export function SquadsPage() {
         }
       }}
       rightPanel={
-        <div className="side-stack">
+        <div className="side-stack squads-side">
+          <SquadDeleteConfirm
+            pending={deleteSquad.isPending}
+            target={pendingDelete}
+            onCancel={() => setPendingDelete(null)}
+            onConfirm={() => void confirmDeleteSquad()}
+          />
           <article className="panel">
             <div className="panel__header">
               <div>
@@ -302,7 +327,7 @@ export function SquadsPage() {
                   <button
                     type="button"
                     className="icon-button"
-                    aria-label={`Remove ${user.email}`}
+                    aria-label={t('Remove {name}', { name: user.email })}
                     onClick={() =>
                       selectedSquad &&
                       void removeUsers.mutateAsync({
@@ -413,7 +438,7 @@ export function SquadsPage() {
                   <button
                     type="button"
                     className="icon-button"
-                    aria-label={`Detach profile ${profile.name}`}
+                    aria-label={t('Detach profile {name}', { name: profile.name })}
                     disabled={updateProfile.isPending}
                     onClick={() => void handleUnbindProfile(profile.id)}
                   >
@@ -447,7 +472,7 @@ export function SquadsPage() {
                   <button
                     type="button"
                     className="icon-button"
-                    aria-label={`Detach host ${host.hostname}`}
+                    aria-label={t('Detach host {name}', { name: host.hostname })}
                     disabled={updateHost.isPending}
                     onClick={() => void handleUnbindHost(host.id)}
                   >
@@ -495,9 +520,45 @@ export function SquadsPage() {
         </div>
       }
       spec={sectionSpecs.squads}
+      tablePanelClassName="squads-inventory-panel"
       tableEyebrow="Access groups"
       tableTitle="Squad registry"
     />
+  )
+}
+
+function SquadDeleteConfirm({
+  onCancel,
+  onConfirm,
+  pending,
+  target,
+}: {
+  onCancel: () => void
+  onConfirm: () => void
+  pending: boolean
+  target: PendingSquadDelete | null
+}) {
+  const { t } = useI18n()
+  if (!target) {
+    return null
+  }
+
+  return (
+    <section className="danger-confirm-inline" role="alertdialog" aria-modal="false" aria-label={t('Delete squad {name}', { name: target.name })}>
+      <div>
+        <p className="eyebrow">{t('Danger action')}</p>
+        <h3>{t('Delete squad {name}', { name: target.name })}</h3>
+        <p>{t('This real squad and its delivery bindings will be removed through the live API.')}</p>
+      </div>
+      <div className="inline-actions inline-actions--compact">
+        <button type="button" className="button button--secondary" disabled={pending} onClick={onCancel}>
+          {t('Cancel')}
+        </button>
+        <button type="button" className="button button--danger" disabled={pending} onClick={onConfirm}>
+          {t('Delete')}
+        </button>
+      </div>
+    </section>
   )
 }
 
@@ -552,7 +613,7 @@ function SquadEditor({
         metadata_json: metadata,
       })
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : 'Squad could not be saved.')
+      setError(saveError instanceof Error ? saveError.message : t('Squad could not be saved.'))
     }
   }
 
@@ -587,8 +648,8 @@ function SquadEditor({
           value={draft.kind ?? 'internal'}
           onChange={(event) => setDraft({ ...draft, kind: event.target.value as 'internal' | 'external' })}
         >
-          <option value="internal">internal</option>
-          <option value="external">external</option>
+          <option value="internal">{t('internal')}</option>
+          <option value="external">{t('external')}</option>
         </select>
       </label>
       <label htmlFor="editor-squad-status">

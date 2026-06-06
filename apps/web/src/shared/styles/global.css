@@ -2539,6 +2539,79 @@ h2 {
   align-items: center;
 }
 
+.squads-page .resource-grid {
+  grid-template-columns: minmax(0, 1.35fr) minmax(360px, 0.65fr);
+  align-items: start;
+}
+
+.squads-inventory-panel {
+  grid-column: auto;
+  overflow: hidden;
+}
+
+.squads-inventory-panel .data-table-wrap {
+  max-height: min(640px, calc(100vh - 230px));
+  overflow: auto;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+}
+
+.squads-inventory-panel .data-table {
+  min-width: 1180px;
+  table-layout: fixed;
+}
+
+.squads-inventory-panel .data-table th,
+.squads-inventory-panel .data-table td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.squads-inventory-panel .data-table th:nth-child(1),
+.squads-inventory-panel .data-table td:nth-child(1) {
+  width: 210px;
+}
+
+.squads-inventory-panel .data-table th:nth-child(6),
+.squads-inventory-panel .data-table td:nth-child(6) {
+  width: 320px;
+}
+
+.squads-inventory-panel .data-table th:nth-child(8),
+.squads-inventory-panel .data-table td:nth-child(8) {
+  width: 150px;
+}
+
+.squads-inventory-panel .inline-actions {
+  min-width: 0;
+  flex-wrap: nowrap;
+}
+
+.squads-side {
+  position: sticky;
+  top: calc(var(--space-6) + 72px);
+  align-self: start;
+}
+
+.squads-side .auth-card,
+.squads-side .panel {
+  width: min(100%, 680px);
+}
+
+.squads-side .auth-card label,
+.squads-side .panel label {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.squads-side .resource-list {
+  max-height: 360px;
+  overflow: auto;
+}
+
 .hosts-side .auth-card input,
 .hosts-side .auth-card select,
 .hosts-side .panel input,
