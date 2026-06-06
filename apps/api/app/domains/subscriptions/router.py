@@ -659,18 +659,19 @@ def _subscription_browser_page(
         if expires_at
         else "\u041d\u0435 \u043e\u0433\u0440\u0430\u043d\u0438\u0447\u0435\u043d\u043e"
     )
-    escaped_raw = html_escape(subscription_url, quote=True)
     raw_subscription_url = _public_subscription_short_target_url(
         request,
         public_id=username,
         target=render_target,
         raw=True,
     )
+    escaped_page_url = html_escape(subscription_url, quote=True)
+    escaped_raw = html_escape(raw_subscription_url, quote=True)
     escaped_raw_subscription_url = html_escape(raw_subscription_url, quote=True)
-    add_link = _subscription_import_url(subscription_url, render_target)
+    add_link = _subscription_import_url(raw_subscription_url, render_target)
     escaped_add_link = html_escape(add_link, quote=True)
     tabs_html = _subscription_target_tabs(request, username, render_target)
-    qr_svg = _subscription_qr_svg(subscription_url)
+    qr_svg = _subscription_qr_svg(raw_subscription_url)
     client_label = {
         "happ": "Happ",
         "hiddify": "Hiddify",
@@ -1091,7 +1092,7 @@ def _subscription_browser_page(
 <body>
   <main>
     <header class="topbar">
-      <a class="brand" href="{escaped_raw}">
+      <a class="brand" href="{escaped_page_url}">
         <span class="brand-mark" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4v16"/><path d="M18 4v16"/><path d="M9 7h6"/><path d="M9 17h6"/></svg>
         </span>
