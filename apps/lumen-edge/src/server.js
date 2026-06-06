@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { createServer } from "node:http";
 
 import { createFallbackLandingModel, renderFallbackLandingHtml } from "./fallback-landing.js";
-import { renderSubscriptionPageHtml, wantsHtmlSubscriptionPage } from "./subscription-page.js";
+import { renderDeviceBindingHtml, renderSubscriptionPageHtml, wantsHtmlSubscriptionPage } from "./subscription-page.js";
 import {
   matchSubscriptionManifestPath,
   matchSubscriptionRenderPath,
@@ -95,6 +95,19 @@ async function proxySubscriptionRender(request, response, input) {
     });
     const manifestText = await manifestResponse.text();
     if (!manifestResponse.ok) {
+      if (manifestResponse.status === 428 && isDeviceBindingRequired(manifestText)) {
+        const publicUrl = buildExternalRequestUrl(request, url);
+        response.writeHead(200, {
+          "content-type": "text/html; charset=utf-8",
+          "cache-control": "no-store",
+          "x-lumen-subscription-page": "device-binding"
+        });
+        response.end(renderDeviceBindingHtml({
+          publicId: match.publicId,
+          publicUrl
+        }));
+        return true;
+      }
       response.writeHead(manifestResponse.status, {
         "content-type": manifestResponse.headers.get("content-type") ?? "application/json; charset=utf-8",
         "cache-control": "no-store"
@@ -128,6 +141,15 @@ async function proxySubscriptionRender(request, response, input) {
   response.writeHead(upstream.status, headers);
   response.end(body);
   return true;
+}
+
+function isDeviceBindingRequired(body) {
+  try {
+    const parsed = JSON.parse(body);
+    return parsed?.error?.code === "subscription_device_id_required";
+  } catch {
+    return false;
+  }
 }
 
 function copySafeUpstreamHeaders(source, target) {

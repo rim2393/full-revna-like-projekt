@@ -100,6 +100,66 @@ export function wantsHtmlSubscriptionPage(request) {
   return accept.includes("text/html") && !/(hiddify|happ|clash|mihomo|sing-box|v2ray|nekobox|stash)/.test(userAgent);
 }
 
+export function renderDeviceBindingHtml({ publicId, publicUrl }) {
+  const safePublicId = String(publicId ?? "");
+  const safePublicUrl = String(publicUrl ?? "");
+  const storageKey = `lumen-sub-device:${safePublicId}`;
+  return `<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lumen subscription device binding</title>
+  <style>
+    :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #10151d; color: #f7fafc; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: radial-gradient(circle at 30% 0%, #1b2441 0, #101720 42%, #0c1118 100%); }
+    body::before { content: ""; position: fixed; inset: 0; background-image: linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px); background-size: 64px 64px; pointer-events: none; }
+    main { position: relative; width: min(520px, calc(100% - 28px)); border: 1px solid #293341; background: rgba(19,25,35,.9); border-radius: 16px; padding: 28px; box-shadow: 0 18px 60px rgba(0,0,0,.24); }
+    .mark { width: 42px; height: 42px; border-radius: 12px; background: linear-gradient(135deg,#35e4ff,#1468ff); margin-bottom: 18px; }
+    h1 { margin: 0 0 10px; font-size: 24px; }
+    p { margin: 0; color: #a7b2c2; line-height: 1.55; }
+    a { color: #54e7ff; }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="mark" aria-hidden="true"></div>
+    <h1>Готовим привязку устройства</h1>
+    <p>Сейчас страница подписки откроется заново с постоянным идентификатором этого браузера. Это нужно для лимита устройств и HWID-политики.</p>
+    <p><a href="${escapeHtml(safePublicUrl)}">Продолжить вручную</a></p>
+  </main>
+  <script>
+    (() => {
+      const storageKey = ${JSON.stringify(storageKey)};
+      const generateId = () => {
+        if (globalThis.crypto?.randomUUID) {
+          return "web-" + globalThis.crypto.randomUUID();
+        }
+        const random = Math.random().toString(36).slice(2);
+        return "web-" + Date.now().toString(36) + "-" + random;
+      };
+      let deviceId = "";
+      try {
+        deviceId = localStorage.getItem(storageKey) || "";
+        if (!deviceId) {
+          deviceId = generateId();
+          localStorage.setItem(storageKey, deviceId);
+        }
+      } catch {
+        deviceId = generateId();
+      }
+      const url = new URL(globalThis.location.href);
+      if (!url.searchParams.get("hwid") && !url.searchParams.get("device_id")) {
+        url.searchParams.set("hwid", deviceId);
+      }
+      globalThis.location.replace(url.toString());
+    })();
+  </script>
+</body>
+</html>`;
+}
+
 export function renderSubscriptionPageHtml({ manifest, publicUrl }) {
   const provider = manifest.provider?.name || "Lumen";
   const subpage = normalizeSubpageConfig(manifest.metadata?.subpage);

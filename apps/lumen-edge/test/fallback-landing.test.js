@@ -218,6 +218,44 @@ test("renders browser subscription portal while preserving client render endpoin
   }
 });
 
+test("renders device binding page when browser portal requires HWID", async () => {
+  const upstreamCalls = [];
+  const server = createLumenEdgeServer({
+    env: { API_INTERNAL_URL: "http://api.internal:8000" },
+    fetchImpl: async (url, options) => {
+      upstreamCalls.push({ url, options });
+      return new Response(JSON.stringify({
+        error: {
+          code: "subscription_device_id_required",
+          message: "This subscription requires a device id or HWID.",
+          details: []
+        }
+      }), {
+        status: 428,
+        headers: { "content-type": "application/json; charset=utf-8" }
+      });
+    },
+    randomUUID: () => "req_test"
+  });
+  const port = await listen(server);
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/sub/lumen_sub_abc1234567890xyz`, {
+      headers: { accept: "text/html", "user-agent": "Mozilla/5.0" }
+    });
+    const body = await response.text();
+
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get("content-type"), /text\/html/);
+    assert.equal(response.headers.get("x-lumen-subscription-page"), "device-binding");
+    assert.match(body, /lumen-sub-device:lumen_sub_abc1234567890xyz/);
+    assert.match(body, /url\.searchParams\.set\("hwid", deviceId\)/);
+    assert.doesNotMatch(body, /subscription_device_id_required/);
+    assert.equal(upstreamCalls[0].url, "http://api.internal:8000/api/v1/subscriptions/public/lumen_sub_abc1234567890xyz/manifest");
+  } finally {
+    await close(server);
+  }
+});
+
 test("uses forwarded public URL for subscription portal links", async () => {
   const upstreamCalls = [];
   const server = createLumenEdgeServer({

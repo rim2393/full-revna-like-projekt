@@ -350,6 +350,16 @@ async def _render_public_subscription_request(
         )
         await session.commit()
     except APIError as error:
+        if (
+            error.code == "subscription_device_id_required"
+            and not raw
+            and _wants_browser_subscription_page(request)
+        ):
+            return _subscription_device_binding_page(
+                request=request,
+                public_id=public_id,
+                render_target=render_target,
+            )
         if rule_response := await _response_rule_for_error(session, error):
             return rule_response
         raise
@@ -473,6 +483,96 @@ def _public_subscription_target_url(request: Request, target: str) -> str:
 
 def _subscription_qr_svg(value: str) -> str:
     return segno.make(value, error="q").svg_inline(scale=7, border=4)
+
+
+def _subscription_device_binding_page(
+    *,
+    request: Request,
+    public_id: str,
+    render_target: str,
+) -> Response:
+    current_url = _public_url_from_request_url(request, request.url)
+    storage_key = f"lumen-sub-device:{public_id}"
+    escaped_current_url = html_escape(current_url, quote=True)
+    escaped_storage_key = html_escape(storage_key, quote=True)
+    escaped_target = html_escape(render_target, quote=True)
+    body = f"""<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lumen subscription device binding</title>
+  <style>
+    :root {{ color-scheme: dark; font-family: Inter, system-ui, -apple-system, Segoe UI, sans-serif; }}
+    * {{ box-sizing: border-box; }}
+    body {{
+      margin: 0; min-height: 100vh; display: grid; place-items: center; color: #f4f7fb;
+      background: radial-gradient(circle at 30% 0%, #1b2441 0, #101720 42%, #0c1118 100%);
+    }}
+    body::before {{
+      content: ""; position: fixed; inset: 0;
+      background-image: linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px);
+      background-size: 64px 64px; pointer-events: none;
+    }}
+    main {{ position: relative; width: min(520px, calc(100% - 28px)); border: 1px solid #293341; background: rgba(19,25,35,.9); border-radius: 16px; padding: 28px; box-shadow: 0 18px 60px rgba(0,0,0,.24); }}
+    .mark {{ width: 42px; height: 42px; border-radius: 12px; background: linear-gradient(135deg,#35e4ff,#1468ff); margin-bottom: 18px; }}
+    h1 {{ margin: 0 0 10px; font-size: 24px; }}
+    p {{ margin: 0; color: #a7b2c2; line-height: 1.55; }}
+    a {{ color: #54e7ff; }}
+  </style>
+</head>
+<body>
+  <main>
+    <div class="mark" aria-hidden="true"></div>
+    <h1>Готовим привязку устройства</h1>
+    <p>Сейчас страница подписки откроется заново с постоянным идентификатором этого браузера. Это нужно для лимита устройств и HWID-политики.</p>
+    <p><a href="{escaped_current_url}">Продолжить вручную</a></p>
+  </main>
+  <script>
+    (() => {{
+      const storageKey = "{escaped_storage_key}";
+      const target = "{escaped_target}";
+      const generateId = () => {{
+        if (globalThis.crypto?.randomUUID) {{
+          return `web-${{globalThis.crypto.randomUUID()}}`;
+        }}
+        const random = Math.random().toString(36).slice(2);
+        return `web-${{Date.now().toString(36)}}-${{random}}`;
+      }};
+      let deviceId = "";
+      try {{
+        deviceId = localStorage.getItem(storageKey) || "";
+        if (!deviceId) {{
+          deviceId = generateId();
+          localStorage.setItem(storageKey, deviceId);
+        }}
+      }} catch {{
+        deviceId = generateId();
+      }}
+      const url = new URL(globalThis.location.href);
+      if (!url.searchParams.get("hwid") && !url.searchParams.get("device_id")) {{
+        url.searchParams.set("hwid", deviceId);
+      }}
+      if (target && !url.searchParams.get("target") && url.pathname.endsWith("/render")) {{
+        url.searchParams.set("target", target);
+      }}
+      globalThis.location.replace(url.toString());
+    }})();
+  </script>
+</body>
+</html>
+"""
+    return Response(
+        content=body,
+        media_type="text/html; charset=utf-8",
+        headers={
+            "cache-control": "no-store",
+            "content-disposition": 'inline; filename="subscription-device.html"',
+            "x-lumen-subscription-page": "device-binding",
+            "x-lumen-render-target": render_target,
+        },
+    )
 
 
 def _subscription_target_tabs(request: Request, current_target: str) -> str:

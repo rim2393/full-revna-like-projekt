@@ -1885,6 +1885,22 @@ async def test_public_subscription_enforces_user_device_limit_and_registers_hwid
     assert missing_device_response.status_code == 428
     assert missing_device_response.json()["error"]["code"] == "subscription_device_id_required"
 
+    browser_binding_response = await route_app.client.get(
+        f"/api/v1/subscriptions/public/{public_id}/render?target=happ",
+        headers={
+            "Accept": "text/html,application/xhtml+xml",
+            "X-Forwarded-Host": "sub.example.test",
+            "X-Forwarded-Proto": "https",
+        },
+    )
+    assert browser_binding_response.status_code == 200
+    assert browser_binding_response.headers["content-type"].startswith("text/html")
+    assert browser_binding_response.headers["x-lumen-subscription-page"] == "device-binding"
+    assert "subscription_device_id_required" not in browser_binding_response.text
+    assert "lumen-sub-device:" in browser_binding_response.text
+    assert "url.searchParams.set(\"hwid\", deviceId)" in browser_binding_response.text
+    assert "https://sub.example.test/api/v1/subscriptions/public/" in browser_binding_response.text
+
     first_device_response = await route_app.client.get(
         f"/api/v1/subscriptions/public/{public_id}/manifest?device_id=device-1",
         headers={"User-Agent": "Lumen QA Device"},
