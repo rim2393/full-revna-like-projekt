@@ -197,6 +197,17 @@ function formatQuery(searchParams) {
 
 function buildSubscriptionProxyHeaders(request, accept) {
   const headers = { accept };
+  const forwardedHost = firstHeaderValue(request.headers["x-forwarded-host"])
+    || firstHeaderValue(request.headers.host);
+  const forwardedProto = firstHeaderValue(request.headers["x-forwarded-proto"])
+    || (request.headers["x-forwarded-ssl"] === "on" ? "https" : null)
+    || inferPublicProto(forwardedHost);
+  if (forwardedHost) {
+    headers["X-Forwarded-Host"] = forwardedHost;
+  }
+  if (forwardedProto) {
+    headers["X-Forwarded-Proto"] = forwardedProto;
+  }
   for (const [incomingName, upstreamName] of [
     ["x-lumen-hwid", "X-Lumen-HWID"],
     ["x-device-id", "X-Device-Id"]
@@ -207,6 +218,14 @@ function buildSubscriptionProxyHeaders(request, accept) {
     }
   }
   return headers;
+}
+
+function inferPublicProto(host) {
+  const value = String(host ?? "").toLowerCase();
+  if (!value || value.startsWith("localhost") || value.startsWith("127.") || value.startsWith("[::1]")) {
+    return "http";
+  }
+  return "https";
 }
 
 function inferTargetFromUserAgent(userAgent = "") {

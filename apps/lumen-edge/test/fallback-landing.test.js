@@ -139,6 +139,8 @@ test("proxies public rendered subscription with target negotiation", async () =>
     assert.equal(response.headers.get("x-lumen-render-target"), "hiddify");
     assert.equal(upstreamCalls[0].url, "http://api.internal:8000/api/v1/subscriptions/public/lumen_sub_abc1234567890xyz/render?device_id=device-1&hwid=HWID-1&target=hiddify");
     assert.equal(upstreamCalls[0].options.headers.authorization, undefined);
+    assert.equal(upstreamCalls[0].options.headers["X-Forwarded-Host"], `127.0.0.1:${port}`);
+    assert.equal(upstreamCalls[0].options.headers["X-Forwarded-Proto"], "http");
     assert.equal(upstreamCalls[0].options.headers["X-Device-Id"], "HEADER-DEVICE");
   } finally {
     await close(server);
@@ -291,6 +293,8 @@ test("uses forwarded public URL for subscription portal links", async () => {
     assert.match(body, /https:\/\/sub\.example\/sub\/lumen_sub_abc1234567890xyz\/hiddify/);
     assert.doesNotMatch(body, /http:\/\/sub\.example/);
     assert.equal(upstreamCalls[0].url, "http://api.internal:8000/api/v1/subscriptions/public/lumen_sub_abc1234567890xyz/manifest");
+    assert.equal(upstreamCalls[0].options.headers["X-Forwarded-Host"], "sub.example");
+    assert.equal(upstreamCalls[0].options.headers["X-Forwarded-Proto"], "https");
   } finally {
     await close(server);
   }
