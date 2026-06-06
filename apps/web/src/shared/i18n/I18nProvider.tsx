@@ -398,6 +398,9 @@ const ru: Record<string, string> = {
   'Save setting': 'Сохранить настройку',
   'Loading providers...': 'Загрузка провайдеров...',
   'api ready': 'api готов',
+  'api-backed': 'через API',
+  'typed API': 'типизированный API',
+  'real auth': 'реальная аутентификация',
   'Load on demand': 'Загрузка по запросу',
   'Open this panel to load real MFA methods and passkeys for the current operator account.':
     'Откройте этот блок, чтобы загрузить реальные MFA-методы и passkey текущего оператора.',
@@ -991,6 +994,10 @@ const ru: Record<string, string> = {
   'Provider could not be updated.': 'Не удалось обновить провайдера.',
   'Provider has no live login callback and cannot be enabled yet.':
     'У провайдера нет живого login callback, его пока нельзя включить.',
+  'This login method is backed by a real provider configuration.':
+    'Метод входа подключён к реальной конфигурации провайдера.',
+  'needs configuration': 'нужна настройка',
+  'no scopes': 'без scope',
   Renderable: 'Можно выдать',
   'Renderer profile': 'Профиль рендерера',
   'Scoped token management with API-ready loading, error, and empty states. Secret values are never displayed.':

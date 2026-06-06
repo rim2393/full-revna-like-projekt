@@ -1970,6 +1970,7 @@ describe('Control plane resource screens', () => {
     const unavailableButtons = await screen.findAllByRole('button', { name: /unavailable/i })
     expect(unavailableButtons.length).toBeGreaterThan(0)
     expect(unavailableButtons[0]).toBeDisabled()
+    expect(unavailableButtons[0]).toHaveAttribute('title', expect.stringMatching(/provider has no live login callback/i))
     expect(updateAuthProvider).not.toHaveBeenCalled()
   })
 })

@@ -1075,7 +1075,7 @@ h2 {
 
 .settings-workbench {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.36fr);
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 400px);
   gap: var(--space-4);
   align-items: start;
 }
@@ -1211,17 +1211,19 @@ h2 {
 }
 
 .settings-provider-card__meta {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
   gap: 6px;
   margin-top: var(--space-2);
 }
 
 .settings-provider-card__meta span {
-  display: inline-flex;
-  min-height: 24px;
-  align-items: center;
-  padding: 0 var(--space-2);
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  min-height: 34px;
+  align-content: center;
+  padding: var(--space-1) var(--space-2);
   color: var(--color-muted-strong);
   background: rgb(0 0 0 / 16%);
   border: 1px solid var(--color-line);
@@ -1229,12 +1231,32 @@ h2 {
   font-size: 0.78rem;
 }
 
+.settings-provider-card__meta span strong,
+.settings-provider-card__meta span small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-provider-card__meta span strong {
+  color: var(--color-ink-strong);
+}
+
 .settings-provider-card__actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-start;
+  display: grid;
+  grid-template-columns: repeat(2, max-content) minmax(0, 1fr) max-content;
+  align-items: center;
   gap: var(--space-2);
   min-width: 0;
+}
+
+.settings-provider-card__hint {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .settings-security-loader {
@@ -3120,6 +3142,20 @@ h2 {
   }
 }
 
+@media (max-width: 1500px) {
+  .settings-page {
+    max-width: 1120px;
+  }
+
+  .settings-workbench {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .settings-provider-card__actions {
+    grid-template-columns: repeat(2, max-content) minmax(0, 1fr) max-content;
+  }
+}
+
 @media (max-width: 1280px) {
   h1 {
     font-size: 1.9rem;
@@ -3193,7 +3229,7 @@ h2 {
   }
 
   .settings-provider-card__actions {
-    justify-content: flex-start;
+    grid-template-columns: repeat(2, max-content) minmax(0, 1fr) max-content;
   }
 
   .page-header {
@@ -3244,7 +3280,7 @@ h2 {
   }
 
   .settings-provider-card__actions {
-    justify-content: flex-start;
+    grid-template-columns: repeat(2, max-content) minmax(0, 1fr) max-content;
   }
 }
 
@@ -3303,7 +3339,7 @@ h2 {
   }
 
   .settings-provider-card__actions {
-    justify-content: flex-start;
+    grid-template-columns: repeat(2, max-content) minmax(0, 1fr) max-content;
     min-width: 0;
   }
 
@@ -3315,6 +3351,14 @@ h2 {
 
   .settings-value-chip small {
     max-width: 100%;
+  }
+
+  .settings-provider-card__actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .settings-provider-card__hint {
+    white-space: normal;
   }
 
   .workflow-list li,

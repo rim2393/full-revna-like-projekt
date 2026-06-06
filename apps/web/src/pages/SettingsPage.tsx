@@ -130,7 +130,7 @@ export function SettingsPage() {
               <p className="eyebrow">{t('Typed settings')}</p>
               <h2>{t('Settings groups')}</h2>
             </div>
-            <StatusBadge tone="good">typed API</StatusBadge>
+            <StatusBadge tone="good">{t('typed API')}</StatusBadge>
           </div>
           {groupsQuery.isLoading ? <LoadingState label="Loading settings groups..." /> : null}
           {groupsQuery.isError ? (
@@ -169,7 +169,7 @@ export function SettingsPage() {
                 <p className="eyebrow">{t('Authentication')}</p>
                 <h2>{t('Provider toggles')}</h2>
               </div>
-              <StatusBadge tone="good">api-backed</StatusBadge>
+              <StatusBadge tone="good">{t('api-backed')}</StatusBadge>
             </div>
             {providersQuery.isLoading ? <LoadingState label="Loading providers..." /> : null}
             {providersQuery.isError ? (
@@ -300,9 +300,10 @@ function SettingsSummaryCard({
 }
 
 function SettingValuePreview({ value }: { value: Record<string, unknown> | null | undefined }) {
+  const { t } = useI18n()
   const entries = Object.entries(value ?? {})
   if (entries.length === 0) {
-    return <span className="settings-value-empty">None</span>
+    return <span className="settings-value-empty">{t('None')}</span>
   }
 
   return (
@@ -443,7 +444,7 @@ function SecurityMethodsPanel() {
           <p className="eyebrow">{t('Account security')}</p>
           <h2>{t('MFA and passkeys')}</h2>
         </div>
-        <StatusBadge tone="good">real auth</StatusBadge>
+        <StatusBadge tone="good">{t('real auth')}</StatusBadge>
       </div>
       <div className="resource-list">
         <div className="resource-list__item">
@@ -962,8 +963,14 @@ function AuthProviderRow({
   pending: boolean
   provider: AuthProviderRecord
 }) {
+  const { t } = useI18n()
   const canToggle = provider.status === 'active' || provider.status === 'disabled'
   const actionLabel = provider.enabled ? 'Disable' : canToggle ? 'Enable' : 'Unavailable'
+  const statusTone = provider.enabled ? 'good' : canToggle ? 'neutral' : 'watch'
+  const providerStatusTone = provider.status === 'active' ? 'good' : provider.status === 'disabled' ? 'neutral' : 'watch'
+  const providerHint = canToggle
+    ? 'This login method is backed by a real provider configuration.'
+    : 'Provider has no live login callback and cannot be enabled yet.'
 
   const metadata = Object.entries(provider.metadata_json)
 
@@ -972,32 +979,47 @@ function AuthProviderRow({
       <div className="settings-provider-card__body">
         <strong>{provider.display_name}</strong>
         <span>{provider.provider}</span>
-        <small>{provider.scopes.join(', ') || 'no scopes'}</small>
+        <small>{provider.scopes.join(', ') || t('no scopes')}</small>
         {metadata.length > 0 ? (
           <div className="settings-provider-card__meta">
             {metadata.slice(0, 4).map(([key, value]) => (
-              <span key={key}>
-                {key}: {formatSettingValue(value)}
+              <span key={key} title={`${key}: ${formatSettingValue(value)}`}>
+                <strong>{key}</strong>
+                <small>{formatSettingValue(value)}</small>
               </span>
             ))}
           </div>
         ) : null}
       </div>
       <div className="settings-provider-card__actions">
-        <StatusBadge tone={provider.enabled ? 'good' : 'neutral'}>
-          {provider.enabled ? 'enabled' : 'disabled'}
+        <StatusBadge tone={statusTone}>
+          {provider.enabled ? t('enabled') : t('disabled')}
         </StatusBadge>
-        <StatusBadge tone={canToggle ? 'good' : 'watch'}>{provider.status}</StatusBadge>
+        <StatusBadge tone={providerStatusTone}>{t(authProviderStatusLabel(provider.status))}</StatusBadge>
+        <small className="settings-provider-card__hint">{t(providerHint)}</small>
         <button
           type="button"
           className="button button--secondary"
           disabled={pending || !canToggle}
-          title={canToggle ? undefined : 'Provider has no live login callback and cannot be enabled yet.'}
+          title={t(providerHint)}
           onClick={() => void onToggle(provider.provider, !provider.enabled)}
         >
-          {actionLabel}
+          {t(actionLabel)}
         </button>
       </div>
     </div>
   )
+}
+
+function authProviderStatusLabel(status: string) {
+  if (status === 'active') {
+    return 'active'
+  }
+  if (status === 'disabled') {
+    return 'disabled'
+  }
+  if (status === 'unimplemented') {
+    return 'needs configuration'
+  }
+  return status
 }
