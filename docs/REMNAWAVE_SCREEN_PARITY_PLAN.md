@@ -379,3 +379,29 @@ deployed before being marked done.
   contains no `window.confirm`, `globalThis.confirm`, or `.confirm(` native
   browser confirmation calls and contains the inline delete copy for node,
   node plugin and subscription delete confirmations.
+- 2026-06-06: RSP-006 Users detail subscription-operation pass released
+  through the official image build and installer deploy path at product
+  commit `ce27953` and installer workflow `27058474033`. The user detail page
+  now keeps the existing real user PATCH form and real device/HWID actions,
+  collapses advanced `metadata_json` behind `Advanced metadata JSON`, bounds
+  dense subscription/device/audit tables, and adds real per-subscription
+  operator actions directly inside the user detail surface: copy public page
+  URL, copy HApp raw URL, clone subscription through
+  `POST /api/v1/subscriptions/{id}/clone`, revoke subscription through the
+  existing inline production confirmation, and delete subscription through
+  the existing inline production confirmation. No fake subscription rows or
+  local-only handlers were introduced. Local gates passed:
+  `npx vitest run src/pages/ControlPlaneScreens.test.tsx --reporter=dot`
+  (`30 passed`), `npx tsc -b --pretty false`, `npm run build`,
+  `python scripts/validate_release_guard.py`,
+  `python scripts/validate_production_reality.py`, `git diff --check`, and
+  source grep showed no native browser confirmation calls in page/shared
+  code. Live evidence after deploy: `https://panel.lumentech.tel` returns
+  new assets `/assets/index-D2lHqRQv.js` and `/assets/index-102J8BNc.css`;
+  the JS asset contains `Clone subscription {id}`,
+  `Copy HApp raw subscription {id}`, and `Advanced metadata JSON`; the CSS
+  asset contains `subscription-row-actions` and `advanced-json-panel`; the JS
+  asset contains no `window.confirm`, `globalThis.confirm`, or `.confirm(`
+  native browser confirmation calls; and
+  `https://panel.lumentech.tel/api/v1/health/ready` returns status 200 with
+  `{"status":"ok","dependencies":{"api":"ok"}}`.

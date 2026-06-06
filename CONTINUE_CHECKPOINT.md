@@ -245,6 +245,25 @@ Last audited: 2026-06-01 21:28 Europe/Moscow.
   `trojan://`, and `ss://`. Live admin asset `/assets/index-BoRcw4Mm.js`
   contains no native confirm calls and contains inline delete confirmation copy
   for nodes, node plugins and subscriptions.
+- Live prod evidence for release
+  `main-ce279538cd1ada17f59ddc21491d0b4a41da3adf`: official signed
+  publish/deploy workflow `27058474033` completed successfully. User detail
+  now keeps the real user PATCH form and real device/HWID actions, collapses
+  advanced `metadata_json`, bounds dense user detail tables, and wires
+  per-subscription actions directly from the user detail surface: copy public
+  page URL, copy HApp raw URL, clone subscription, revoke subscription with
+  inline production confirmation, and delete subscription with inline
+  production confirmation. Local gates passed: focused
+  `ControlPlaneScreens.test.tsx` Vitest (`30 passed`), TypeScript build,
+  web production build, release guard, production reality guard, `git
+  diff --check`, and source grep found no native browser confirmation calls
+  in page/shared code. Live evidence: panel root returned assets
+  `/assets/index-D2lHqRQv.js` and `/assets/index-102J8BNc.css`; JS contains
+  `Clone subscription {id}`, `Copy HApp raw subscription {id}`, and
+  `Advanced metadata JSON`; CSS contains `subscription-row-actions` and
+  `advanced-json-panel`; JS contains no `window.confirm`,
+  `globalThis.confirm`, or `.confirm(`; `/api/v1/health/ready` returned
+  status 200 with API dependency ok.
 - Alembic heads: single head `0009_node_management_parity` after this slice.
 
 ## Fixes Applied During Audit
@@ -262,9 +281,8 @@ Last audited: 2026-06-01 21:28 Europe/Moscow.
 ## Next Suggested Work
 
 1. Continue Remnawave parity UI pages only against live API state; no fake
-   counters or static placeholder rows. The next practical page slice is Users
-   detail parity, then Subscriptions/Subscription page configs, then Settings
-   and Tools.
+   counters or static placeholder rows. The next practical page slice is
+   Subscriptions/Subscription page configs, then Settings and Tools.
 2. For each admin page slice, replace remaining native/browser-only UX with
    real inline controls, add focused tests, run build/guards, push, wait
    product workflows, deploy by official installer workflow, and record live
