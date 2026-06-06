@@ -317,7 +317,12 @@ export function ToolsPage() {
       void truncateTorrentReports.mutateAsync().then(() => setPendingAction(null))
       return
     }
-    void deleteSnippet.mutateAsync(pendingAction.snippetId).then(() => setPendingAction(null))
+    void deleteSnippet.mutateAsync(pendingAction.snippetId).then(() => {
+      if (editingSnippetId === pendingAction.snippetId) {
+        resetSnippetEditor()
+      }
+      setPendingAction(null)
+    })
   }
 
   const pendingActionBusy =

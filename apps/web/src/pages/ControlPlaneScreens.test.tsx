@@ -943,6 +943,8 @@ describe('Control plane resource screens', () => {
     expect(deleteToolSnippet).not.toHaveBeenCalled()
     await user.click(within(await screen.findByRole('alertdialog', { name: /confirm delete-snippet xray status/i })).getByRole('button', { name: /^confirm$/i }))
     await waitFor(() => expect(deleteToolSnippet).toHaveBeenCalledWith('snippet-1'))
+    expect(screen.getByRole('heading', { name: /new snippet/i })).toBeInTheDocument()
+    expect(screen.getByLabelText(/^name$/i)).toHaveValue('')
   })
 
   it('exposes refresh buttons as real accessible controls on resource screens', async () => {
