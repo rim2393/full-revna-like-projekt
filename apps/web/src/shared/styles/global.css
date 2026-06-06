@@ -1344,8 +1344,6 @@ h2 {
   top: calc(var(--space-5) + 76px);
   display: grid;
   gap: var(--space-4);
-  max-height: calc(100svh - 120px);
-  overflow: auto;
   padding-right: 2px;
 }
 
@@ -2074,8 +2072,6 @@ h2 {
 
   .users-side {
     position: static;
-    max-height: none;
-    overflow: visible;
   }
 }
 

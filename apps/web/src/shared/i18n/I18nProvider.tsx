@@ -576,6 +576,8 @@ const ru: Record<string, string> = {
   'Over traffic limit': 'Превысили лимит',
   'Newest first': 'Сначала новые',
   'Expiration first': 'Сначала истекающие',
+  Sort: 'Сортировка',
+  'over limit': 'превысили лимит',
   'Selected user': 'Выбранный пользователь',
   'Open detail': 'Открыть карточку',
   'Policy edits': 'Изменение политики',
