@@ -293,7 +293,7 @@ render_template() {
   fi
 
   tmp="$(mktemp)"
-  envsubst '${PANEL_DOMAIN} ${SUBSCRIPTION_DOMAIN} ${AUTH_PORTAL_DOMAIN} ${TLS_CERT_DIR} ${LUMEN_API_PORT} ${LUMEN_WEB_PORT} ${LUMEN_SUBSCRIPTION_PORT}' <"$src" >"$tmp"
+  envsubst "\${PANEL_DOMAIN} \${SUBSCRIPTION_DOMAIN} \${AUTH_PORTAL_DOMAIN} \${TLS_CERT_DIR} \${LUMEN_API_PORT} \${LUMEN_WEB_PORT} \${LUMEN_SUBSCRIPTION_PORT}" <"$src" >"$tmp"
   install -m 0644 "$tmp" "$dst"
   rm -f "$tmp"
 }

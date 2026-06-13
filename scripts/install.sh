@@ -201,13 +201,14 @@ health_check() {
     return 0
   fi
 
-  local attempt
-  for attempt in $(seq 1 40); do
+  local attempt=1
+  while [ "$attempt" -le 40 ]; do
     if curl -fsS "https://$PANEL_DOMAIN/api/healthz" >/dev/null; then
       log "panel health check passed"
       return 0
     fi
     sleep 3
+    attempt=$((attempt + 1))
   done
 
   die "Panel health check failed"

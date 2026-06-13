@@ -128,13 +128,14 @@ wait_node_agent_health() {
     return 0
   fi
 
-  local attempt
-  for attempt in $(seq 1 30); do
+  local attempt=1
+  while [ "$attempt" -le 30 ]; do
     if compose_run exec -T node-agent lumen-node-agent healthcheck >/dev/null 2>&1; then
       log "node-agent healthcheck passed"
       return 0
     fi
     sleep 2
+    attempt=$((attempt + 1))
   done
   die "node-agent did not pass healthcheck after 60 seconds"
 }

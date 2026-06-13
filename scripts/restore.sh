@@ -67,7 +67,7 @@ prepare_backup() {
 
   while IFS= read -r member; do
     case "$member" in
-      /*|../*|*/../*|*"/../"*|*"/.."|*"/../"*)
+      /*|../*|*/../*|*/..)
         die "Unsafe path in backup archive: $member"
         ;;
       *)

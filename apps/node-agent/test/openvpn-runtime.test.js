@@ -52,6 +52,8 @@ test("applyOpenVpnConfig writes runtime files and starts managed process", async
       dryRun: false,
       env: {
         LUMEN_OPENVPN_AUTH_SCRIPT: join(dir, "auth.sh"),
+        LUMEN_OPENVPN_LOG_FILE: join(dir, "openvpn.log"),
+        LUMEN_OPENVPN_PID_FILE: join(dir, "openvpn.pid"),
         LUMEN_OPENVPN_USERS_FILE: join(dir, "users.txt")
       },
       execFileImpl: async (command, args) => {
