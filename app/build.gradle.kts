@@ -145,7 +145,8 @@ val prepareHiddifyCoreAar by tasks.registering {
 val hiddifyCoreAar = files(hiddifyCoreAarFile).builtBy(prepareHiddifyCoreAar)
 
 dependencies {
-    implementation(hiddifyCoreAar)
+    compileOnly(files("libs/hiddify-core.aar"))
+    runtimeOnly(hiddifyCoreAar)
     implementation(project(":amnezia-openvpn"))
     implementation("com.zaneschepke:amneziawg-android:2.3.7")
 
