@@ -26,10 +26,11 @@ Then rerun:
 sudo ./scripts/install.sh --config /opt/lumen/.env
 ```
 
-## Private image pull fails
+## Image pull fails
 
-Put the registry token in `REGISTRY_TOKEN_FILE`, set `REGISTRY_USERNAME`, and
-rerun the installer. Do not put the token inline in `.env`.
+If the registry requires authentication, put the registry token in
+`REGISTRY_TOKEN_FILE`, set `REGISTRY_USERNAME`, and rerun the installer. Do not
+put the token inline in `.env`.
 
 ## Health check fails after upgrade
 
@@ -41,4 +42,3 @@ sudo docker compose --env-file /opt/lumen/.env -f deploy/compose/lumen.yml logs 
 ```
 
 If migration failed, restore the pre-upgrade backup.
-

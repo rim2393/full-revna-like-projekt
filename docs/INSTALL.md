@@ -14,8 +14,8 @@
 1. Clone this repository.
 2. Copy `.env.example` to a private path, usually `/opt/lumen/.env`.
 3. Set domains, ACME email, timezone, and release image references.
-4. Put registry credentials in `REGISTRY_TOKEN_FILE` if private image pulls
-   require authentication.
+4. Put registry credentials in `REGISTRY_TOKEN_FILE` only if the selected image
+   registry requires authentication.
 5. Run a dry run:
 
 ```bash
@@ -46,7 +46,6 @@ zeroed, or marked as `CHANGE_ME`.
 ## First admin
 
 Set `FIRST_ADMIN_EMAIL` and `FIRST_ADMIN_USERNAME`. If
-`FIRST_ADMIN_PASSWORD=GENERATE`, the installer asks the private API image to
+`FIRST_ADMIN_PASSWORD=GENERATE`, the installer asks the API container to
 generate a first admin password and recovery codes. These values are printed
 once by the backend command and are not stored in this repository.
-
