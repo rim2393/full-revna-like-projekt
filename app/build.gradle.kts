@@ -132,7 +132,10 @@ val prepareHiddifyCoreAar by tasks.registering {
                     entry = input.nextEntry
                 }
                 zip.putNextEntry(ZipEntry("AndroidManifest.xml"))
-                zip.write("""<manifest xmlns:android="http://schemas.android.com/apk/res/android"/>""".toByteArray())
+                zip.write(
+                    """<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="go.libbox.gojni"/>"""
+                        .toByteArray()
+                )
                 zip.closeEntry()
             }
         }
