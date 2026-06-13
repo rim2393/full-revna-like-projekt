@@ -188,7 +188,7 @@ async def delete_record(
     if record is None:
         raise APIError(
             code="infra_billing_record_not_found",
-            message="Billing record not found",
+            message="Server cost record not found",
             status_code=status.HTTP_404_NOT_FOUND,
         )
     await session.delete(record)

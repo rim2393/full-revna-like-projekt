@@ -1046,7 +1046,7 @@ export function NodesPage() {
                   }))}
                 />
                 <DataTable
-                  caption={t('Node infra billing history')}
+                  caption={t('Node server cost history')}
                   columns={[t('Provider'), t('Period'), t('Amount'), t('Currency'), t('Note')]}
                   rows={overviewQuery.data.infra_billing_records.map((record) => ({
                     cells: [

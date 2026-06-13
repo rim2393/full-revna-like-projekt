@@ -56,7 +56,7 @@ export const navigationGroups: NavigationGroup[] = [
     label: 'Governance',
     items: [
       { label: 'License', to: '/license', icon: BadgeCheck },
-      { label: 'Infra billing', to: '/infra-billing', icon: Wallet },
+      { label: 'Server costs', to: '/infra-billing', icon: Wallet },
       { label: 'API keys', to: '/api-keys', icon: KeyRound },
       { label: 'Guard portal', to: '/guard/portal', icon: ShieldCheck },
     ],

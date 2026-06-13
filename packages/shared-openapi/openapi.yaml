@@ -4275,14 +4275,14 @@
             "items": {
               "$ref": "#/components/schemas/NodeInfraBillingRecord"
             },
-            "title": "Infra Billing Records",
+            "title": "Server Cost Records",
             "type": "array"
           },
           "infra_billing_totals": {
             "items": {
               "$ref": "#/components/schemas/NodeInfraBillingCurrencyTotal"
             },
-            "title": "Infra Billing Totals",
+            "title": "Server Cost Totals",
             "type": "array"
           },
           "latest_commands": {
@@ -23126,7 +23126,7 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Create Infra Billing Record",
+        "summary": "Create Server Cost Record",
         "tags": [
           "infra-billing"
         ]
@@ -23210,7 +23210,7 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Delete Infra Billing Record",
+        "summary": "Delete Server Cost Record",
         "tags": [
           "infra-billing"
         ]

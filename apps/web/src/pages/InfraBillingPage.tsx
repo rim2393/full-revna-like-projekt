@@ -90,8 +90,8 @@ export function InfraBillingPage() {
   return (
     <section className="page">
       <PageHeader
-        eyebrow="Infrastructure CRM"
-        title="Infra billing"
+        eyebrow="Self-hosted operations"
+        title="Server costs"
         description="Track infrastructure providers and their recurring costs across the node fleet."
         actions={
           <button
@@ -109,18 +109,18 @@ export function InfraBillingPage() {
         }
       />
 
-      {isLoading ? <LoadingState label="Loading infra billing..." /> : null}
-      {error ? <ErrorState title="Infra billing unavailable" error={error} /> : null}
+      {isLoading ? <LoadingState label="Loading server costs..." /> : null}
+      {error ? <ErrorState title="Server costs unavailable" error={error} /> : null}
 
       {!isLoading && !error ? (
         <>
-          <section className="summary-grid" aria-label={t('Infra billing summary')}>
+          <section className="summary-grid" aria-label={t('Server costs summary')}>
             <div>
               <span>{t('Providers')}</span>
               <strong>{summary?.providers ?? providers.length}</strong>
             </div>
             <div>
-              <span>{t('Billing records')}</span>
+              <span>{t('Cost records')}</span>
               <strong>{summary?.records ?? records.length}</strong>
             </div>
             {(summary?.totals_by_currency ?? []).map((total) => (
@@ -167,15 +167,15 @@ export function InfraBillingPage() {
 
               <div className="panel__header">
                 <div>
-                  <p className="eyebrow">{t('Billing records')}</p>
-                  <h2>{t('Billing records')}</h2>
+                  <p className="eyebrow">{t('Cost records')}</p>
+                  <h2>{t('Cost records')}</h2>
                 </div>
               </div>
               {records.length === 0 ? (
-                <EmptyState title="No records" description="Add a billing record for a provider." />
+                <EmptyState title="No records" description="Add a cost record for a provider." />
               ) : (
                 <DataTable
-                  caption="Billing records"
+                  caption="Cost records"
                   columns={[t('Provider'), t('Node'), t('Period'), t('Amount'), t('Currency')]}
                   rows={records.map((record) => ({
                     id: record.id,
@@ -222,8 +222,8 @@ export function InfraBillingPage() {
 
               <form className="auth-card auth-card--wide" onSubmit={submitRecord}>
                 <div>
-                  <p className="eyebrow">{t('Add billing record')}</p>
-                  <h2>{t('Add billing record')}</h2>
+                  <p className="eyebrow">{t('Add cost record')}</p>
+                  <h2>{t('Add cost record')}</h2>
                 </div>
                 <label htmlFor="record-provider">
                   {t('Provider')}
@@ -287,7 +287,7 @@ export function InfraBillingPage() {
                 {formError ? <p className="auth-card__error">{formError}</p> : null}
                 <button type="submit" className="button button--primary" disabled={isMutating}>
                   <Plus size={18} aria-hidden="true" />
-                  {t('Add billing record')}
+                  {t('Add cost record')}
                 </button>
               </form>
             </div>
