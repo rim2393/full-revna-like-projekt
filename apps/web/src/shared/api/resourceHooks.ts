@@ -1383,6 +1383,14 @@ export function useCreateNodeProvisioningJob() {
   })
 }
 
+export function useIssueInstallToken() {
+  const apiClient = useApiClient()
+
+  return useMutation({
+    mutationFn: (jobId: string) => apiClient.issueInstallToken(jobId),
+  })
+}
+
 export function useUsersPageData() {
   const apiClient = useApiClient()
 

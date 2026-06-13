@@ -202,6 +202,8 @@ export function createHttpLumenApiClient({
       request(`/api/v1/profiles/${profileId}/apply-to-node`, { method: 'POST' }),
     createProvisioningJob: (payload: ProvisioningJobCreateRequest) =>
       request('/api/v1/nodes/provisioning-jobs', { body: payload, method: 'POST' }),
+    issueInstallToken: (jobId: string) =>
+      request(`/api/v1/nodes/provisioning-jobs/${jobId}/install-token`, { method: 'POST' }),
     createNodeCommand: (nodeId: string, payload: NodeCommandCreateRequest) =>
       request(`/api/v1/nodes/${nodeId}/commands`, { body: payload, method: 'POST' }),
     getNodeProtocolSelection: (nodeId: string) =>

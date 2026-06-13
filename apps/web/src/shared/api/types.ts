@@ -1328,6 +1328,7 @@ export type LumenApiClient = {
   createProvisioningJob: (
     request: ProvisioningJobCreateRequest,
   ) => Promise<ProvisioningJobResponse>
+  issueInstallToken: (jobId: string) => Promise<InstallTokenIssueResponse>
   createNodeCommand: (
     nodeId: string,
     request: NodeCommandCreateRequest,

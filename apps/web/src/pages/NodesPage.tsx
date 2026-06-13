@@ -5,6 +5,7 @@ import {
   useCreateNodeCommand,
   useCreateNodeProvisioningJob,
   useDeleteNode,
+  useIssueInstallToken,
   useNodeCommandsData,
   useNodeMetricsData,
   useNodeOverviewData,
@@ -19,7 +20,12 @@ import {
   useResumeNode,
   useUpdateNodeProtocolSelection,
 } from '../shared/api/resourceHooks'
-import type { NodeCommandRecord, NodeResponse, ProvisioningJobResponse } from '../shared/api/types'
+import type {
+  InstallTokenIssueResponse,
+  NodeCommandRecord,
+  NodeResponse,
+  ProvisioningJobResponse,
+} from '../shared/api/types'
 import { DataTable } from '../shared/components/DataTable'
 import { EmptyState, ErrorState, LoadingState } from '../shared/components/DataState'
 import { OperatorGuide } from '../shared/components/OperatorGuide'
@@ -315,10 +321,22 @@ function pluralize(count: number, singular: string, plural = `${singular}s`) {
 }
 
 function ProvisioningJobPanel({
+  copyStatus,
+  installToken,
+  issueError,
+  issuingToken,
   job,
+  onCopyInstallCommand,
+  onIssueInstallToken,
   t,
 }: {
+  copyStatus: string | null
+  installToken: InstallTokenIssueResponse | null
+  issueError: string | null
+  issuingToken: boolean
   job: ProvisioningJobResponse | null
+  onCopyInstallCommand: () => void
+  onIssueInstallToken: () => void
   t: (value: string) => string
 }) {
   if (!job) {
@@ -348,6 +366,9 @@ function ProvisioningJobPanel({
       </article>
     )
   }
+  const canIssueInstallToken =
+    job.preflight_status === 'passed' && !job.token_issued_at && !job.token_exchanged_at
+  const installCommand = installToken ? buildNodeInstallCommand(job, installToken) : null
 
   return (
     <article className="panel">
@@ -402,6 +423,39 @@ function ProvisioningJobPanel({
           <span>Heartbeat endpoint: /api/v1/nodes/{job.node_id}/heartbeat</span>
         </li>
       </ul>
+      <div className="step-actions">
+        <button
+          type="button"
+          className="button button--secondary"
+          disabled={!canIssueInstallToken || issuingToken}
+          onClick={onIssueInstallToken}
+        >
+          {issuingToken ? 'Issuing...' : 'Issue install token'}
+        </button>
+      </div>
+      {issueError ? <p className="auth-card__note" role="alert">{issueError}</p> : null}
+      {installToken && installCommand ? (
+        <div className="details-card">
+          <div className="panel__header">
+            <div>
+              <p className="eyebrow">One-time token</p>
+              <h3>{installToken.token_prefix}</h3>
+            </div>
+            <StatusBadge tone="watch">shown once</StatusBadge>
+          </div>
+          <p className="auth-card__note">
+            Expires {formatTimestamp(installToken.expires_at)}. Copy the command now; the token
+            plaintext will not be returned again.
+          </p>
+          <pre className="code-block">{installCommand}</pre>
+          <div className="step-actions">
+            <button type="button" className="button button--secondary" onClick={onCopyInstallCommand}>
+              Copy install command
+            </button>
+          </div>
+          {copyStatus ? <p className="auth-card__note">{copyStatus}</p> : null}
+        </div>
+      ) : null}
     </article>
   )
 }
@@ -412,9 +466,13 @@ export function NodesPage() {
   const query = useNodesPageData()
   const [searchParams, setSearchParams] = useSearchParams()
   const createJob = useCreateNodeProvisioningJob()
+  const issueInstallToken = useIssueInstallToken()
   const [form, setForm] = useState<ProvisioningFormState>(initialFormState)
   const [formError, setFormError] = useState<string | null>(null)
   const [latestJob, setLatestJob] = useState<ProvisioningJobResponse | null>(null)
+  const [issuedInstallToken, setIssuedInstallToken] = useState<InstallTokenIssueResponse | null>(null)
+  const [installTokenError, setInstallTokenError] = useState<string | null>(null)
+  const [installCopyStatus, setInstallCopyStatus] = useState<string | null>(null)
   const [selectedNodeId, setSelectedNodeId] = useState<string | undefined>(undefined)
   const [commandType, setCommandType] = useState('capabilities.report')
   const [commandPayload, setCommandPayload] = useState('{}')
@@ -562,9 +620,43 @@ export function NodesPage() {
         },
       })
       setLatestJob(job)
+      setIssuedInstallToken(null)
+      setInstallTokenError(null)
+      setInstallCopyStatus(null)
     } catch {
       // The mutation error is rendered below from TanStack Query state.
     }
+  }
+
+  async function handleIssueInstallToken() {
+    if (!latestJob) {
+      return
+    }
+    setInstallTokenError(null)
+    setInstallCopyStatus(null)
+    try {
+      const token = await issueInstallToken.mutateAsync(latestJob.id)
+      setIssuedInstallToken(token)
+      setLatestJob((current) =>
+        current && current.id === latestJob.id
+          ? { ...current, token_issued_at: new Date().toISOString(), status: 'install_token_issued' }
+          : current,
+      )
+    } catch (error) {
+      setInstallTokenError(getErrorMessage(error))
+    }
+  }
+
+  async function copyInstallCommand() {
+    if (!latestJob || !issuedInstallToken) {
+      return
+    }
+    if (!navigator.clipboard) {
+      setInstallCopyStatus('Clipboard is unavailable. Select and copy the command manually.')
+      return
+    }
+    await navigator.clipboard.writeText(buildNodeInstallCommand(latestJob, issuedInstallToken))
+    setInstallCopyStatus('Install command copied.')
   }
 
   async function handleCommandSubmit(event: FormEvent<HTMLFormElement>) {
@@ -1463,8 +1555,35 @@ export function NodesPage() {
           ]}
         />
 
-        <ProvisioningJobPanel job={latestJob} t={t} />
+        <ProvisioningJobPanel
+          copyStatus={installCopyStatus}
+          installToken={issuedInstallToken}
+          issueError={installTokenError}
+          issuingToken={issueInstallToken.isPending}
+          job={latestJob}
+          onCopyInstallCommand={() => void copyInstallCommand()}
+          onIssueInstallToken={() => void handleIssueInstallToken()}
+          t={t}
+        />
       </section>
     </section>
   )
+}
+
+function buildNodeInstallCommand(
+  job: ProvisioningJobResponse,
+  token: InstallTokenIssueResponse,
+): string {
+  const panelUrl = globalThis.location?.origin || 'https://panel.example.com'
+  return [
+    `printf '%s\\n' ${shellSingleQuote(token.install_token)} | sudo ./scripts/install-node.sh`,
+    `--panel-url ${shellSingleQuote(panelUrl)}`,
+    `--node-name ${shellSingleQuote(job.node_id)}`,
+    '--image "$LUMEN_NODE_AGENT_IMAGE"',
+    '--install-token-stdin',
+  ].join(' ')
+}
+
+function shellSingleQuote(value: string): string {
+  return `'${value.replace(/'/g, "'\\''")}'`
 }

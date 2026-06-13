@@ -736,6 +736,12 @@ export function createDevelopmentLumenApiClient(): LumenApiClient {
       }
     },
     createProvisioningJob: async (request) => buildDevelopmentProvisioningJob(request),
+    issueInstallToken: async (jobId) => ({
+      expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+      install_token: `lni_dev_${jobId.replace(/[^a-zA-Z0-9]/g, '_')}`,
+      provisioning_job_id: jobId,
+      token_prefix: 'lni_dev',
+    }),
     createNodeCommand: async (nodeId: string, request: NodeCommandCreateRequest) =>
       createDevelopmentNodeCommand(nodeId, request),
     getNodeProtocolSelection: async (nodeId: string) => ({
