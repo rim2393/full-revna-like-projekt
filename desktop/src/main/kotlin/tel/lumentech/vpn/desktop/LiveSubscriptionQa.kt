@@ -74,6 +74,7 @@ class LiveSubscriptionQa(private val input: Path) {
                     return@forEach
                 }
                 when (backend) {
+                    RuntimeBackend.XRAY_CORE,
                     RuntimeBackend.SING_BOX -> {
                         val check = checkSingBox(server.id, configFactory.build(server, settings))
                         if (check == null) {

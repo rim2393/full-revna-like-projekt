@@ -63,6 +63,7 @@ kotlin {
             )
             kotlin.exclude("NodeUrlTester.kt")
             kotlin.exclude("StrictVpnUrlTester.kt")
+            kotlin.exclude("SubscriptionSourceResolver.kt")
             kotlin.exclude("XrayConfigFactory.kt")
             kotlin.exclude("XrayUrlTester.kt")
             kotlin.exclude("SecureTokenStore.kt")
