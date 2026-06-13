@@ -1,0 +1,2 @@
+"""VPN node domain."""
+

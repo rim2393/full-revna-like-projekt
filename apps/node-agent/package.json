@@ -1,0 +1,16 @@
+{
+  "name": "@lumen/node-agent",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dry-run": "node src/cli.js --dry-run",
+    "test": "node --test"
+  },
+  "bin": {
+    "lumen-node-agent": "./src/cli.js"
+  },
+  "exports": {
+    ".": "./src/index.js"
+  }
+}

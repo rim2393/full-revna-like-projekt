@@ -1,0 +1,70 @@
+# Local secrets and generated configs
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.jks
+*.keystore
+.tooling/signing.properties
+local.properties
+
+# Build outputs
+__pycache__/
+*.pyc
+.gradle/
+.kotlin/
+build/
+**/build/
+out/
+dist/
+node_modules/
+coverage/
+
+# Runtime artifacts and logs
+*.log
+*.pid
+*.db
+*.sqlite
+*.sqlite3
+*.exe
+*.dll
+*.msi
+*.wixpdb
+support-bundle*
+backups/
+*.tar.gz
+*.zip
+
+# Local QA artifacts
+/*.png
+/*.xml
+/*.txt
+qa-*.png
+qa-*.xml
+qa-*.txt
+pytest-tmp/
+.tmp/
+.tmp-*/
+_work/
+CONTINUE_CHECKPOINT.md
+desktop/packaging/downloads/
+desktop/packaging/jre/
+desktop/packaging/runtime/
+
+# Local AI/project memory, not public source
+PROJECT_WIKI/
+.ai_wiki/
+ai_wiki/
+.claude/
+.obsidian/
+.research/
+.tooling/
+
+# IDE/OS
+.idea/
+.vscode/
+*.iml
+Thumbs.db
+.DS_Store
