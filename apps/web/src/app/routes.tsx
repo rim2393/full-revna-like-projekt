@@ -1,6 +1,5 @@
 import { createBrowserRouter, Navigate, type RouteObject } from 'react-router-dom'
 import { AuthLayout } from '../features/auth/AuthLayout'
-import { GuardPortalPage } from '../features/auth/GuardPortalPage'
 import { LoginPage } from '../features/auth/LoginPage'
 import { MfaPage } from '../features/auth/MfaPage'
 import { RequireAuth } from '../features/auth/RequireAuth'
@@ -8,8 +7,6 @@ import { ApiKeysPage } from '../pages/ApiKeysPage'
 import { DashboardPage } from '../pages/DashboardPage'
 import { ErrorPage } from '../pages/ErrorPage'
 import { HostsPage } from '../pages/HostsPage'
-import { InfraBillingPage } from '../pages/InfraBillingPage'
-import { LicensePage } from '../pages/LicensePage'
 import { NodePluginsPage } from '../pages/NodePluginsPage'
 import { NodesPage } from '../pages/NodesPage'
 import { NotFoundPage } from '../pages/NotFoundPage'
@@ -33,14 +30,6 @@ export const appRoutes: RouteObject[] = [
       { index: true, element: <Navigate to="/guard/login" replace /> },
       { path: 'login', element: <LoginPage /> },
       { path: 'mfa', element: <MfaPage /> },
-      {
-        path: 'portal',
-        element: (
-          <RequireAuth>
-            <GuardPortalPage />
-          </RequireAuth>
-        ),
-      },
     ],
   },
   {
@@ -66,8 +55,6 @@ export const appRoutes: RouteObject[] = [
       { path: 'response-rules', element: <ResponseRulesPage /> },
       { path: 'subscription-page', element: <SubscriptionPublicPage /> },
       { path: 'settings', element: <SettingsPage /> },
-      { path: 'license', element: <LicensePage /> },
-      { path: 'infra-billing', element: <InfraBillingPage /> },
       { path: 'api-keys', element: <ApiKeysPage /> },
       { path: 'tools', element: <ToolsPage /> },
       { path: '*', element: <NotFoundPage /> },

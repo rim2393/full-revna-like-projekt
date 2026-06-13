@@ -14,7 +14,7 @@ React + TypeScript + Vite admin UI for the Lumen Guard control plane.
 - Guard login, MFA, and portal routes.
 - Admin dashboard shell with sidebar navigation.
 - API-backed screens for dashboard, users, nodes, hosts, profiles, squads,
-  subscription delivery, subscription page metadata, license, settings, tools,
+  subscription delivery, subscription page metadata, settings, tools,
   and API keys.
 - TanStack Query provider with the production HTTP client and an isolated
   development client used only by local tests/offline development.

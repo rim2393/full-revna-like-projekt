@@ -86,7 +86,7 @@ API credits for my project
 How will you use API credits for your project? (496 characters)
 
 ```text
-We will use API credits for core OSS maintainer workflows: pull request review, issue triage, regression test generation, dependency and license review, documentation updates, release checklist validation, CI failure diagnosis, and security-focused code review across Android, Windows desktop, backend API, web admin console, node-agent, deployment, and subscription-rendering code. Codex will reduce maintainer load and improve release quality.
+We will use API credits for core OSS maintainer workflows: pull request review, issue triage, regression test generation, dependency audit and OSS notices review, documentation updates, release checklist validation, CI failure diagnosis, and security-focused code review across Android, Windows desktop, backend API, web admin console, node-agent, deployment, and subscription-rendering code. Codex will reduce maintainer load and improve release quality.
 ```
 
 Anything else we should know? (479 characters)

@@ -1,8 +1,6 @@
 import {
   apiKeyRecords,
   hostRecords,
-  licenseRecords,
-  licenseSummary,
   developmentSession,
   nodeRecords,
   profileRecords,
@@ -25,11 +23,6 @@ import type {
   HwidInspectorResponse,
   HostListResponse,
   HostRecord,
-  InfraBillingRecordCreateRequest,
-  InfraBillingRecordRecord,
-  InfraProviderCreateRequest,
-  InfraProviderRecord,
-  LicenseListResponse,
   LumenApiClient,
   MfaMethod,
   NodeUserIpResponse,
@@ -239,8 +232,6 @@ export function createDevelopmentLumenApiClient(): LumenApiClient {
   const responseRules: ResponseRuleRecord[] = []
   const subpageConfigs: SubscriptionPageConfigRecord[] = []
   const nodePlugins: NodePluginRecord[] = []
-  const infraProviders: InfraProviderRecord[] = []
-  const infraBillingRecords: InfraBillingRecordRecord[] = []
   const nodeCommands: NodeCommandRecord[] = []
   const mfaMethods: MfaMethod[] = [
     {
@@ -473,30 +464,8 @@ export function createDevelopmentLumenApiClient(): LumenApiClient {
       acc[command.status] = (acc[command.status] ?? 0) + 1
       return acc
     }, {})
-    const records = infraBillingRecords.filter((record) => record.node_id === nodeId)
-    const totals = records.reduce<Record<string, { currency: string; total: number; records: number }>>(
-      (acc, record) => {
-        acc[record.currency] ??= { currency: record.currency, records: 0, total: 0 }
-        acc[record.currency].records += 1
-        acc[record.currency].total += record.amount
-        return acc
-      },
-      {},
-    )
     return {
       command_status_counts: Object.entries(counts).map(([status, count]) => ({ count, status })),
-      infra_billing_records: records.map((record) => ({
-        amount: record.amount,
-        currency: record.currency,
-        id: record.id,
-        note: record.note,
-        period: record.period,
-        provider_id: record.provider_id,
-        provider_name:
-          infraProviders.find((provider) => provider.id === record.provider_id)?.name ??
-          record.provider_id,
-      })),
-      infra_billing_totals: Object.values(totals),
       latest_commands: commands.slice(0, 10).map((command) => ({
         claimed_at: command.claimed_at,
         command_type: command.command_type,
@@ -867,7 +836,6 @@ export function createDevelopmentLumenApiClient(): LumenApiClient {
         delivery_profile: deliveryProfile,
         expires_at: request.expires_at ?? null,
         id: `sub_${request.user_id}_${Date.now()}`,
-        license_id: request.license_id,
         node_id: request.node_id ?? null,
         public_id: publicId,
         ...subscriptionPublicFields(publicId, deliveryProfile),
@@ -917,7 +885,6 @@ export function createDevelopmentLumenApiClient(): LumenApiClient {
         delivery_profile: deliveryProfile,
         expires_at: request.expires_at ?? null,
         id: `sub_profile_${request.profile_id}_${Date.now()}`,
-        license_id: request.license_id,
         node_id: profile.node_id,
         public_id: publicId,
         ...subscriptionPublicFields(publicId, deliveryProfile),
@@ -1242,7 +1209,6 @@ export function createDevelopmentLumenApiClient(): LumenApiClient {
     getSession: async () => developmentSession,
     listApiKeys: async () => asListResponse(apiKeys),
     listHosts: async (): Promise<HostListResponse> => ({ items: hosts }),
-    listLicenses: async (): Promise<LicenseListResponse> => ({ items: licenseRecords }),
     listNodes: async () => asNodeListResponse(),
     getNodeOverview: async (nodeId: string) => buildDevelopmentNodeOverview(nodeId),
     listNodeCommands: async (nodeId: string) => ({
@@ -1816,7 +1782,6 @@ export function createDevelopmentLumenApiClient(): LumenApiClient {
       asNodeResponse({ ...nodeRecords[0], id: nodeId, status: 'healthy' }),
     quarantineNode: async (nodeId: string) =>
       asNodeResponse({ ...nodeRecords[0], id: nodeId, status: 'offline' }),
-    readLicense: async () => licenseSummary,
     readPanelIdentity: async () => ({
       default_locale: 'ru',
       docs_url: 'https://docs.lumentech.tel',
@@ -2215,65 +2180,6 @@ export function createDevelopmentLumenApiClient(): LumenApiClient {
       const index = nodePlugins.findIndex((item) => item.id === pluginId)
       if (index >= 0) {
         nodePlugins.splice(index, 1)
-      }
-    },
-    listInfraProviders: async () => ({ items: infraProviders }),
-    createInfraProvider: async (
-      request: InfraProviderCreateRequest,
-    ): Promise<InfraProviderRecord> => {
-      const now = new Date().toISOString()
-      const provider: InfraProviderRecord = {
-        id: `provider_${Date.now()}`,
-        name: request.name,
-        login_url: request.login_url ?? null,
-        notes: request.notes ?? null,
-        created_at: now,
-        updated_at: now,
-      }
-      infraProviders.unshift(provider)
-      return provider
-    },
-    deleteInfraProvider: async (providerId: string) => {
-      const index = infraProviders.findIndex((item) => item.id === providerId)
-      if (index >= 0) {
-        infraProviders.splice(index, 1)
-      }
-    },
-    listInfraBillingRecords: async () => ({ items: infraBillingRecords }),
-    createInfraBillingRecord: async (
-      request: InfraBillingRecordCreateRequest,
-    ): Promise<InfraBillingRecordRecord> => {
-      const now = new Date().toISOString()
-      const record: InfraBillingRecordRecord = {
-        id: `billing_${Date.now()}`,
-        provider_id: request.provider_id,
-        node_id: request.node_id ?? null,
-        amount: request.amount,
-        currency: (request.currency ?? 'USD').toUpperCase(),
-        period: request.period,
-        note: request.note ?? null,
-        created_at: now,
-        updated_at: now,
-      }
-      infraBillingRecords.unshift(record)
-      return record
-    },
-    infraBillingSummary: async () => {
-      const totals = new Map<string, { total: number; records: number }>()
-      for (const record of infraBillingRecords) {
-        const current = totals.get(record.currency) ?? { total: 0, records: 0 }
-        current.total += record.amount
-        current.records += 1
-        totals.set(record.currency, current)
-      }
-      return {
-        providers: infraProviders.length,
-        records: infraBillingRecords.length,
-        totals_by_currency: Array.from(totals.entries()).map(([currency, value]) => ({
-          currency,
-          total: value.total,
-          records: value.records,
-        })),
       }
     },
     clearUserDevices: async (userId: string) => {

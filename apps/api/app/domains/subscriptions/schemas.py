@@ -8,7 +8,6 @@ class SubscriptionCreateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     user_id: UUID
-    license_id: UUID
     node_id: UUID | None = None
     delivery_profile: dict[str, object] = Field(default_factory=dict)
     config_hash: str | None = Field(default=None, max_length=128)
@@ -19,7 +18,6 @@ class SubscriptionIssueFromProfileRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     user_id: UUID
-    license_id: UUID
     profile_id: UUID
     host_id: UUID | None = None
     render_targets: list[str] = Field(default_factory=list, max_length=32)
@@ -42,7 +40,6 @@ class SubscriptionResponse(BaseModel):
     id: UUID
     public_id: str
     user_id: UUID
-    license_id: UUID
     node_id: UUID | None
     status: str
     delivery_profile: dict[str, object]

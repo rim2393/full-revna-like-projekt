@@ -88,41 +88,11 @@ export type ApiKeyRecord = {
   status: ApiKeyStatus
 }
 
-export type LicenseStatus = 'valid' | 'expiring' | 'invalid'
-
 export type PanelIdentity = {
   default_locale: 'en' | 'ru'
   docs_url: string | null
   product_name: string
   support_url: string | null
-}
-
-export type LicenseSummary = {
-  auditEvents: Array<{
-    at: string
-    label: string
-  }>
-  expiresAt: string
-  features: string[]
-  issuedTo: string
-  plan: string
-  seatsLimit: number
-  seatsUsed: number
-  status: LicenseStatus
-}
-
-export type LicenseRecord = {
-  customer_ref: string | null
-  expires_at: string | null
-  id: string
-  max_devices: number
-  metadata_json: Record<string, string>
-  starts_at: string | null
-  status: string
-}
-
-export type LicenseListResponse = {
-  items: LicenseRecord[]
 }
 
 export type UserStatus = 'active' | 'limited' | 'disabled'
@@ -259,7 +229,6 @@ export type NodeStatus =
   | 'offline'
   | 'failed'
   | 'deleted'
-  | 'license_paused'
   | 'paused'
   | 'quarantined'
   | (string & {})
@@ -336,7 +305,6 @@ export type NodeMetricListResponse = {
 }
 
 export type NodePauseRequest = {
-  license_enforced?: boolean
   reason?: string | null
 }
 
@@ -753,7 +721,6 @@ export type SubscriptionRecord = {
   delivery_profile: Record<string, string>
   expires_at: string | null
   id: string
-  license_id: string
   node_id: string | null
   public_id: string
   public_manifest_url: string
@@ -771,7 +738,6 @@ export type SubscriptionCreateRequest = {
   config_hash?: string | null
   delivery_profile?: Record<string, string>
   expires_at?: string | null
-  license_id: string
   node_id?: string | null
   user_id: string
 }
@@ -780,7 +746,6 @@ export type SubscriptionIssueFromProfileRequest = {
   config_hash?: string | null
   expires_at?: string | null
   host_id?: string | null
-  license_id: string
   profile_id: string
   profile_title?: string | null
   render_targets?: string[]
@@ -1332,82 +1297,12 @@ export type NodeCommandHistoryRecord = {
   created_at: string
 }
 
-export type NodeInfraBillingRecord = {
-  id: string
-  provider_id: string
-  provider_name: string
-  amount: number
-  currency: string
-  period: string
-  note: string | null
-}
-
-export type NodeInfraBillingCurrencyTotal = {
-  currency: string
-  total: number
-  records: number
-}
-
 export type NodeOverviewResponse = {
   node: NodeResponse
   latest_metrics: NodeLatestMetricRecord[]
   traffic: NodeTrafficSummary
   command_status_counts: NodeCommandStatusCount[]
   latest_commands: NodeCommandHistoryRecord[]
-  infra_billing_records: NodeInfraBillingRecord[]
-  infra_billing_totals: NodeInfraBillingCurrencyTotal[]
-}
-
-export type InfraProviderRecord = {
-  id: string
-  name: string
-  login_url: string | null
-  notes: string | null
-  created_at: string
-  updated_at: string
-}
-
-export type InfraProviderListResponse = { items: InfraProviderRecord[] }
-
-export type InfraProviderCreateRequest = {
-  name: string
-  login_url?: string | null
-  notes?: string | null
-}
-
-export type InfraBillingRecordRecord = {
-  id: string
-  provider_id: string
-  node_id: string | null
-  amount: number
-  currency: string
-  period: string
-  note: string | null
-  created_at: string
-  updated_at: string
-}
-
-export type InfraBillingRecordListResponse = { items: InfraBillingRecordRecord[] }
-
-export type InfraBillingRecordCreateRequest = {
-  provider_id: string
-  node_id?: string | null
-  amount: number
-  currency?: string
-  period: string
-  note?: string | null
-}
-
-export type InfraBillingCurrencyTotal = {
-  currency: string
-  total: number
-  records: number
-}
-
-export type InfraBillingSummaryResponse = {
-  providers: number
-  records: number
-  totals_by_currency: InfraBillingCurrencyTotal[]
 }
 
 export type LumenApiClient = {
@@ -1486,7 +1381,6 @@ export type LumenApiClient = {
   listProfileRuntimeReadiness: () => Promise<ProfileRuntimeReadinessListResponse>
   listApiKeys: () => Promise<ResourceListResponse<ApiKeyRecord>>
   listHosts: () => Promise<HostListResponse>
-  listLicenses: () => Promise<LicenseListResponse>
   listNodes: () => Promise<NodeListResponse>
   getNodeOverview: (nodeId: string) => Promise<NodeOverviewResponse>
   listNodeCommands: (nodeId: string) => Promise<NodeCommandListResponse>
@@ -1554,7 +1448,6 @@ export type LumenApiClient = {
   pauseNode: (nodeId: string, request: NodePauseRequest) => Promise<NodeResponse>
   resumeNode: (nodeId: string, request: NodeResumeRequest) => Promise<NodeResponse>
   quarantineNode: (nodeId: string, request: NodeQuarantineRequest) => Promise<NodeResponse>
-  readLicense: () => Promise<LicenseSummary | null>
   readPanelIdentity: () => Promise<PanelIdentity>
   revokeApiKey: (apiKeyId: string) => Promise<void>
   revokeSubscription: (subscriptionId: string) => Promise<SubscriptionRecord>
@@ -1624,14 +1517,6 @@ export type LumenApiClient = {
     request: NodePluginUpdateRequest,
   ) => Promise<NodePluginRecord>
   deleteNodePlugin: (pluginId: string) => Promise<void>
-  listInfraProviders: () => Promise<InfraProviderListResponse>
-  createInfraProvider: (request: InfraProviderCreateRequest) => Promise<InfraProviderRecord>
-  deleteInfraProvider: (providerId: string) => Promise<void>
-  listInfraBillingRecords: () => Promise<InfraBillingRecordListResponse>
-  createInfraBillingRecord: (
-    request: InfraBillingRecordCreateRequest,
-  ) => Promise<InfraBillingRecordRecord>
-  infraBillingSummary: () => Promise<InfraBillingSummaryResponse>
 }
 
 export type LoginMethod = {

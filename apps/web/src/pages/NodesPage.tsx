@@ -97,9 +97,8 @@ function getNodeState(status: string): NodeStatePresentation {
       return { detail: 'Provisioning or heartbeat reported failure.', label: 'failed', tone: 'danger' }
     case 'deleted':
       return { detail: 'Node has been removed from active service.', label: 'deleted', tone: 'neutral' }
-    case 'license_paused':
     case 'paused':
-      return { detail: 'Paid capacity is paused by license policy.', label: 'license paused', tone: 'watch' }
+      return { detail: 'Node is paused by the operator.', label: 'paused', tone: 'watch' }
     case 'quarantine':
     case 'quarantined':
       return { detail: 'Node is quarantined and should not receive traffic.', label: 'quarantined', tone: 'danger' }
@@ -245,9 +244,9 @@ function getHeartbeatLabel(node: NodeResponse) {
   return 'Heartbeat missing'
 }
 
-function isLicensePaused(node: NodeResponse) {
+function isPaused(node: NodeResponse) {
   const status = normalizeStatus(node.status)
-  return status === 'license_paused' || status === 'paused'
+  return status === 'paused'
 }
 
 function isQuarantined(node: NodeResponse) {
@@ -256,11 +255,11 @@ function isQuarantined(node: NodeResponse) {
 }
 
 function canPauseNode(node: NodeResponse) {
-  return !isLicensePaused(node) && !isQuarantined(node)
+  return !isPaused(node) && !isQuarantined(node)
 }
 
 function canResumeNode(node: NodeResponse) {
-  return isLicensePaused(node) || isQuarantined(node)
+  return isPaused(node) || isQuarantined(node)
 }
 
 function canQuarantineNode(node: NodeResponse) {
@@ -446,7 +445,7 @@ export function NodesPage() {
     () => ({
       heartbeatMissing: nodes.filter(hasMissingHeartbeat).length,
       heartbeatReported: nodes.filter((node) => Boolean(node.last_seen_at)).length,
-      licensePaused: nodes.filter(isLicensePaused).length,
+      paused: nodes.filter(isPaused).length,
       quarantined: nodes.filter(isQuarantined).length,
       total: nodes.length,
     }),
@@ -818,7 +817,7 @@ export function NodesPage() {
                               () =>
                                 pauseNode.mutateAsync({
                                   id: node.id,
-                                  request: { reason: 'operator disabled node', license_enforced: false },
+                                  request: { reason: 'operator disabled node' },
                                 }),
                               (updatedNode) =>
                                 nodeActionResultFromNode(
@@ -859,7 +858,7 @@ export function NodesPage() {
                             () =>
                               pauseNode.mutateAsync({
                                 id: node.id,
-                                request: { reason: 'operator requested', license_enforced: false },
+                                request: { reason: 'operator requested' },
                               }),
                             (updatedNode) =>
                               nodeActionResultFromNode(
@@ -1018,19 +1017,6 @@ export function NodesPage() {
                     <span>{t('Metric samples')}</span>
                     <strong>{overviewQuery.data.traffic.metric_samples}</strong>
                   </div>
-                  {overviewQuery.data.infra_billing_totals.length === 0 ? (
-                    <div>
-                      <span>{t('Node infra cost')}</span>
-                      <strong>{t('No node-linked records')}</strong>
-                    </div>
-                  ) : (
-                    overviewQuery.data.infra_billing_totals.map((total) => (
-                      <div key={total.currency}>
-                        <span>{t('Node infra cost')} {total.currency}</span>
-                        <strong>{total.total.toFixed(2)}</strong>
-                      </div>
-                    ))
-                  )}
                 </section>
                 {overviewQuery.data.traffic.total_bytes === null ? (
                   <p className="auth-card__note">
@@ -1043,20 +1029,6 @@ export function NodesPage() {
                   rows={overviewQuery.data.command_status_counts.map((item) => ({
                     cells: [t(formatStatus(item.status)), item.count],
                     id: item.status,
-                  }))}
-                />
-                <DataTable
-                  caption={t('Node server cost history')}
-                  columns={[t('Provider'), t('Period'), t('Amount'), t('Currency'), t('Note')]}
-                  rows={overviewQuery.data.infra_billing_records.map((record) => ({
-                    cells: [
-                      record.provider_name,
-                      record.period,
-                      record.amount.toFixed(2),
-                      record.currency,
-                      record.note ?? '-',
-                    ],
-                    id: record.id,
                   }))}
                 />
               </>
@@ -1460,8 +1432,8 @@ export function NodesPage() {
             <li>
               <CirclePause size={18} aria-hidden="true" />
               <span>
-                <StatusBadge tone="watch">license pause</StatusBadge>{' '}
-                {nodeStateSummary.licensePaused} nodes paused by license policy.
+                <StatusBadge tone="watch">paused</StatusBadge>{' '}
+                {nodeStateSummary.paused} nodes paused by operator policy.
               </span>
             </li>
             <li>

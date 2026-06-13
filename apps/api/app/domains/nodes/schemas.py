@@ -13,7 +13,6 @@ class NodeStatus(StrEnum):
     FAILED = "failed"
     DELETED = "deleted"
     PAUSED = "paused"
-    LICENSE_PAUSED = "license_paused"
     QUARANTINED = "quarantined"
 
 
@@ -157,7 +156,6 @@ class NodePauseRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     reason: str | None = Field(default=None, max_length=512)
-    license_enforced: bool = False
 
 
 class NodeResumeRequest(BaseModel):
@@ -281,30 +279,12 @@ class NodeCommandHistoryRecord(BaseModel):
     created_at: datetime
 
 
-class NodeInfraBillingRecord(BaseModel):
-    id: UUID
-    provider_id: UUID
-    provider_name: str
-    amount: float
-    currency: str
-    period: str
-    note: str | None
-
-
-class NodeInfraBillingCurrencyTotal(BaseModel):
-    currency: str
-    total: float
-    records: int
-
-
 class NodeOverviewResponse(BaseModel):
     node: NodeResponse
     latest_metrics: list[NodeLatestMetricRecord]
     traffic: NodeTrafficSummary
     command_status_counts: list[NodeCommandStatusCount]
     latest_commands: list[NodeCommandHistoryRecord]
-    infra_billing_records: list[NodeInfraBillingRecord]
-    infra_billing_totals: list[NodeInfraBillingCurrencyTotal]
 
 
 class ProvisioningJobResponse(BaseModel):

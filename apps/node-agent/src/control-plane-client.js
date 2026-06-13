@@ -5,7 +5,6 @@ export const NODE_API_STATUS = Object.freeze({
   OFFLINE: "offline",
   FAILED: "failed",
   PAUSED: "paused",
-  LICENSE_PAUSED: "license_paused",
   QUARANTINED: "quarantined"
 });
 

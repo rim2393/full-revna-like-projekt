@@ -63,11 +63,6 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("FIRST_ADMIN_PASSWORD", "LUMEN_FIRST_ADMIN_PASSWORD"),
     )
 
-    free_license_node_limit: int = 3
-    central_license_sync_url: AnyUrl | None = None
-    central_license_sync_secret: SecretStr | None = None
-    central_license_public_key_b64: str | None = None
-
     # Public URL of the panel, used to build OAuth redirect URIs and the
     # WebAuthn relying-party origin when those are not configured explicitly.
     panel_public_url: str | None = Field(

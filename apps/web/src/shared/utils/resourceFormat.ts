@@ -75,7 +75,7 @@ export function toneForStatus(status: string): MetricTone {
   if (['active', 'valid', 'ready', 'enabled', 'passed'].includes(normalized)) {
     return 'good'
   }
-  if (['paused', 'license_paused', 'limited', 'expiring', 'queued', 'pending'].includes(normalized)) {
+  if (['paused', 'limited', 'expiring', 'queued', 'pending'].includes(normalized)) {
     return 'watch'
   }
   if (['failed', 'invalid', 'revoked', 'disabled', 'quarantined'].includes(normalized)) {

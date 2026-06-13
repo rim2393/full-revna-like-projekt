@@ -16,8 +16,6 @@ from app.core.security import (
     require_secret,
 )
 from app.domains.audit.models import AuditEvent
-from app.domains.infra_billing.models import InfraBillingRecord, InfraProvider
-from app.domains.licenses.service import enforce_free_node_policy
 from app.domains.nodes.models import (
     Node,
     NodeCommand,
@@ -35,8 +33,6 @@ from app.domains.nodes.schemas import (
     NodeCreateRequest,
     NodeEventCreateRequest,
     NodeHeartbeatRequest,
-    NodeInfraBillingCurrencyTotal,
-    NodeInfraBillingRecord,
     NodeLatestMetricRecord,
     NodeMetricCreateRequest,
     NodeOverviewResponse,
@@ -287,7 +283,6 @@ async def create_provisioning_job(
             status_code=status.HTTP_409_CONFLICT,
         )
 
-    await enforce_free_node_policy(session, settings)
     node = Node(
         name=request.node.name,
         region=request.node.region,
@@ -418,40 +413,6 @@ async def get_node_overview(session: AsyncSession, *, node_id: UUID) -> NodeOver
             )
         ).scalars()
     )
-    billing_rows = (
-        await session.execute(
-            select(InfraBillingRecord, InfraProvider.name)
-            .join(InfraProvider, InfraBillingRecord.provider_id == InfraProvider.id)
-            .where(InfraBillingRecord.node_id == node_id)
-            .order_by(InfraBillingRecord.period.desc(), InfraBillingRecord.created_at.desc())
-        )
-    ).all()
-
-    totals_by_currency: dict[str, NodeInfraBillingCurrencyTotal] = {}
-    billing_records: list[NodeInfraBillingRecord] = []
-    for record, provider_name in billing_rows:
-        billing_records.append(
-            NodeInfraBillingRecord(
-                id=record.id,
-                provider_id=record.provider_id,
-                provider_name=provider_name,
-                amount=record.amount,
-                currency=record.currency,
-                period=record.period,
-                note=record.note,
-            )
-        )
-        current = totals_by_currency.get(record.currency)
-        if current is None:
-            totals_by_currency[record.currency] = NodeInfraBillingCurrencyTotal(
-                currency=record.currency,
-                total=float(record.amount),
-                records=1,
-            )
-        else:
-            current.total += float(record.amount)
-            current.records += 1
-
     return NodeOverviewResponse(
         node=_node_response(node),
         latest_metrics=[
@@ -479,8 +440,6 @@ async def get_node_overview(session: AsyncSession, *, node_id: UUID) -> NodeOver
             )
             for command in latest_commands
         ],
-        infra_billing_records=billing_records,
-        infra_billing_totals=list(totals_by_currency.values()),
     )
 
 
@@ -512,7 +471,6 @@ async def create_manual_node(
             status_code=status.HTTP_409_CONFLICT,
         )
 
-    await enforce_free_node_policy(session, settings)
     node = Node(
         name=request.name,
         region=request.region,
@@ -856,7 +814,6 @@ async def record_node_heartbeat(
     enforced_statuses = {
         NodeStatus.DELETED,
         NodeStatus.PAUSED,
-        NodeStatus.LICENSE_PAUSED,
         NodeStatus.QUARANTINED,
     }
     if previous_status in enforced_statuses and request.status != previous_status:
@@ -933,18 +890,14 @@ async def pause_node(
     request: NodePauseRequest,
 ) -> Node:
     node = await get_node(session, node_id=node_id)
-    status_value = (
-        NodeStatus.LICENSE_PAUSED.value if request.license_enforced else NodeStatus.PAUSED.value
-    )
     command = await enqueue_node_command(
         session,
         node_id=node_id,
         request=NodeCommandCreateRequest(
             command_type="node.pause",
             payload_json={
-                "status": status_value,
+                "status": NodeStatus.PAUSED.value,
                 "reason": request.reason or "",
-                "license_enforced": request.license_enforced,
             },
         ),
     )
@@ -962,7 +915,6 @@ async def resume_node(
     node = await get_node(session, node_id=node_id)
     if request.target_status in {
         NodeStatus.PAUSED,
-        NodeStatus.LICENSE_PAUSED,
         NodeStatus.QUARANTINED,
     }:
         raise APIError(

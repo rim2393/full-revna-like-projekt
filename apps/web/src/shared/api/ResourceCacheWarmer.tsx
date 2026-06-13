@@ -43,7 +43,6 @@ export function ResourceCacheWarmer() {
 
       void prefetch([
         { queryFn: apiClient.listUsers, queryKey: resourceQueryKeys.users },
-        { queryFn: apiClient.listLicenses, queryKey: resourceQueryKeys.licenses },
         { queryFn: apiClient.listSubscriptions, queryKey: resourceQueryKeys.subscriptions },
         { queryFn: apiClient.listSettingGroups, queryKey: resourceQueryKeys.settingGroups },
         { queryFn: apiClient.listSubscriptionPageConfigs, queryKey: resourceQueryKeys.subscriptionPageConfigs },

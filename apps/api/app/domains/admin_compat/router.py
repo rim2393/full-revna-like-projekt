@@ -10,13 +10,11 @@ from app.domains.admin_compat.schemas import (
     AdminUsersResponse,
     ApiKeysResponse,
     AuthSessionResponse,
-    LicenseSummaryResponse,
 )
 from app.domains.admin_compat.service import (
     list_admin_api_keys,
     list_admin_users,
     read_auth_session,
-    read_license_summary,
 )
 
 router = APIRouter(prefix="/api")
@@ -48,11 +46,3 @@ async def get_admin_api_keys(
     session: DbSession,
 ) -> ApiKeysResponse:
     return await list_admin_api_keys(session, principal=principal)
-
-
-@router.get("/admin/license", response_model=LicenseSummaryResponse | None)
-async def get_admin_license(
-    principal: CurrentPrincipal,
-    session: DbSession,
-) -> LicenseSummaryResponse | None:
-    return await read_license_summary(session, principal=principal)

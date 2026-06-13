@@ -22,7 +22,6 @@ class Role(StrEnum):
 
 class Permission(StrEnum):
     API_KEY_MANAGE = "api_key:manage"
-    LICENSE_MANAGE = "license:manage"
     NODE_MANAGE = "node:manage"
     SUBSCRIPTION_READ = "subscription:read"
     SUBSCRIPTION_MANAGE = "subscription:manage"
@@ -43,7 +42,6 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
     Role.ADMIN: frozenset(
         {
             Permission.API_KEY_MANAGE,
-            Permission.LICENSE_MANAGE,
             Permission.NODE_MANAGE,
             Permission.SUBSCRIPTION_READ,
             Permission.SUBSCRIPTION_MANAGE,

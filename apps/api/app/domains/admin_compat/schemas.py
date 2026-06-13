@@ -62,18 +62,3 @@ class ApiKeysResponse(CamelModel):
     source: ApiSource
     total: int
 
-
-class LicenseAuditEvent(CamelModel):
-    at: datetime
-    label: str
-
-
-class LicenseSummaryResponse(CamelModel):
-    audit_events: list[LicenseAuditEvent]
-    expires_at: datetime | None
-    features: list[str]
-    issued_to: str | None
-    plan: str
-    seats_limit: int
-    seats_used: int
-    status: Literal["valid", "expiring", "invalid", "unlicensed"]

@@ -261,9 +261,6 @@ function nodeStatusFromProvisioningState(state) {
   if (state.mode === NODE_PROVISIONING_MODES.PAUSED) {
     return "paused";
   }
-  if (state.mode === NODE_PROVISIONING_MODES.LICENSE_PAUSED) {
-    return "license_paused";
-  }
   if (state.mode === NODE_PROVISIONING_MODES.QUARANTINED) {
     return "quarantined";
   }

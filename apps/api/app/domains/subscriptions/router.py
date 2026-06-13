@@ -111,7 +111,6 @@ async def issue_subscription_from_profile_route(
             "profile_id": str(request.profile_id),
             "host_id": str(request.host_id) if request.host_id else None,
             "user_id": str(request.user_id),
-            "license_id": str(request.license_id),
         },
     )
     await session.commit()
@@ -1316,8 +1315,6 @@ def _public_client_ip(request: Request) -> str | None:
 ERROR_RULE_STATUSES = {
     "subscription_not_active": ("disabled", "revoked", "inactive"),
     "subscription_expired": ("expired",),
-    "subscription_license_not_active": ("limited", "disabled", "inactive"),
-    "subscription_license_expired": ("expired",),
 }
 
 UNSAFE_RULE_RESPONSE_HEADERS = {

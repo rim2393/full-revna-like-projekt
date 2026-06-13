@@ -290,7 +290,7 @@ export function SubscriptionPublicPage() {
         <MetricCard
           metric={{
             detail: deliveryGroup ? GROUP_KEY : 'typed group missing',
-            icon: sectionSpecs.license.icon,
+            icon: sectionSpecs.subscription.icon,
             label: 'Applied setting',
             tone: deliveryGroup ? 'good' : 'watch',
             value: deliveryGroup ? 'Active' : 'Missing',

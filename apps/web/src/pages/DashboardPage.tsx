@@ -1,10 +1,9 @@
 import { useQueries } from '@tanstack/react-query'
-import { Activity, AlertTriangle, BadgeCheck, Network, RadioTower, UsersRound } from 'lucide-react'
+import { Activity, AlertTriangle, Network, RadioTower, UsersRound } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useApiClient } from '../shared/api/apiClientContext'
 import type {
   ApiKeyRecord,
-  LicenseSummary,
   NodeResponse,
   SubscriptionRecord,
   UserRecord,
@@ -34,12 +33,12 @@ type RiskRow = {
 }
 
 const ACTIVE_NODE_STATUSES = new Set(['active'])
-const ATTENTION_NODE_STATUSES = new Set(['failed', 'offline', 'license_paused', 'paused', 'quarantined'])
+const ATTENTION_NODE_STATUSES = new Set(['failed', 'offline', 'paused', 'quarantined'])
 
 export function DashboardPage() {
   const apiClient = useApiClient()
   const { language, t } = useI18n()
-  const [usersQuery, nodesQuery, subscriptionsQuery, apiKeysQuery, licenseQuery] = useQueries({
+  const [usersQuery, nodesQuery, subscriptionsQuery, apiKeysQuery] = useQueries({
     queries: [
       {
         queryFn: apiClient.listUsers,
@@ -57,23 +56,18 @@ export function DashboardPage() {
         queryFn: apiClient.listApiKeys,
         queryKey: ['dashboard', 'api-keys'],
       },
-      {
-        queryFn: apiClient.readLicense,
-        queryKey: ['dashboard', 'license'],
-      },
     ],
   }) as [
     DashboardQueryResult<{ items: UserRecord[]; source?: string; total?: number }>,
     DashboardQueryResult<{ items: NodeResponse[] }>,
     DashboardQueryResult<{ items: SubscriptionRecord[] }>,
     DashboardQueryResult<{ items: ApiKeyRecord[] }>,
-    DashboardQueryResult<LicenseSummary | null>,
   ]
 
-  const isLoading = [usersQuery, nodesQuery, subscriptionsQuery, apiKeysQuery, licenseQuery].some(
+  const isLoading = [usersQuery, nodesQuery, subscriptionsQuery, apiKeysQuery].some(
     (query) => query.isLoading,
   )
-  const firstError = [usersQuery, nodesQuery, subscriptionsQuery, apiKeysQuery, licenseQuery].find(
+  const firstError = [usersQuery, nodesQuery, subscriptionsQuery, apiKeysQuery].find(
     (query) => query.isError,
   )?.error
 
@@ -81,10 +75,9 @@ export function DashboardPage() {
   const nodes = nodesQuery.data?.items ?? []
   const subscriptions = subscriptionsQuery.data?.items ?? []
   const apiKeys = apiKeysQuery.data?.items ?? []
-  const license = licenseQuery.data ?? null
-  const metricSections = buildDashboardSections({ license, nodes, subscriptions, t, users })
-  const activityRows = buildActivityRows({ apiKeys, language, license, nodes, subscriptions, t, users })
-  const riskRows = buildRiskRows({ apiKeys, license, nodes, subscriptions, t, users })
+  const metricSections = buildDashboardSections({ nodes, subscriptions, t, users })
+  const activityRows = buildActivityRows({ apiKeys, language, nodes, subscriptions, t, users })
+  const riskRows = buildRiskRows({ apiKeys, nodes, subscriptions, t, users })
 
   return (
     <section className="page">
@@ -175,13 +168,11 @@ type DashboardSection = {
 }
 
 function buildDashboardSections({
-  license,
   nodes,
   subscriptions,
   t,
   users,
 }: {
-  license: LicenseSummary | null
   nodes: NodeResponse[]
   subscriptions: SubscriptionRecord[]
   t: (value: string, params?: Record<string, string | number>) => string
@@ -238,7 +229,7 @@ function buildDashboardSections({
       ],
     },
     {
-      title: 'Subscriptions & license',
+      title: 'Subscriptions',
       metrics: [
         {
           detail: t('{count} active subscriptions', {
@@ -249,20 +240,6 @@ function buildDashboardSections({
           tone: activeSubscriptions > 0 ? 'good' : 'neutral',
           value: `${formatInteger(activeSubscriptions)} / ${formatInteger(subscriptions.length)}`,
         },
-        {
-          detail: license ? t(license.status) : 'free mode or not synced',
-          icon: BadgeCheck,
-          label: 'License seats',
-          tone:
-            license?.status === 'invalid'
-              ? 'danger'
-              : license?.status === 'expiring'
-                ? 'watch'
-                : 'good',
-          value: license
-            ? `${formatInteger(license.seatsUsed)} / ${formatInteger(license.seatsLimit)}`
-            : 'Free',
-        },
       ],
     },
   ]
@@ -271,7 +248,6 @@ function buildDashboardSections({
 function buildActivityRows({
   apiKeys,
   language,
-  license,
   nodes,
   subscriptions,
   t,
@@ -279,7 +255,6 @@ function buildActivityRows({
 }: {
   apiKeys: ApiKeyRecord[]
   language: 'en' | 'ru'
-  license: LicenseSummary | null
   nodes: NodeResponse[]
   subscriptions: SubscriptionRecord[]
   t: (value: string) => string
@@ -320,12 +295,6 @@ function buildActivityRows({
         : t('never used'),
     })
   }
-  if (license) {
-    rows.push({
-      label: t('activity.license_status').replace('{status}', t(license.status)),
-      meta: t('activity.expires_at').replace('{date}', formatDateTime(license.expiresAt, language)),
-    })
-  }
   if (users.length > 0) {
     rows.push({
       label: t('activity.users_loaded').replace('{count}', formatInteger(users.length)),
@@ -341,14 +310,12 @@ function buildActivityRows({
 
 function buildRiskRows({
   apiKeys,
-  license,
   nodes,
   subscriptions,
   t,
   users,
 }: {
   apiKeys: ApiKeyRecord[]
-  license: LicenseSummary | null
   nodes: NodeResponse[]
   subscriptions: SubscriptionRecord[]
   t: (value: string) => string
@@ -374,10 +341,6 @@ function buildRiskRows({
   if (expiringApiKeys.length > 0) {
     rows.push({ label: t('API keys expiring'), value: formatInteger(expiringApiKeys.length) })
   }
-  if (license?.status === 'invalid' || license?.status === 'expiring') {
-    rows.push({ label: t('License attention'), value: t(license.status) })
-  }
-
   return rows
 }
 

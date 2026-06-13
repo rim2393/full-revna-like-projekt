@@ -1,5 +1,4 @@
 import {
-  BadgeCheck,
   Cable,
   Fingerprint,
   KeyRound,
@@ -84,15 +83,6 @@ export const sectionSpecs: Record<string, SectionSpec> = {
     primaryAction: 'Configure feed',
     icon: Rss,
     items: ['Safe URL rendering with no secrets logged', 'Client compatibility switches', 'Cache purge and import checks'],
-  },
-  license: {
-    title: 'License',
-    eyebrow: 'Instance entitlement',
-    description: 'Expose license health, renewal windows, and seat pressure without storing keys in UI.',
-    status: 'Entitlement status',
-    primaryAction: 'Check status',
-    icon: BadgeCheck,
-    items: ['License summary and expiry', 'Feature gates and limits', 'Audit trail for entitlement checks'],
   },
   apiKeys: {
     title: 'API keys',

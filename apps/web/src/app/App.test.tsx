@@ -42,7 +42,6 @@ describe('Lumen admin routing', () => {
         source: 'api',
         total: 0,
       }),
-      readLicense: async () => null,
     }
 
     renderWithRouter('/dashboard', { apiClient, initialSession: developmentSession })
@@ -216,7 +215,6 @@ describe('Lumen admin routing', () => {
       readProvisioningJob: async () => {
         throw new Error('Provisioning job is unavailable')
       },
-      readLicense: async () => null,
     }
 
     renderWithRouter('/api-keys', { apiClient: emptyApiClient, initialSession: developmentSession })

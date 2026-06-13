@@ -259,7 +259,7 @@ test("connection drop runtime executes available Linux drop tools", async () => 
   assert.equal(calls.includes("ss -K dst 203.0.113.44"), true);
 });
 
-test("apply command persists license pause mode and reports it in heartbeat", async () => {
+test("apply command persists operator pause mode and reports it in heartbeat", async () => {
   const active = createProvisioningState({
     nodeId: "node-1",
     updatedAt: "2026-05-27T00:00:00.000Z"
@@ -271,9 +271,8 @@ test("apply command persists license pause mode and reports it in heartbeat", as
       command_type: COMMAND_TYPES.NODE_PAUSE,
       created_at: "2026-05-27T00:01:00.000Z",
       payload_json: {
-        license_enforced: true,
-        reason: "license expired",
-        status: "license_paused"
+        reason: "maintenance",
+        status: "paused"
       }
     },
     active,
@@ -284,7 +283,7 @@ test("apply command persists license pause mode and reports it in heartbeat", as
   );
 
   assert.equal(pausedResult.status, "succeeded");
-  assert.equal(pausedResult.state.mode, NODE_PROVISIONING_MODES.LICENSE_PAUSED);
+  assert.equal(pausedResult.state.mode, NODE_PROVISIONING_MODES.PAUSED);
 
   const skippedResult = applyNodeCommand(
     {
@@ -302,7 +301,7 @@ test("apply command persists license pause mode and reports it in heartbeat", as
   );
 
   assert.equal(skippedResult.status, "skipped");
-  assert.match(skippedResult.errorMessage, /license-paused/);
+  assert.match(skippedResult.errorMessage, /paused/);
 
   const stateDir = mkdtempSync(join(tmpdir(), "lumen-agent-state-"));
   try {
@@ -327,7 +326,7 @@ test("apply command persists license pause mode and reports it in heartbeat", as
           return jsonResponse({
             id: "node-1",
             name: "node-1",
-            status: "license_paused",
+            status: "paused",
             last_seen_at: "2026-05-27T00:00:00Z",
             capabilities: {}
           });
@@ -344,7 +343,7 @@ test("apply command persists license pause mode and reports it in heartbeat", as
       }
     });
 
-    assert.equal(JSON.parse(calls[0].options.body).status, "license_paused");
+    assert.equal(JSON.parse(calls[0].options.body).status, "paused");
   } finally {
     rmSync(stateDir, { recursive: true, force: true });
   }

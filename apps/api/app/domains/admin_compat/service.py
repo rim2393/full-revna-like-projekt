@@ -14,12 +14,9 @@ from app.domains.admin_compat.schemas import (
     ApiKeyRecord,
     ApiKeysResponse,
     AuthSessionResponse,
-    LicenseAuditEvent,
-    LicenseSummaryResponse,
 )
 from app.domains.api_keys.models import ApiKey
 from app.domains.auth.models import UserMfaMethod, UserSession
-from app.domains.licenses.models import License
 from app.domains.subscriptions.models import Subscription
 from app.domains.users.models import User
 
@@ -27,7 +24,6 @@ ADMIN_COMPAT_ROLES = frozenset({Role.OWNER, Role.ADMIN})
 ADMIN_COMPAT_PERMISSIONS = frozenset(
     {
         Permission.API_KEY_MANAGE,
-        Permission.LICENSE_MANAGE,
         Permission.SUBSCRIPTION_MANAGE,
         Permission.USER_MANAGE,
     }
@@ -145,28 +141,6 @@ async def list_admin_api_keys(
     )
 
 
-async def read_license_summary(
-    session: AsyncSession,
-    *,
-    principal: Principal,
-) -> LicenseSummaryResponse | None:
-    require_admin_compat_read(principal)
-    licenses = (
-        (await session.execute(select(License).order_by(License.created_at.desc()))).scalars().all()
-    )
-    if not licenses:
-        return None
-
-    generated_at = utc_now()
-    license_record = _select_license(licenses, generated_at=generated_at)
-    seats_used = await _count_license_seats(
-        session,
-        license_id=license_record.id,
-        generated_at=generated_at,
-    )
-    return _license_summary(license_record, seats_used=seats_used, generated_at=generated_at)
-
-
 async def _real_web_session(
     session: AsyncSession,
     *,
@@ -261,7 +235,7 @@ async def _confirmed_mfa_by_user(
         )
         .distinct(),
     )
-    return {user_id: True for user_id in result.scalars().all()}
+    return dict.fromkeys(result.scalars().all(), True)
 
 
 async def _users_by_id(
@@ -382,112 +356,3 @@ def _api_key_status(api_key: ApiKey, *, generated_at: datetime) -> str:
         return "expiring"
     return "active"
 
-
-def _select_license(
-    licenses: list[License],
-    *,
-    generated_at: datetime,
-) -> License:
-    return sorted(
-        licenses,
-        key=lambda license_record: (
-            _license_status(license_record, generated_at=generated_at) == "valid",
-            ensure_aware(license_record.expires_at)
-            if license_record.expires_at is not None
-            else NO_EXPIRY_SENTINEL,
-            ensure_aware(license_record.created_at),
-        ),
-        reverse=True,
-    )[0]
-
-
-async def _count_license_seats(
-    session: AsyncSession,
-    *,
-    license_id: UUID,
-    generated_at: datetime,
-) -> int:
-    subscriptions = (
-        await session.execute(
-            select(Subscription)
-            .where(Subscription.license_id == license_id)
-            .where(Subscription.revoked_at.is_(None))
-        )
-    ).scalars()
-    return sum(
-        1
-        for subscription in subscriptions
-        if _subscription_status(subscription, generated_at=generated_at) != "expired"
-    )
-
-
-def _license_summary(
-    license_record: License,
-    *,
-    seats_used: int,
-    generated_at: datetime,
-) -> LicenseSummaryResponse:
-    return LicenseSummaryResponse(
-        audit_events=_license_audit_events(license_record),
-        expires_at=(
-            ensure_aware(license_record.expires_at)
-            if license_record.expires_at is not None
-            else None
-        ),
-        features=_license_features(license_record),
-        issued_to=license_record.customer_ref,
-        plan=_license_plan(license_record),
-        seats_limit=license_record.max_devices,
-        seats_used=seats_used,
-        status=_license_status(license_record, generated_at=generated_at),
-    )
-
-
-def _license_audit_events(license_record: License) -> list[LicenseAuditEvent]:
-    events = [
-        LicenseAuditEvent(
-            at=ensure_aware(license_record.created_at),
-            label="License registered",
-        )
-    ]
-    updated_at = ensure_aware(license_record.updated_at)
-    if updated_at != ensure_aware(license_record.created_at):
-        events.append(LicenseAuditEvent(at=updated_at, label="License updated"))
-    return events
-
-
-def _license_features(license_record: License) -> list[str]:
-    raw_features = license_record.metadata_json.get("features")
-    if raw_features:
-        features = [feature.strip() for feature in raw_features.split(",") if feature.strip()]
-        if features:
-            return features
-    return []
-
-
-def _license_plan(license_record: License) -> str:
-    return (
-        license_record.metadata_json.get("plan")
-        or license_record.metadata_json.get("tier")
-        or "unknown"
-    )
-
-
-def _license_status(license_record: License, *, generated_at: datetime) -> str:
-    starts_at = (
-        ensure_aware(license_record.starts_at) if license_record.starts_at is not None else None
-    )
-    expires_at = (
-        ensure_aware(license_record.expires_at) if license_record.expires_at is not None else None
-    )
-    if license_record.status != "active":
-        return "unlicensed"
-    if starts_at is not None and starts_at > generated_at:
-        return "invalid"
-    if expires_at is None:
-        return "valid"
-    if expires_at <= generated_at:
-        return "invalid"
-    if expires_at <= generated_at + API_KEY_EXPIRING_WINDOW:
-        return "expiring"
-    return "valid"

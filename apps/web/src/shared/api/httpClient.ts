@@ -16,8 +16,6 @@ import type {
   NodePluginCreateRequest,
   NodePluginReorderRequest,
   NodePluginUpdateRequest,
-  InfraProviderCreateRequest,
-  InfraBillingRecordCreateRequest,
   OAuthStartResponse,
   TelegramLoginPayload,
   DropConnectionsRequest,
@@ -294,7 +292,6 @@ export function createHttpLumenApiClient({
       }
     },
     listHosts: () => request('/api/v1/hosts'),
-    listLicenses: () => request('/api/v1/licenses'),
     listNodes: () => request('/api/v1/nodes'),
     getNodeOverview: (nodeId: string) => request(`/api/v1/nodes/${nodeId}/overview`),
     listNodeCommands: (nodeId: string) => request(`/api/v1/nodes/${nodeId}/commands`),
@@ -454,7 +451,6 @@ export function createHttpLumenApiClient({
       request(`/api/v1/nodes/${nodeId}/resume`, { body: payload, method: 'POST' }),
     quarantineNode: (nodeId: string, payload: NodeQuarantineRequest) =>
       request(`/api/v1/nodes/${nodeId}/quarantine`, { body: payload, method: 'POST' }),
-    readLicense: () => request('/api/admin/license'),
     readPanelIdentity: () => request('/api/v1/settings/public/identity'),
     revokeApiKey: (apiKeyId: string) =>
       request(`/api/v1/api-keys/${apiKeyId}`, { method: 'DELETE' }),
@@ -538,15 +534,6 @@ export function createHttpLumenApiClient({
       request(`/api/v1/node-plugins/${pluginId}`, { body: payload, method: 'PATCH' }),
     deleteNodePlugin: (pluginId: string) =>
       request(`/api/v1/node-plugins/${pluginId}`, { method: 'DELETE' }),
-    listInfraProviders: () => request('/api/v1/infra-billing/providers'),
-    createInfraProvider: (payload: InfraProviderCreateRequest) =>
-      request('/api/v1/infra-billing/providers', { body: payload, method: 'POST' }),
-    deleteInfraProvider: (providerId: string) =>
-      request(`/api/v1/infra-billing/providers/${providerId}`, { method: 'DELETE' }),
-    listInfraBillingRecords: () => request('/api/v1/infra-billing/records'),
-    createInfraBillingRecord: (payload: InfraBillingRecordCreateRequest) =>
-      request('/api/v1/infra-billing/records', { body: payload, method: 'POST' }),
-    infraBillingSummary: () => request('/api/v1/infra-billing/summary'),
   }
 
   async function readSessionAfterTokenIssue(tokenPair: TokenPairResponse): Promise<AuthSession> {

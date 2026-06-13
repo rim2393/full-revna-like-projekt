@@ -1,5 +1,4 @@
 import {
-  BadgeCheck,
   Cog,
   Folder,
   Globe2,
@@ -14,7 +13,6 @@ import {
   Rss,
   ShieldCheck,
   UsersRound,
-  Wallet,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -55,10 +53,7 @@ export const navigationGroups: NavigationGroup[] = [
   {
     label: 'Governance',
     items: [
-      { label: 'License', to: '/license', icon: BadgeCheck },
-      { label: 'Server costs', to: '/infra-billing', icon: Wallet },
       { label: 'API keys', to: '/api-keys', icon: KeyRound },
-      { label: 'Guard portal', to: '/guard/portal', icon: ShieldCheck },
     ],
   },
   {

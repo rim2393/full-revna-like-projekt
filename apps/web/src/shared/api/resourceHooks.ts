@@ -6,8 +6,6 @@ import type {
   HostBulkActionRequest,
   HostCreateRequest,
   HostUpdateRequest,
-  InfraBillingRecordCreateRequest,
-  InfraProviderCreateRequest,
   DropConnectionsRequest,
   HappRoutingBuildRequest,
   NodeBulkActionRequest,
@@ -54,8 +52,6 @@ import type {
 export const resourceQueryKeys = {
   apiKeys: ['resource', 'api-keys'] as const,
   hosts: ['resource', 'hosts'] as const,
-  license: ['resource', 'license'] as const,
-  licenses: ['resource', 'licenses'] as const,
   nodes: ['resource', 'nodes'] as const,
   nodeCommands: (nodeId: string) => ['resource', 'nodes', nodeId, 'commands'] as const,
   nodeMetrics: (nodeId: string) => ['resource', 'nodes', nodeId, 'metrics'] as const,
@@ -84,9 +80,6 @@ export const resourceQueryKeys = {
   subscriptionPageConfigs: ['resource', 'subscription-page-configs'] as const,
   nodePlugins: ['resource', 'node-plugins'] as const,
   panelIdentity: ['resource', 'settings', 'public-identity'] as const,
-  infraProviders: ['resource', 'infra-billing', 'providers'] as const,
-  infraBillingRecords: ['resource', 'infra-billing', 'records'] as const,
-  infraBillingSummary: ['resource', 'infra-billing', 'summary'] as const,
   toolSummary: ['resource', 'tools', 'summary'] as const,
   toolHwid: ['resource', 'tools', 'hwid'] as const,
   toolTopUsers: ['resource', 'tools', 'top-users'] as const,
@@ -140,24 +133,6 @@ export function useRevokeApiKey() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.apiKeys })
     },
-  })
-}
-
-export function useLicensePageData() {
-  const apiClient = useApiClient()
-
-  return useQuery({
-    queryFn: apiClient.readLicense,
-    queryKey: resourceQueryKeys.license,
-  })
-}
-
-export function useLicensesPageData() {
-  const apiClient = useApiClient()
-
-  return useQuery({
-    queryFn: apiClient.listLicenses,
-    queryKey: resourceQueryKeys.licenses,
   })
 }
 
@@ -1647,72 +1622,5 @@ export function useDeleteNodePlugin() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.nodePlugins })
     },
-  })
-}
-
-export function useInfraProvidersData() {
-  const apiClient = useApiClient()
-
-  return useQuery({
-    queryFn: apiClient.listInfraProviders,
-    queryKey: resourceQueryKeys.infraProviders,
-  })
-}
-
-export function useInfraBillingRecordsData() {
-  const apiClient = useApiClient()
-
-  return useQuery({
-    queryFn: apiClient.listInfraBillingRecords,
-    queryKey: resourceQueryKeys.infraBillingRecords,
-  })
-}
-
-export function useInfraBillingSummary() {
-  const apiClient = useApiClient()
-
-  return useQuery({
-    queryFn: apiClient.infraBillingSummary,
-    queryKey: resourceQueryKeys.infraBillingSummary,
-  })
-}
-
-function useInvalidateInfraBilling() {
-  const queryClient = useQueryClient()
-  return () => {
-    void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.infraProviders })
-    void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.infraBillingRecords })
-    void queryClient.invalidateQueries({ queryKey: resourceQueryKeys.infraBillingSummary })
-  }
-}
-
-export function useCreateInfraProvider() {
-  const apiClient = useApiClient()
-  const invalidate = useInvalidateInfraBilling()
-
-  return useMutation({
-    mutationFn: (request: InfraProviderCreateRequest) => apiClient.createInfraProvider(request),
-    onSuccess: invalidate,
-  })
-}
-
-export function useDeleteInfraProvider() {
-  const apiClient = useApiClient()
-  const invalidate = useInvalidateInfraBilling()
-
-  return useMutation({
-    mutationFn: (id: string) => apiClient.deleteInfraProvider(id),
-    onSuccess: invalidate,
-  })
-}
-
-export function useCreateInfraBillingRecord() {
-  const apiClient = useApiClient()
-  const invalidate = useInvalidateInfraBilling()
-
-  return useMutation({
-    mutationFn: (request: InfraBillingRecordCreateRequest) =>
-      apiClient.createInfraBillingRecord(request),
-    onSuccess: invalidate,
   })
 }

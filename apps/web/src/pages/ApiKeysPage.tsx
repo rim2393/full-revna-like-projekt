@@ -24,7 +24,6 @@ const scopeOptions = [
   { label: 'Subscription read', value: 'subscription:read' },
   { label: 'Subscription management', value: 'subscription:manage' },
   { label: 'User management', value: 'user:manage' },
-  { label: 'License management', value: 'license:manage' },
 ]
 
 const scopePresets = [

@@ -17,12 +17,6 @@ class Subscription(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         nullable=False,
         index=True,
     )
-    license_id: Mapped[UUID] = mapped_column(
-        Uuid(as_uuid=True),
-        ForeignKey("licenses.id", ondelete="RESTRICT"),
-        nullable=False,
-        index=True,
-    )
     node_id: Mapped[UUID | None] = mapped_column(
         Uuid(as_uuid=True),
         ForeignKey("nodes.id", ondelete="SET NULL"),

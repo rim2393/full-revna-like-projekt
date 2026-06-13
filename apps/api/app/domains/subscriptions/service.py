@@ -12,7 +12,6 @@ from app.core.config import get_settings
 from app.core.errors import APIError
 from app.core.security import generate_opaque_token
 from app.domains.ip_control.service import build_ip_control_policy
-from app.domains.licenses.models import License
 from app.domains.node_plugins.service import list_effective_node_plugins, plugin_policy_records
 from app.domains.nodes.models import Node
 from app.domains.protocols.models import Host, ProtocolProfile, Squad
@@ -39,7 +38,7 @@ from app.domains.users.models import User
 SUBSCRIPTION_PUBLIC_ID_PREFIX = "lumen_sub"
 SUBSCRIPTION_INFO_SETTING_KEY = "subscription.info"
 PUBLIC_ID_COLLISION_ATTEMPTS = 3
-SERVABLE_STATUSES = frozenset({"active", "paid", "trial"})
+SERVABLE_STATUSES = frozenset({"active"})
 SECRET_FIELD_FRAGMENTS = frozenset(
     {
         "password",
@@ -535,8 +534,6 @@ async def build_public_subscription_manifest(
 ) -> dict[str, object]:
     subscription = await get_subscription_by_public_id(session, public_id=public_id)
     _ensure_subscription_can_be_served(subscription)
-    license_record = await session.get(License, subscription.license_id)
-    _ensure_license_can_be_served(license_record)
     return await build_subscription_manifest(session, subscription_id=subscription.id)
 
 
@@ -658,14 +655,6 @@ async def create_subscription(
             status_code=status.HTTP_404_NOT_FOUND,
         )
 
-    license_record = await session.get(License, request.license_id)
-    if license_record is None:
-        raise APIError(
-            code="subscription_license_not_found",
-            message="Subscription license was not found.",
-            status_code=status.HTTP_404_NOT_FOUND,
-        )
-
     if request.node_id is not None:
         node = await session.get(Node, request.node_id)
         if node is None:
@@ -683,7 +672,6 @@ async def create_subscription(
     subscription = Subscription(
         public_id=await create_subscription_public_id(session),
         user_id=request.user_id,
-        license_id=request.license_id,
         node_id=request.node_id,
         status="active",
         delivery_profile=request.delivery_profile,
@@ -749,7 +737,6 @@ async def issue_subscription_from_profile(
         session,
         request=SubscriptionCreateRequest(
             user_id=request.user_id,
-            license_id=request.license_id,
             node_id=profile.node_id,
             delivery_profile=delivery_profile,
             config_hash=request.config_hash,
@@ -837,7 +824,6 @@ async def clone_subscription(session: AsyncSession, *, subscription_id: UUID) ->
     clone = Subscription(
         public_id=await create_subscription_public_id(session),
         user_id=source.user_id,
-        license_id=source.license_id,
         node_id=source.node_id,
         status="active",
         delivery_profile=dict(source.delivery_profile),
@@ -914,7 +900,6 @@ def subscription_to_response(subscription: Subscription) -> SubscriptionResponse
         id=subscription.id,
         public_id=subscription.public_id,
         user_id=subscription.user_id,
-        license_id=subscription.license_id,
         node_id=subscription.node_id,
         status=subscription.status,
         delivery_profile=subscription.delivery_profile,
@@ -2114,34 +2099,6 @@ def _ensure_subscription_can_be_served(subscription: Subscription) -> None:
         raise APIError(
             code="subscription_expired",
             message="Subscription has expired.",
-            status_code=status.HTTP_410_GONE,
-        )
-
-
-def _ensure_license_can_be_served(license_record: License | None) -> None:
-    if license_record is None:
-        raise APIError(
-            code="subscription_license_not_found",
-            message="Subscription license was not found.",
-            status_code=status.HTTP_404_NOT_FOUND,
-        )
-    if license_record.status not in SERVABLE_STATUSES:
-        raise APIError(
-            code="subscription_license_not_active",
-            message="Subscription license is not active.",
-            status_code=status.HTTP_410_GONE,
-        )
-    now = datetime.now(UTC)
-    if license_record.starts_at is not None and _ensure_aware(license_record.starts_at) > now:
-        raise APIError(
-            code="subscription_license_not_active",
-            message="Subscription license is not active yet.",
-            status_code=status.HTTP_410_GONE,
-        )
-    if license_record.expires_at is not None and _ensure_aware(license_record.expires_at) <= now:
-        raise APIError(
-            code="subscription_license_expired",
-            message="Subscription license has expired.",
             status_code=status.HTTP_410_GONE,
         )
 

@@ -1,7 +1,7 @@
 """Add node management parity fields.
 
 Revision ID: 0009_node_management_parity
-Revises: 0008_infra_billing
+Revises: 0007_node_plugins
 Create Date: 2026-06-01 19:00:00
 """
 
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "0009_node_management_parity"
-down_revision: str | None = "0008_infra_billing"
+down_revision: str | None = "0007_node_plugins"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

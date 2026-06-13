@@ -4,7 +4,6 @@ export const PROVISIONING_STATE_VERSION = "lumen.node-agent.provisioning-state.v
 
 export const NODE_PROVISIONING_MODES = Object.freeze({
   ACTIVE: "active",
-  LICENSE_PAUSED: "license_paused",
   PAUSED: "paused",
   QUARANTINED: "quarantined"
 });
@@ -119,16 +118,11 @@ export function commandAllowanceForState(command, state) {
     return Object.freeze({ allowed: true, reason: null });
   }
 
-  if (
-    current.mode === NODE_PROVISIONING_MODES.PAUSED ||
-    current.mode === NODE_PROVISIONING_MODES.LICENSE_PAUSED
-  ) {
+  if (current.mode === NODE_PROVISIONING_MODES.PAUSED) {
     const allowed = commandType === COMMAND_TYPES.NODE_RESUME ||
       commandType === COMMAND_TYPES.NODE_QUARANTINE ||
       DIAGNOSTIC_COMMANDS.has(commandType);
-    const reason = current.mode === NODE_PROVISIONING_MODES.LICENSE_PAUSED
-      ? "node is license-paused; mutating commands are blocked until license renewal"
-      : "node is paused; mutating commands are deferred until resume";
+    const reason = "node is paused; mutating commands are deferred until resume";
     return Object.freeze({
       allowed,
       reason: allowed ? null : reason
@@ -231,10 +225,9 @@ export function transitionProvisioningState(currentState, event, input = {}) {
       requireIdle(state, event);
       if (
         input.mode !== undefined &&
-        input.mode !== NODE_PROVISIONING_MODES.PAUSED &&
-        input.mode !== NODE_PROVISIONING_MODES.LICENSE_PAUSED
+        input.mode !== NODE_PROVISIONING_MODES.PAUSED
       ) {
-        throw new Error("Pause mode must be paused or license_paused");
+        throw new Error("Pause mode must be paused");
       }
       return freezeState({
         ...state,

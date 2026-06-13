@@ -33,7 +33,6 @@ import {
   useGlobalProfileInbounds,
   useHostsPageData,
   useIssueSubscriptionFromProfile,
-  useLicensesPageData,
   useNodesPageData,
   useProfileRuntimeReadiness,
   useProfileComputedConfig,
@@ -50,7 +49,6 @@ import {
 } from '../shared/api/resourceHooks'
 import type {
   HostRecord,
-  LicenseRecord,
   PortReservation,
   ProfileInboundRecord,
   ProfileRuntimeReadinessRecord,
@@ -128,7 +126,6 @@ export function ProfilesPage() {
   const squadsQuery = useSquadsPageData()
   const hostsQuery = useHostsPageData()
   const usersQuery = useUsersPageData()
-  const licensesQuery = useLicensesPageData()
   const globalInboundsQuery = useGlobalProfileInbounds()
   const readinessQuery = useProfileRuntimeReadiness()
   const staleCleanupQuery = useStaleProfileCleanupCandidates()
@@ -146,7 +143,6 @@ export function ProfilesPage() {
   const squads = squadsQuery.data?.items ?? []
   const hosts = hostsQuery.data?.items ?? []
   const users = usersQuery.data?.items ?? []
-  const licenses = licensesQuery.data?.items ?? []
   const staleCleanupCandidates = staleCleanupQuery.data?.items ?? []
   const [selectedProfileId, setSelectedProfileId] = useState('')
   const [selectedProfileIds, setSelectedProfileIds] = useState<Set<string>>(new Set())
@@ -669,7 +665,6 @@ export function ProfilesPage() {
 
   async function handleIssueSubscriptionFromProfile(request: {
     host_id: string
-    license_id: string
     profile_id: string
     profile_title: string
     render_targets: string[]
@@ -680,7 +675,6 @@ export function ProfilesPage() {
     try {
       const subscription = await issueSubscriptionFromProfile.mutateAsync({
         host_id: request.host_id,
-        license_id: request.license_id,
         profile_id: request.profile_id,
         profile_title: request.profile_title,
         render_targets: request.render_targets,
@@ -1078,7 +1072,6 @@ export function ProfilesPage() {
 
               <ProfileSubscriptionIssuer
                 hosts={selectedProfileHosts}
-                licenses={licenses}
                 onIssue={handleIssueSubscriptionFromProfile}
                 pending={issueSubscriptionFromProfile.isPending}
                 profile={selectedProfile}
@@ -1638,7 +1631,6 @@ const profileSubscriptionTargets = [
 
 function ProfileSubscriptionIssuer({
   hosts,
-  licenses,
   onIssue,
   pending,
   profile,
@@ -1646,10 +1638,8 @@ function ProfileSubscriptionIssuer({
   users,
 }: {
   hosts: HostRecord[]
-  licenses: LicenseRecord[]
   onIssue: (request: {
     host_id: string
-    license_id: string
     profile_id: string
     profile_title: string
     render_targets: string[]
@@ -1664,7 +1654,6 @@ function ProfileSubscriptionIssuer({
     (host) => host.status === 'active' && !host.hidden && !host.subscription_excluded,
   )
   const [userId, setUserId] = useState(users[0]?.id ?? '')
-  const [licenseId, setLicenseId] = useState(licenses[0]?.id ?? '')
   const [hostId, setHostId] = useState(renderableHosts[0]?.id ?? '')
   const [title, setTitle] = useState(profile?.name ?? '')
   const [targets, setTargets] = useState<Set<string>>(new Set(['happ', 'sing-box', 'mihomo']))
@@ -1676,12 +1665,6 @@ function ProfileSubscriptionIssuer({
       setUserId(users[0].id)
     }
   }, [userId, users])
-
-  useEffect(() => {
-    if (!licenseId && licenses[0]?.id) {
-      setLicenseId(licenses[0].id)
-    }
-  }, [licenseId, licenses])
 
   useEffect(() => {
     if (!hostId || !renderableHosts.some((host) => host.id === hostId)) {
@@ -1703,11 +1686,9 @@ function ProfileSubscriptionIssuer({
         ? t('Profile needs an active visible host included in subscriptions.')
         : users.length === 0
           ? t('Create a real user first.')
-          : licenses.length === 0
-            ? t('Create or sync a real license first.')
-            : targets.size === 0
-              ? t('Select at least one client target.')
-              : null
+          : targets.size === 0
+            ? t('Select at least one client target.')
+            : null
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -1720,7 +1701,6 @@ function ProfileSubscriptionIssuer({
     try {
       const subscription = await onIssue({
         host_id: hostId,
-        license_id: licenseId,
         profile_id: profile.id,
         profile_title: title.trim() || profile.name,
         render_targets: Array.from(targets),
@@ -1770,24 +1750,6 @@ function ProfileSubscriptionIssuer({
             {users.map((user) => (
               <option key={user.id} value={user.id}>
                 {user.display_name ?? user.username ?? user.email}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label htmlFor="profile-issue-license">
-          {t('License')}
-          <select
-            id="profile-issue-license"
-            value={licenseId}
-            onChange={(event) => setLicenseId(event.target.value)}
-            disabled={pending || licenses.length === 0}
-            required
-          >
-            <option value="">{t('Select license')}</option>
-            {licenses.map((license) => (
-              <option key={license.id} value={license.id}>
-                {profileLicenseLabel(license)}
               </option>
             ))}
           </select>
@@ -3141,12 +3103,6 @@ function groupHostsByProfile(hosts: HostRecord[]) {
     groups.set(host.protocol_profile_id, items)
   }
   return groups
-}
-
-function profileLicenseLabel(license: LicenseRecord) {
-  const customer = license.customer_ref ?? license.id.slice(0, 8)
-  const expiry = license.expires_at ? formatTimestamp(license.expires_at) : 'no expiry'
-  return `${customer} · ${license.status} · ${license.max_devices} devices · ${expiry}`
 }
 
 function profileExport(profile: ProtocolProfileRecord) {

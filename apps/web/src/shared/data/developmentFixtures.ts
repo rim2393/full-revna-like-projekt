@@ -2,8 +2,6 @@ import type {
   ApiKeyRecord,
   AuthSession,
   HostRecord,
-  LicenseRecord,
-  LicenseSummary,
   NodeRecord,
   ProtocolAdapterRecord,
   ProtocolProfileRecord,
@@ -18,7 +16,7 @@ export const developmentSession: AuthSession = {
   expiresAt: '2026-05-27T23:59:59Z',
   name: 'Control Plane Operator',
   role: 'admin',
-  scopes: ['users:read', 'nodes:read', 'license:read', 'api-keys:read'],
+  scopes: ['users:read', 'nodes:read', 'api-keys:read'],
   userId: 'usr_dev_operator',
 }
 
@@ -44,32 +42,6 @@ export const apiKeyRecords: ApiKeyRecord[] = [
     owner: 'SRE automation',
     scopes: ['nodes:read'],
     status: 'expiring',
-  },
-]
-
-export const licenseSummary: LicenseSummary = {
-  auditEvents: [
-    { at: '2026-05-27T00:04:00Z', label: 'Entitlement check succeeded' },
-    { at: '2026-05-26T18:45:00Z', label: 'Seat pressure recalculated' },
-  ],
-  expiresAt: '2026-09-30',
-  features: ['Guard admin shell', 'Node health telemetry', 'Scoped automation keys'],
-  issuedTo: 'Lumen production instance',
-  plan: 'Business mesh',
-  seatsLimit: 25000,
-  seatsUsed: 18420,
-  status: 'valid',
-}
-
-export const licenseRecords: LicenseRecord[] = [
-  {
-    customer_ref: 'lumen-production-instance',
-    expires_at: '2026-09-30T00:00:00Z',
-    id: 'license_business',
-    max_devices: 25000,
-    metadata_json: { tier: 'business' },
-    starts_at: '2026-05-01T00:00:00Z',
-    status: 'active',
   },
 ]
 
@@ -301,7 +273,6 @@ export const subscriptionRecords: SubscriptionRecord[] = [
     },
     expires_at: '2026-09-30T00:00:00Z',
     id: 'sub_default',
-    license_id: 'license_business',
     node_id: 'node_mow_02',
     public_id: 'sub_pub_default',
     public_manifest_url: '/api/v1/subscriptions/public/sub_pub_default/manifest',

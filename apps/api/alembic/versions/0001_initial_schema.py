@@ -34,24 +34,6 @@ def upgrade() -> None:
     op.create_index("ix_users_email", "users", ["email"], unique=False)
 
     op.create_table(
-        "licenses",
-        sa.Column("license_key_hash", sa.String(length=128), nullable=False),
-        sa.Column("customer_ref", sa.String(length=128), nullable=True),
-        sa.Column("status", sa.String(length=32), nullable=False),
-        sa.Column("max_devices", sa.Integer(), nullable=False),
-        sa.Column("starts_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("expires_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("metadata_json", sa.JSON(), nullable=False),
-        sa.Column("id", sa.Uuid(), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
-        sa.PrimaryKeyConstraint("id", name="pk_licenses"),
-        sa.UniqueConstraint("license_key_hash", name="uq_licenses_license_key_hash"),
-    )
-    op.create_index("ix_licenses_customer_ref", "licenses", ["customer_ref"], unique=False)
-    op.create_index("ix_licenses_license_key_hash", "licenses", ["license_key_hash"], unique=False)
-
-    op.create_table(
         "nodes",
         sa.Column("name", sa.String(length=128), nullable=False),
         sa.Column("region", sa.String(length=64), nullable=False),
@@ -219,7 +201,6 @@ def upgrade() -> None:
         "subscriptions",
         sa.Column("public_id", sa.String(length=64), nullable=False),
         sa.Column("user_id", sa.Uuid(), nullable=False),
-        sa.Column("license_id", sa.Uuid(), nullable=False),
         sa.Column("node_id", sa.Uuid(), nullable=True),
         sa.Column("status", sa.String(length=32), nullable=False),
         sa.Column("delivery_profile", sa.JSON(), nullable=False),
@@ -229,12 +210,6 @@ def upgrade() -> None:
         sa.Column("id", sa.Uuid(), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
-        sa.ForeignKeyConstraint(
-            ["license_id"],
-            ["licenses.id"],
-            name="fk_subscriptions_license_id_licenses",
-            ondelete="RESTRICT",
-        ),
         sa.ForeignKeyConstraint(
             ["node_id"],
             ["nodes.id"],
@@ -250,7 +225,6 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id", name="pk_subscriptions"),
         sa.UniqueConstraint("public_id", name="uq_subscriptions_public_id"),
     )
-    op.create_index("ix_subscriptions_license_id", "subscriptions", ["license_id"], unique=False)
     op.create_index("ix_subscriptions_node_id", "subscriptions", ["node_id"], unique=False)
     op.create_index("ix_subscriptions_public_id", "subscriptions", ["public_id"], unique=False)
     op.create_index("ix_subscriptions_user_id", "subscriptions", ["user_id"], unique=False)
@@ -260,7 +234,6 @@ def downgrade() -> None:
     op.drop_index("ix_subscriptions_user_id", table_name="subscriptions")
     op.drop_index("ix_subscriptions_public_id", table_name="subscriptions")
     op.drop_index("ix_subscriptions_node_id", table_name="subscriptions")
-    op.drop_index("ix_subscriptions_license_id", table_name="subscriptions")
     op.drop_table("subscriptions")
 
     op.drop_index("ix_user_sessions_user_id", table_name="user_sessions")
@@ -292,10 +265,6 @@ def downgrade() -> None:
     op.drop_index("ix_nodes_agent_token_hash", table_name="nodes")
     op.drop_index("ix_nodes_region", table_name="nodes")
     op.drop_table("nodes")
-
-    op.drop_index("ix_licenses_license_key_hash", table_name="licenses")
-    op.drop_index("ix_licenses_customer_ref", table_name="licenses")
-    op.drop_table("licenses")
 
     op.drop_index("ix_users_email", table_name="users")
     op.drop_table("users")

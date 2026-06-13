@@ -2,8 +2,9 @@
 
 ## Public repo scope
 
-This repo contains installer, deployment templates, release metadata, and public
-operator docs only. Private application source remains in private repositories.
+This repo is the public open-source monorepo for Lumen VPN. Backend, node-agent,
+web UI, deployment templates, release metadata, and operator docs are intended
+to live here.
 
 ## Secrets
 
@@ -15,9 +16,7 @@ placeholders and file paths only.
 All production images are configured through environment variables and must be
 pinned by digest from a release manifest.
 
-## License
+## Product access
 
-The public scaffold exposes free mode with `FREE_NODE_LIMIT=3` and file-based
-license placeholders. Final enforcement belongs to the private backend/license
-service.
-
+Lumen VPN is distributed as an open-source self-hosted project. Access control
+is handled by normal admin/user permissions and server operation policy.

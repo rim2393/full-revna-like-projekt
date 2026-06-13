@@ -27,7 +27,6 @@ function createTestClient(overrides: Partial<LumenApiClient> = {}): LumenApiClie
       source: 'development',
       total: 0,
     }),
-    readLicense: async () => null,
     ...overrides,
   }
 }

@@ -5,7 +5,6 @@ import {
   useCreateSubscription,
   useDeleteSubscription,
   useHostsPageData,
-  useLicensesPageData,
   useLookupSubscriptions,
   useNodesPageData,
   useProfilesPageData,
@@ -15,7 +14,7 @@ import {
   useUpdateSubscription,
   useUsersPageData,
 } from '../shared/api/resourceHooks'
-import type { HostRecord, LicenseRecord, ProtocolProfileRecord, SubscriptionCreateRequest, SubscriptionRecord } from '../shared/api/types'
+import type { HostRecord, ProtocolProfileRecord, SubscriptionCreateRequest, SubscriptionRecord } from '../shared/api/types'
 import { OperatorGuide } from '../shared/components/OperatorGuide'
 import {
   FormError,
@@ -32,7 +31,6 @@ export function SubscriptionPage() {
   const { t } = useI18n()
   const query = useSubscriptionsPageData()
   const usersQuery = useUsersPageData()
-  const licensesQuery = useLicensesPageData()
   const nodesQuery = useNodesPageData()
   const profilesQuery = useProfilesPageData()
   const hostsQuery = useHostsPageData()
@@ -48,7 +46,6 @@ export function SubscriptionPage() {
   const deviceQuery = useSubscriptionDevices(selectedDeviceSubscriptionId)
   const subscriptions = query.data?.items ?? []
   const users = usersQuery.data?.items ?? []
-  const licenses = licensesQuery.data?.items ?? []
   const nodes = nodesQuery.data?.items ?? []
   const activeSubscription = subscriptions.find((subscription) => subscription.status === 'active') ?? subscriptions[0]
   const activeRenderability = activeSubscription ? getSubscriptionRenderability(activeSubscription) : null
@@ -120,7 +117,7 @@ export function SubscriptionPage() {
         </div>
       }
       columns={['Public ID', 'User', 'Node', 'Delivery profile', 'Formats', 'Expires', 'Config hash', 'Status', 'Actions']}
-      emptyDescription="Subscription records will appear after user/license/node bindings are created."
+      emptyDescription="Subscription records will appear after user and node bindings are created."
       emptyTitle="No subscriptions"
       error={query.error}
       errorTitle="Subscriptions unavailable"
@@ -173,9 +170,7 @@ export function SubscriptionPage() {
       }
       createForm={
         <SubscriptionCreateForm
-          defaultLicenseId={licenses[0]?.id ?? subscriptions[0]?.license_id ?? ''}
           hosts={hostsQuery.data?.items ?? []}
-          licenses={licenses}
           nodes={nodes}
           onCreate={async (request) => {
             await createSubscription.mutateAsync(request)
@@ -259,18 +254,14 @@ function SubscriptionActions({
 }
 
 function SubscriptionCreateForm({
-  defaultLicenseId,
   hosts,
-  licenses,
   nodes,
   onCreate,
   pending,
   profiles,
   users,
 }: {
-  defaultLicenseId: string
   hosts: HostRecord[]
-  licenses: LicenseRecord[]
   nodes: Array<{ id: string; name: string; public_address: string }>
   onCreate: (request: SubscriptionCreateRequest) => Promise<void>
   pending: boolean
@@ -279,7 +270,6 @@ function SubscriptionCreateForm({
 }) {
   const { t } = useI18n()
   const [userId, setUserId] = useState(users[0]?.id ?? '')
-  const [licenseId, setLicenseId] = useState(defaultLicenseId)
   const [nodeId, setNodeId] = useState(nodes[0]?.id ?? '')
   const [profileId, setProfileId] = useState('')
   const [hostId, setHostId] = useState('')
@@ -308,13 +298,6 @@ function SubscriptionCreateForm({
   }, [userId, users])
 
   useEffect(() => {
-    const fallbackLicenseId = licenses[0]?.id ?? defaultLicenseId
-    if (fallbackLicenseId && (!licenseId || !licenses.some((license) => license.id === licenseId))) {
-      setLicenseId(fallbackLicenseId)
-    }
-  }, [defaultLicenseId, licenseId, licenses])
-
-  useEffect(() => {
     if (!nodeId && nodes[0]?.id) {
       setNodeId(nodes[0].id)
     }
@@ -324,8 +307,8 @@ function SubscriptionCreateForm({
     event.preventDefault()
     setFormError(null)
     try {
-      if (!userId || !licenseId.trim() || !nodeId) {
-        setFormError(t('User, license, and node are required.'))
+      if (!userId || !nodeId) {
+        setFormError(t('User and node are required.'))
         return
       }
       const parsedDeliveryProfile = parseDeliveryProfile(deliveryProfile)
@@ -348,7 +331,6 @@ function SubscriptionCreateForm({
         config_hash: configHash.trim() || null,
         delivery_profile: parsedDeliveryProfile,
         expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
-        license_id: licenseId.trim(),
         node_id: nodeId,
         user_id: userId,
       })
@@ -371,17 +353,6 @@ function SubscriptionCreateForm({
           {users.map((user) => (
             <option key={user.id} value={user.id}>
               {user.username ?? user.email}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label htmlFor="subscription-license">
-        {t('License')}
-        <select id="subscription-license" required value={licenseId} onChange={(event) => setLicenseId(event.target.value)}>
-          <option value="">{t('Select license')}</option>
-          {licenses.map((license) => (
-            <option key={license.id} value={license.id}>
-              {formatLicenseOption(license)}
             </option>
           ))}
         </select>
@@ -488,12 +459,6 @@ function parseDeliveryProfile(value: string): Record<string, string> {
       profile[key] = parsedValue
       return profile
     }, {})
-}
-
-function formatLicenseOption(license: LicenseRecord) {
-  const customer = license.customer_ref ?? license.id
-  const expiry = license.expires_at ? `expires ${formatDateTime(license.expires_at)}` : 'no expiry'
-  return `${customer} · ${license.status} · ${license.max_devices} devices · ${expiry}`
 }
 
 function SubscriptionSidePanel({
