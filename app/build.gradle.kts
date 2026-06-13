@@ -105,6 +105,7 @@ ksp {
 }
 
 val hiddifyCoreAarFile = layout.buildDirectory.file("generated/hiddify-core/hiddify-core-sanitized.aar")
+val hiddifyCoreClassesJarFile = layout.buildDirectory.file("generated/hiddify-core/classes.jar")
 
 val prepareHiddifyCoreAar by tasks.registering {
     val upstreamAar = layout.projectDirectory.file("libs/hiddify-core.aar")
@@ -142,10 +143,37 @@ val prepareHiddifyCoreAar by tasks.registering {
     }
 }
 
+val extractHiddifyCoreClassesJar by tasks.registering {
+    val upstreamAar = layout.projectDirectory.file("libs/hiddify-core.aar")
+
+    inputs.file(upstreamAar)
+    outputs.file(hiddifyCoreClassesJarFile)
+
+    doLast {
+        val output = hiddifyCoreClassesJarFile.get().asFile
+        output.parentFile.mkdirs()
+        ZipInputStream(upstreamAar.asFile.inputStream().buffered()).use { input ->
+            var entry = input.nextEntry
+            var found = false
+            while (entry != null) {
+                if (entry.name == "classes.jar") {
+                    output.outputStream().buffered().use { input.copyTo(it) }
+                    found = true
+                    break
+                }
+                input.closeEntry()
+                entry = input.nextEntry
+            }
+            check(found) { "classes.jar was not found in hiddify-core.aar" }
+        }
+    }
+}
+
 val hiddifyCoreAar = files(hiddifyCoreAarFile).builtBy(prepareHiddifyCoreAar)
+val hiddifyCoreClassesJar = files(hiddifyCoreClassesJarFile).builtBy(extractHiddifyCoreClassesJar)
 
 dependencies {
-    compileOnly(files("libs/hiddify-core.aar"))
+    compileOnly(hiddifyCoreClassesJar)
     runtimeOnly(hiddifyCoreAar)
     implementation(project(":amnezia-openvpn"))
     implementation("com.zaneschepke:amneziawg-android:2.3.7")
