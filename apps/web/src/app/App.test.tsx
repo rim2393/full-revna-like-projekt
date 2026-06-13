@@ -5,6 +5,12 @@ import { createDevelopmentLumenApiClient } from '../shared/api/developmentClient
 import type { LumenApiClient } from '../shared/api/types'
 import { developmentSession } from '../shared/data/developmentFixtures'
 import { renderWithRouter } from '../test/renderWithRouter'
+import { appRoutes } from './routes'
+
+function adminChildPaths() {
+  const adminRoute = appRoutes.find((route) => route.path === '/')
+  return new Set((adminRoute?.children ?? []).map((route) => String(route.path ?? '')))
+}
 
 describe('Lumen admin routing', () => {
   beforeEach(() => {
@@ -52,6 +58,30 @@ describe('Lumen admin routing', () => {
     expect(screen.getByRole('combobox', { name: /interface language/i })).toBeInTheDocument()
     expect(await screen.findByText('1 / 1')).toBeInTheDocument()
     expect(screen.getByText('Live API')).toBeInTheDocument()
+  })
+
+  it('keeps all production admin resource routes mounted', () => {
+    expect(adminChildPaths()).toEqual(
+      new Set([
+        '',
+        '*',
+        'api-keys',
+        'dashboard',
+        'hosts',
+        'node-plugins',
+        'nodes',
+        'profiles',
+        'response-rules',
+        'settings',
+        'squads',
+        'subscription',
+        'subscription-page',
+        'templates',
+        'tools',
+        'users',
+        'users/:userId',
+      ]),
+    )
   })
 
   it('wires shell controls to real UI state and routes', async () => {
