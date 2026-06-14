@@ -421,6 +421,19 @@ test("renders device binding page without mojibake text", () => {
   assertNoMojibake(html);
 });
 
+test("subscription portal keeps long provider names out of the header brand", () => {
+  const html = renderSubscriptionPageHtml({
+    publicUrl: "https://sub.example/sub/lumen_sub_abc1234567890xyz",
+    manifest: {
+      provider: { name: "Lumen dev test 2026-06-14 15:22 UTC" },
+      subscription: { id: "lumen_sub_abc1234567890xyz" },
+      metadata: { profileTitle: "Lumen dev test 2026-06-14 15:22 UTC" }
+    }
+  });
+
+  assert.match(html, /<div class="brand"><span class="mark" aria-hidden="true"><\/span>Lumen<\/div>/);
+});
+
 test("subscription nginx CSP permits inline portal assets", () => {
   const config = readFileSync(new URL("../../../deploy/nginx/lumen-subscription.conf.template", import.meta.url), "utf8");
 

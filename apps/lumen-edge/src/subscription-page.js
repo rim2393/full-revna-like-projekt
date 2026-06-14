@@ -164,6 +164,7 @@ export function renderDeviceBindingHtml({ publicId, publicUrl }) {
 
 export function renderSubscriptionPageHtml({ manifest, publicUrl }) {
   const provider = manifest.provider?.name || "Lumen";
+  const brand = provider.length > 20 ? "Lumen" : provider;
   const subpage = normalizeSubpageConfig(manifest.metadata?.subpage);
   const title = subpage.title || manifest.metadata?.profileTitle || provider;
   const subscription = manifest.subscription ?? {};
@@ -258,7 +259,7 @@ export function renderSubscriptionPageHtml({ manifest, publicUrl }) {
 <body class="${escapeHtml(subpage.theme ? `theme-${cssToken(subpage.theme)}` : "")}">
   <main>
     <header>
-      <div class="brand"><span class="mark" aria-hidden="true"></span>${escapeHtml(provider)}</div>
+      <div class="brand"><span class="mark" aria-hidden="true"></span>${escapeHtml(brand)}</div>
       <a class="telegram" href="${escapeHtml(supportUrl)}" aria-label="${escapeHtml(supportText)}">Help</a>
     </header>
     ${showStatus ? `<section class="card hero" data-subpage-config-id="${escapeHtml(subpage.configId ?? "")}" data-subpage-config-name="${escapeHtml(subpage.configName ?? "")}">
