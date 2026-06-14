@@ -132,6 +132,15 @@ jobs:
           EOF
           docker compose --env-file /tmp/lumen-node.env -f deploy/compose/lumen-node.yml config >/tmp/lumen-node-compose.yml
 
+  installer-dry-run:
+    name: Installer dry run
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+      - name: Validate installer dry run
+        run: bash scripts/install.sh --config .env.example --dry-run --non-interactive
+
   secret-scan:
     name: Secret scan
     runs-on: ubuntu-24.04

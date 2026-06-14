@@ -1,13 +1,10 @@
 # Remaining work
 
-- Public release images still need to be built, signed, and published from the
-  current source. The source image definitions now provide the installer
-  entrypoints: `lumen-api migrate`, `lumen-api bootstrap-admin`,
-  `lumen-api healthcheck`, and `lumen-node-agent healthcheck`.
-- Release manifests must be generated, signed, and published by the open-source
-  release pipeline.
+- Public release images and a signed release manifest are produced by the
+  GitHub release pipeline. The current production server was upgraded from a
+  pinned manifest, and CI also validates the installer dry-run path.
 - End-to-end install validation on fresh Debian/Ubuntu VPS images is still
-  required.
+  required before claiming fresh-host install completion.
 - The typed `lumenctl` command is not included in this public Bash scaffold.
 - Panel-initiated SSH push node provisioning is not supported in the current
   public release path. The supported node path is token-based bootstrap with

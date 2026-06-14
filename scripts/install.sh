@@ -168,6 +168,10 @@ issue_cert() {
 }
 
 issue_certificates() {
+  if [ "$DRY_RUN" = "1" ]; then
+    log "would issue TLS certificates for $PANEL_DOMAIN and $SUBSCRIPTION_DOMAIN"
+    return 0
+  fi
   ensure_acme_sh
   issue_cert "$PANEL_DOMAIN"
   if [ "$SUBSCRIPTION_DOMAIN" != "$PANEL_DOMAIN" ]; then
