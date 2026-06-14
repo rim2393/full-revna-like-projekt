@@ -5,6 +5,7 @@ CONFIG_FILE="/opt/lumen/.env"
 OUTPUT_DIR=""
 PASSPHRASE_FILE=""
 ALLOW_PLAINTEXT=0
+BACKUP_WORK_DIR=""
 
 usage() {
   cat <<'USAGE'
@@ -35,6 +36,13 @@ done
 # shellcheck source=scripts/lib/common.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/common.sh"
 
+cleanup_backup_work() {
+  if [ -n "${BACKUP_WORK_DIR:-}" ]; then
+    rm -rf "$BACKUP_WORK_DIR"
+    BACKUP_WORK_DIR=""
+  fi
+}
+
 create_backup() {
   local ts work archive encrypted
   ts="$(date -u +%Y%m%dT%H%M%SZ)"
@@ -57,7 +65,8 @@ create_backup() {
   mkdir -p "$OUTPUT_DIR"
   chmod 0700 "$OUTPUT_DIR"
   work="$(mktemp -d)"
-  trap 'rm -rf "$work"' RETURN
+  BACKUP_WORK_DIR="$work"
+  trap cleanup_backup_work RETURN
 
   mkdir -p "$work/db" "$work/config" "$work/secrets" "$work/data" "$work/nginx" "$work/meta"
   compose exec -T postgres pg_dump -U lumen -d lumen --format=custom >"$work/db/postgres.dump"
@@ -85,6 +94,8 @@ create_backup() {
   else
     warn "plaintext backup created: $archive"
   fi
+  cleanup_backup_work
+  trap - RETURN
 }
 
 main() {
