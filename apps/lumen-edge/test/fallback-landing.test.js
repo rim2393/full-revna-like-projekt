@@ -212,6 +212,8 @@ test("renders browser subscription portal while preserving client render endpoin
     assert.match(body, /happ:\/\/add\/https?%3A%2F%2F127\.0\.0\.1%3A\d+%2Fsub%2Flumen_sub_abc1234567890xyz%2Fhapp%3Fraw%3D1/);
     assert.match(body, /happ:\/\/import\/https?%3A%2F%2F127\.0\.0\.1%3A\d+%2Fsub%2Flumen_sub_abc1234567890xyz%2Fhapp%3Fraw%3D1/);
     assert.match(body, /data-copy-url/);
+    assert.match(body, /data-lumen-qr="raw-happ"/);
+    assert.match(body, /data-qr-value="http:\/\/127\.0\.0\.1:\d+\/sub\/lumen_sub_abc1234567890xyz\/happ\?raw=1"/);
     assert.match(body, /\/sub\/lumen_sub_abc1234567890xyz\/happ\?raw=1/);
     assert.match(body, /\/sub\/lumen_sub_abc1234567890xyz\/mihomo/);
     assert.match(body, /\/sub\/lumen_sub_abc1234567890xyz\/v2ray-base64/);
@@ -296,6 +298,7 @@ test("uses forwarded public URL for subscription portal links", async () => {
     assert.equal(response.status, 200);
     assert.match(body, /https:\/\/sub\.example\/sub\/lumen_sub_abc1234567890xyz\/hiddify/);
     assert.match(body, /happ:\/\/import\/https%3A%2F%2Fsub\.example%2Fsub%2Flumen_sub_abc1234567890xyz%2Fhapp%3Fraw%3D1/);
+    assert.match(body, /data-qr-value="https:\/\/sub\.example\/sub\/lumen_sub_abc1234567890xyz\/happ\?raw=1"/);
     assert.doesNotMatch(body, /http:\/\/sub\.example/);
     assert.equal(upstreamCalls[0].url, "http://api.internal:8000/api/v1/subscriptions/public/lumen_sub_abc1234567890xyz/manifest");
     assert.equal(upstreamCalls[0].options.headers["X-Forwarded-Host"], "sub.example");

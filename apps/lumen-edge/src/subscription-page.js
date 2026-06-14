@@ -1,3 +1,5 @@
+import QRCode from "qrcode";
+
 export const SUBSCRIPTION_PAGE_MODEL_VERSION = "lumen.edge.subscription-page.v1";
 
 const CLIENTS = Object.freeze([
@@ -194,6 +196,7 @@ export function renderSubscriptionPageHtml({ manifest, publicUrl }) {
   });
   const happLink = clientLinks.find((client) => client.key === "happ");
   const rawSubscriptionUrl = happLink?.targetUrl ?? `${publicUrl}/v2ray`;
+  const qrSvg = renderQrSvg(rawSubscriptionUrl);
 
   return `<!doctype html>
 <html lang="ru">
@@ -228,12 +231,16 @@ export function renderSubscriptionPageHtml({ manifest, publicUrl }) {
     .app span { color: #94a3b8; font-size: 12px; }
     .app em { color: #67e8f9; font-style: normal; font-size: 13px; }
     .copy { margin-top: 18px; display: grid; gap: 10px; }
+    .qr-import { display: grid; grid-template-columns: minmax(160px, 190px) 1fr; gap: 18px; align-items: center; margin-bottom: 18px; }
+    .qr-box { display: grid; place-items: center; width: 100%; aspect-ratio: 1; border: 1px solid #334155; border-radius: 12px; background: #f8fafc; padding: 12px; }
+    .qr-box svg { width: 100%; height: 100%; display: block; }
+    .qr-help { display: grid; gap: 8px; }
     .import-actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 16px; }
     .import-action { border: 1px solid #334155; background: #111827; color: #edf2f7; border-radius: 10px; padding: 11px 14px; text-decoration: none; font-weight: 800; }
     .import-action.primary { border-color: #22d3ee; color: #67e8f9; }
     button.import-action { cursor: pointer; font: inherit; }
     code { display: block; word-break: break-all; color: #cbd5e1; background: #0f172a; border: 1px solid #334155; border-radius: 10px; padding: 12px; }
-    @media (max-width: 620px) { header { padding: 18px; } .card { padding: 22px 18px; } .grid { grid-template-columns: 1fr; } }
+    @media (max-width: 620px) { header { padding: 18px; } .card { padding: 22px 18px; } .grid, .qr-import { grid-template-columns: 1fr; } .qr-box { max-width: 220px; justify-self: center; } }
   </style>
 </head>
 <body class="${escapeHtml(subpage.theme ? `theme-${cssToken(subpage.theme)}` : "")}">
@@ -271,6 +278,13 @@ export function renderSubscriptionPageHtml({ manifest, publicUrl }) {
     </section>` : ""}
     ${showLinks ? `<section class="card">
       <h2>Manual import URLs</h2>
+      <div class="qr-import">
+        <div class="qr-box" aria-label="QR code for raw Happ subscription">${qrSvg}</div>
+        <div class="qr-help">
+          <strong>QR import</strong>
+          <p class="muted">Scan this code from Happ or another compatible client. It contains the same Raw Happ URL as the buttons above.</p>
+        </div>
+      </div>
       <div class="copy">
         <p class="muted">Для ручного импорта используйте универсальный URL или нужный URL формата:</p>
         <code>${escapeHtml(rawSubscriptionUrl)}</code>
@@ -293,6 +307,25 @@ export function renderSubscriptionPageHtml({ manifest, publicUrl }) {
   </script>
 </body>
 </html>`;
+}
+
+export function renderQrSvg(value) {
+  const qr = QRCode.create(String(value ?? ""), {
+    errorCorrectionLevel: "M",
+    margin: 2
+  });
+  const size = qr.modules.size;
+  const margin = 2;
+  const viewBoxSize = size + margin * 2;
+  const rects = [];
+  for (let y = 0; y < size; y += 1) {
+    for (let x = 0; x < size; x += 1) {
+      if (qr.modules.get(x, y)) {
+        rects.push(`<rect x="${x + margin}" y="${y + margin}" width="1" height="1"/>`);
+      }
+    }
+  }
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${viewBoxSize} ${viewBoxSize}" role="img" data-lumen-qr="raw-happ" data-qr-value="${escapeHtml(value)}"><rect width="${viewBoxSize}" height="${viewBoxSize}" fill="#fff"/><g fill="#000">${rects.join("")}</g></svg>`;
 }
 
 function normalizeSubpageConfig(value) {
