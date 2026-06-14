@@ -13,7 +13,7 @@ const CLIENTS = Object.freeze([
     label: "Happ",
     platform: "Android, iOS, Windows, macOS",
     renderer: "Raw URI subscription",
-    scheme: null
+    scheme: "happ"
   },
   {
     key: "v2ray",
@@ -176,18 +176,24 @@ export function renderSubscriptionPageHtml({ manifest, publicUrl }) {
   const showApps = enabledCards.size === 0 || enabledCards.has("apps");
   const showLinks = enabledCards.size === 0 || enabledCards.has("links") || enabledCards.has("qr");
   const clientLinks = CLIENTS.map((client) => {
-    const targetUrl = `${publicUrl}/${client.key}`;
+    const targetUrl = client.key === "happ" ? `${publicUrl}/${client.key}?raw=1` : `${publicUrl}/${client.key}`;
     const encodedTargetUrl = encodeURIComponent(targetUrl);
     let importUrl = targetUrl;
+    let iosImportUrl = targetUrl;
     if (client.scheme === "hiddify") {
       importUrl = `hiddify://import/${targetUrl}#${encodeURIComponent(title)}`;
+    }
+    if (client.scheme === "happ") {
+      importUrl = `happ://add/${encodedTargetUrl}`;
+      iosImportUrl = `happ://import/${encodedTargetUrl}`;
     }
     if (client.scheme === "v2rayng") {
       importUrl = `v2rayng://install-sub?url=${encodedTargetUrl}#${encodeURIComponent(title)}`;
     }
-    return { ...client, importUrl, targetUrl };
+    return { ...client, importUrl, iosImportUrl, targetUrl };
   });
-  const rawSubscriptionUrl = `${publicUrl}/v2ray`;
+  const happLink = clientLinks.find((client) => client.key === "happ");
+  const rawSubscriptionUrl = happLink?.targetUrl ?? `${publicUrl}/v2ray`;
 
   return `<!doctype html>
 <html lang="ru">
@@ -222,6 +228,10 @@ export function renderSubscriptionPageHtml({ manifest, publicUrl }) {
     .app span { color: #94a3b8; font-size: 12px; }
     .app em { color: #67e8f9; font-style: normal; font-size: 13px; }
     .copy { margin-top: 18px; display: grid; gap: 10px; }
+    .import-actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 16px; }
+    .import-action { border: 1px solid #334155; background: #111827; color: #edf2f7; border-radius: 10px; padding: 11px 14px; text-decoration: none; font-weight: 800; }
+    .import-action.primary { border-color: #22d3ee; color: #67e8f9; }
+    button.import-action { cursor: pointer; font: inherit; }
     code { display: block; word-break: break-all; color: #cbd5e1; background: #0f172a; border: 1px solid #334155; border-radius: 10px; padding: 12px; }
     @media (max-width: 620px) { header { padding: 18px; } .card { padding: 22px 18px; } .grid { grid-template-columns: 1fr; } }
   </style>
@@ -249,6 +259,12 @@ export function renderSubscriptionPageHtml({ manifest, publicUrl }) {
     </section>` : ""}
     ${showApps ? `<section class="card">
       <h2>Добавить подписку</h2>
+      ${happLink ? `<div class="import-actions" aria-label="Happ import actions">
+        <a class="import-action primary" href="${escapeHtml(happLink.importUrl)}" data-client-link data-client="Happ">Open Happ</a>
+        <a class="import-action" href="${escapeHtml(happLink.iosImportUrl)}" data-client-link data-client="Happ iOS">Open Happ iOS</a>
+        <a class="import-action" href="${escapeHtml(happLink.targetUrl)}">Raw Happ</a>
+        <button class="import-action" type="button" data-copy-url data-url="${escapeHtml(happLink.targetUrl)}">Copy Raw</button>
+      </div>` : ""}
       <div class="apps">
         ${clientLinks.map((client) => `<a class="app" href="${escapeHtml(client.importUrl)}"><strong>${escapeHtml(client.label)}</strong><span>${escapeHtml(client.platform)}</span><em>${escapeHtml(client.renderer)}</em></a>`).join("")}
       </div>
@@ -262,6 +278,19 @@ export function renderSubscriptionPageHtml({ manifest, publicUrl }) {
       </div>
     </section>` : ""}
   </main>
+  <script>
+    document.querySelectorAll("[data-copy-url]").forEach((button) => {
+      button.addEventListener("click", async () => {
+        const value = button.dataset.url || "";
+        try {
+          await navigator.clipboard.writeText(value);
+          button.textContent = "Copied";
+        } catch {
+          button.textContent = "Open Raw and copy";
+        }
+      });
+    });
+  </script>
 </body>
 </html>`;
 }

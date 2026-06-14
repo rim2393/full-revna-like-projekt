@@ -209,6 +209,10 @@ test("renders browser subscription portal while preserving client render endpoin
     assert.match(response.headers.get("content-type"), /text\/html/);
     assert.match(body, /Lumen Live Compat/);
     assert.match(body, /Hiddify/);
+    assert.match(body, /happ:\/\/add\/https?%3A%2F%2F127\.0\.0\.1%3A\d+%2Fsub%2Flumen_sub_abc1234567890xyz%2Fhapp%3Fraw%3D1/);
+    assert.match(body, /happ:\/\/import\/https?%3A%2F%2F127\.0\.0\.1%3A\d+%2Fsub%2Flumen_sub_abc1234567890xyz%2Fhapp%3Fraw%3D1/);
+    assert.match(body, /data-copy-url/);
+    assert.match(body, /\/sub\/lumen_sub_abc1234567890xyz\/happ\?raw=1/);
     assert.match(body, /\/sub\/lumen_sub_abc1234567890xyz\/mihomo/);
     assert.match(body, /\/sub\/lumen_sub_abc1234567890xyz\/v2ray-base64/);
     assert.match(body, /Подписка активна/);
@@ -291,6 +295,7 @@ test("uses forwarded public URL for subscription portal links", async () => {
 
     assert.equal(response.status, 200);
     assert.match(body, /https:\/\/sub\.example\/sub\/lumen_sub_abc1234567890xyz\/hiddify/);
+    assert.match(body, /happ:\/\/import\/https%3A%2F%2Fsub\.example%2Fsub%2Flumen_sub_abc1234567890xyz%2Fhapp%3Fraw%3D1/);
     assert.doesNotMatch(body, /http:\/\/sub\.example/);
     assert.equal(upstreamCalls[0].url, "http://api.internal:8000/api/v1/subscriptions/public/lumen_sub_abc1234567890xyz/manifest");
     assert.equal(upstreamCalls[0].options.headers["X-Forwarded-Host"], "sub.example");
@@ -298,6 +303,27 @@ test("uses forwarded public URL for subscription portal links", async () => {
   } finally {
     await close(server);
   }
+});
+
+test("subscription portal exposes Happ raw import actions", () => {
+  const html = renderSubscriptionPageHtml({
+    publicUrl: "https://sub.example/sub/lumen_sub_abc1234567890xyz",
+    manifest: {
+      provider: { name: "Lumen" },
+      subscription: { id: "lumen_sub_abc1234567890xyz" },
+      metadata: { profileTitle: "Lumen Live Compat" }
+    }
+  });
+
+  const rawHappUrl = "https://sub.example/sub/lumen_sub_abc1234567890xyz/happ?raw=1";
+  const encodedRawHappUrl = encodeURIComponent(rawHappUrl);
+
+  assert.match(html, new RegExp(`happ://add/${encodedRawHappUrl}`));
+  assert.match(html, new RegExp(`happ://import/${encodedRawHappUrl}`));
+  assert.match(html, /data-client-link data-client="Happ"/);
+  assert.match(html, /data-client-link data-client="Happ iOS"/);
+  assert.match(html, new RegExp(`data-copy-url data-url="${rawHappUrl.replaceAll("?", "\\?")}"`));
+  assert.match(html, new RegExp(`<code>${rawHappUrl.replaceAll("?", "\\?")}</code>`));
 });
 
 test("builds external request URL from forwarded headers", () => {
