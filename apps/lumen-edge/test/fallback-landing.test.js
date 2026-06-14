@@ -196,7 +196,7 @@ test("renders browser subscription portal while preserving client render endpoin
         schemaVersion: "lumen.subscription-manifest.v1",
         provider: { name: "Lumen" },
         subscription: { id: "lumen_sub_abc1234567890xyz", expiresAt: "2027-12-20T00:00:00Z" },
-        nodes: [],
+        nodes: [{ protocols: [{ type: "vless-reality" }, { type: "hysteria2" }] }],
         metadata: { profileTitle: "Lumen Live Compat", supportUrl: "https://t.me/lumen" }
       }), {
         status: 200,
@@ -225,7 +225,8 @@ test("renders browser subscription portal while preserving client render endpoin
     assert.match(body, /\/sub\/lumen_sub_abc1234567890xyz\/mihomo/);
     assert.match(body, /\/sub\/lumen_sub_abc1234567890xyz\/v2ray-base64/);
     assert.match(body, /Subscription is active/);
-    assert.match(body, /1 live server/);
+    assert.match(body, /1 server/);
+    assert.match(body, /2 protocols/);
     assert.match(body, /Streisand/);
     assert.match(body, /Shadowrocket/);
     assert.equal(upstreamCalls[0].url, "http://api.internal:8000/api/v1/subscriptions/public/lumen_sub_abc1234567890xyz/manifest");

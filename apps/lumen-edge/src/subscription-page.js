@@ -171,7 +171,14 @@ export function renderSubscriptionPageHtml({ manifest, publicUrl }) {
   const serverCount = Array.isArray(manifest.nodes) && manifest.nodes.length > 0
     ? manifest.nodes.length
     : 1;
-  const serverLabel = serverCount === 1 ? "1 live server" : `${serverCount} live servers`;
+  const protocolCount = Array.isArray(manifest.nodes)
+    ? manifest.nodes.reduce((count, node) => {
+      const protocols = Array.isArray(node?.protocols) ? node.protocols.length : 0;
+      return count + protocols;
+    }, 0)
+    : 0;
+  const serverLabel = serverCount === 1 ? "1 server" : `${serverCount} servers`;
+  const protocolLabel = protocolCount === 1 ? "1 protocol" : `${protocolCount} protocols`;
   const expiresAt = subscription.expiresAt ? new Date(subscription.expiresAt) : null;
   const expiresText = expiresAt && !Number.isNaN(expiresAt.getTime())
     ? expiresAt.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })
@@ -274,6 +281,7 @@ export function renderSubscriptionPageHtml({ manifest, publicUrl }) {
         <div class="info"><span>Profile</span><strong>${escapeHtml(title)}</strong></div>
         <div class="info"><span>Status</span><strong>Active</strong></div>
         <div class="info"><span>Servers</span><strong>${escapeHtml(serverLabel)}</strong></div>
+        <div class="info"><span>Protocols</span><strong>${escapeHtml(protocolLabel)}</strong></div>
         <div class="info"><span>Formats</span><strong>URI / YAML / JSON</strong></div>
       </div>
     </section>` : ""}
