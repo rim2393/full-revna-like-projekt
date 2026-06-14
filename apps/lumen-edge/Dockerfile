@@ -6,6 +6,9 @@ ENV NODE_ENV=production \
 WORKDIR /srv/lumen-edge
 
 COPY --chown=node:node package.json ./
+COPY --chown=node:node package-lock.json ./
+RUN npm ci --omit=dev
+
 COPY --chown=node:node src ./src
 
 USER node
