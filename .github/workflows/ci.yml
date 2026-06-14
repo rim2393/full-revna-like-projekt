@@ -124,7 +124,7 @@ jobs:
           TZ=UTC
           LUMEN_PANEL_URL=https://panel.example.com
           LUMEN_NODE_NAME=ci-node
-          LUMEN_NODE_AGENT_IMAGE=ghcr.io/rim2393/lumen-node-agent:v0.1.0@sha256:0000000000000000000000000000000000000000000000000000000000000000
+          LUMEN_NODE_AGENT_IMAGE=ghcr.io/rim2393/lumen-node-agent:v0.1.0@sha256:ae5fe5c513a29e3ea3993e69b4331e71713e77b2688b96612b0f1833e3703098
           EOF
           docker compose --env-file /tmp/lumen-node.env -f deploy/compose/lumen-node.yml config >/tmp/lumen-node-compose.yml
 
