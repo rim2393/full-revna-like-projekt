@@ -217,7 +217,8 @@ test("renders browser subscription portal while preserving client render endpoin
     assert.match(body, /\/sub\/lumen_sub_abc1234567890xyz\/happ\?raw=1/);
     assert.match(body, /\/sub\/lumen_sub_abc1234567890xyz\/mihomo/);
     assert.match(body, /\/sub\/lumen_sub_abc1234567890xyz\/v2ray-base64/);
-    assert.match(body, /Подписка активна/);
+    assert.match(body, /Subscription is active/);
+    assert.match(body, /1 live server/);
     assert.match(body, /Streisand/);
     assert.match(body, /Shadowrocket/);
     assert.equal(upstreamCalls[0].url, "http://api.internal:8000/api/v1/subscriptions/public/lumen_sub_abc1234567890xyz/manifest");
@@ -396,7 +397,7 @@ test("renders v2rayNG deep link and no mojibake text", () => {
   });
 
   assert.match(html, /v2rayng:\/\/install-sub\?url=/);
-  assert.match(html, /Добавить подписку/);
+  assert.match(html, /Add subscription/);
   assert.doesNotMatch(html, /Рџ|Рґ|Рё|Р°|вњ|в†/);
 });
 

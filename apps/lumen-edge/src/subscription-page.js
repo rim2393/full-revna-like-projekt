@@ -167,10 +167,14 @@ export function renderSubscriptionPageHtml({ manifest, publicUrl }) {
   const subpage = normalizeSubpageConfig(manifest.metadata?.subpage);
   const title = subpage.title || manifest.metadata?.profileTitle || provider;
   const subscription = manifest.subscription ?? {};
+  const serverCount = Array.isArray(manifest.nodes) && manifest.nodes.length > 0
+    ? manifest.nodes.length
+    : 1;
+  const serverLabel = serverCount === 1 ? "1 live server" : `${serverCount} live servers`;
   const expiresAt = subscription.expiresAt ? new Date(subscription.expiresAt) : null;
   const expiresText = expiresAt && !Number.isNaN(expiresAt.getTime())
     ? expiresAt.toLocaleDateString("ru-RU", { year: "numeric", month: "long", day: "numeric" })
-    : "без срока";
+    : "No expiry";
   const supportUrl = manifest.metadata?.supportUrl || "#";
   const supportText = subpage.supportText || "Support";
   const enabledCards = new Set(subpage.cards);
@@ -203,18 +207,18 @@ export function renderSubscriptionPageHtml({ manifest, publicUrl }) {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>${escapeHtml(title)} · Subscription</title>
+  <title>${escapeHtml(title)} - Subscription</title>
   <style>
     :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #10151d; color: #f7fafc; }
     * { box-sizing: border-box; }
-    body { margin: 0; min-height: 100vh; background: linear-gradient(180deg, #10151d 0%, #151a25 100%); }
-    body::before { content: ""; position: fixed; inset: 0; background-image: linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px); background-size: 40px 40px; pointer-events: none; }
+    body { margin: 0; min-height: 100dvh; background: #0f141b; }
+    body::before { content: ""; position: fixed; inset: 0; background: linear-gradient(180deg, rgba(34,211,238,.08), transparent 34%), linear-gradient(90deg, rgba(34,211,238,.08), rgba(45,212,191,.06), transparent 58%); pointer-events: none; }
     main { position: relative; width: min(900px, calc(100% - 32px)); margin: 0 auto; padding: 30px 0 54px; }
-    header, section { border: 1px solid #2d3748; background: rgba(28, 34, 46, .88); border-radius: 16px; }
+    header, section { border: 1px solid #2d3748; background: rgba(23, 31, 43, .94); border-radius: 12px; }
     header { display: flex; justify-content: space-between; gap: 16px; align-items: center; padding: 22px 28px; }
     .brand { display: flex; gap: 12px; align-items: center; font-weight: 800; color: #56dff7; font-size: 22px; }
     .mark { width: 30px; height: 30px; border-left: 4px solid #22d3ee; border-right: 4px solid #22d3ee; border-radius: 7px; }
-    .telegram { display: grid; place-items: center; width: 44px; height: 44px; border: 1px solid #1d9bf0; border-radius: 10px; color: #35d2ff; text-decoration: none; font-weight: 800; }
+    .telegram { display: grid; place-items: center; min-width: 44px; min-height: 44px; padding: 0 12px; border: 1px solid #1d9bf0; border-radius: 10px; color: #35d2ff; text-decoration: none; font-weight: 800; }
     .card { margin-top: 28px; padding: 28px 32px; }
     .status { display: grid; grid-template-columns: 54px 1fr; gap: 14px; align-items: center; }
     .check { width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; background: rgba(16, 185, 129, .15); border: 1px solid #10b981; color: #69f0ae; font-size: 24px; }
@@ -223,7 +227,7 @@ export function renderSubscriptionPageHtml({ manifest, publicUrl }) {
     h2 { font-size: 20px; margin-bottom: 16px; }
     .muted { color: #a6b0c0; margin-top: 4px; }
     .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 22px; }
-    .info { border: 1px solid #334155; border-radius: 10px; padding: 14px; background: rgba(15, 23, 42, .35); }
+    .info { border: 1px solid #334155; border-radius: 10px; padding: 14px; background: rgba(15, 23, 42, .48); }
     .info span { display: block; color: #94a3b8; font-size: 13px; margin-bottom: 5px; }
     .apps { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
     .app { border: 1px solid #334155; background: #1b2330; color: #edf2f7; border-radius: 10px; padding: 14px; text-decoration: none; display: grid; gap: 6px; min-height: 88px; }
@@ -236,7 +240,7 @@ export function renderSubscriptionPageHtml({ manifest, publicUrl }) {
     .qr-box svg { width: 100%; height: 100%; display: block; }
     .qr-help { display: grid; gap: 8px; }
     .import-actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 16px; }
-    .import-action { border: 1px solid #334155; background: #111827; color: #edf2f7; border-radius: 10px; padding: 11px 14px; text-decoration: none; font-weight: 800; }
+    .import-action { min-height: 44px; border: 1px solid #334155; background: #111827; color: #edf2f7; border-radius: 10px; padding: 11px 14px; text-decoration: none; font-weight: 800; }
     .import-action.primary { border-color: #22d3ee; color: #67e8f9; }
     button.import-action { cursor: pointer; font: inherit; }
     code { display: block; word-break: break-all; color: #cbd5e1; background: #0f172a; border: 1px solid #334155; border-radius: 10px; padding: 12px; }
@@ -247,25 +251,26 @@ export function renderSubscriptionPageHtml({ manifest, publicUrl }) {
   <main>
     <header>
       <div class="brand"><span class="mark" aria-hidden="true"></span>${escapeHtml(provider)}</div>
-      <a class="telegram" href="${escapeHtml(supportUrl)}" aria-label="${escapeHtml(supportText)}">↗</a>
+      <a class="telegram" href="${escapeHtml(supportUrl)}" aria-label="${escapeHtml(supportText)}">Help</a>
     </header>
     ${showStatus ? `<section class="card" data-subpage-config-id="${escapeHtml(subpage.configId ?? "")}" data-subpage-config-name="${escapeHtml(subpage.configName ?? "")}">
       <div class="status">
-        <div class="check">✓</div>
+        <div class="check">OK</div>
         <div>
           <h1>${escapeHtml(title)}</h1>
-          <p class="muted">Подписка активна · истекает: ${escapeHtml(expiresText)}</p>
+          <p class="muted">Subscription is active - expires: ${escapeHtml(expiresText)}</p>
         </div>
       </div>
       <div class="grid">
-        <div class="info"><span>Профиль</span><strong>${escapeHtml(title)}</strong></div>
-        <div class="info"><span>Статус</span><strong>Активна</strong></div>
+        <div class="info"><span>Profile</span><strong>${escapeHtml(title)}</strong></div>
+        <div class="info"><span>Status</span><strong>Active</strong></div>
+        <div class="info"><span>Servers</span><strong>${escapeHtml(serverLabel)}</strong></div>
         <div class="info"><span>Subscription ID</span><strong>${escapeHtml(subscription.id || "")}</strong></div>
-        <div class="info"><span>Форматы</span><strong>URI · YAML · JSON</strong></div>
+        <div class="info"><span>Formats</span><strong>URI / YAML / JSON</strong></div>
       </div>
     </section>` : ""}
     ${showApps ? `<section class="card">
-      <h2>Добавить подписку</h2>
+      <h2>Add subscription</h2>
       ${happLink ? `<div class="import-actions" aria-label="Happ import actions">
         <a class="import-action primary" href="${escapeHtml(happLink.importUrl)}" data-client-link data-client="Happ">Open Happ</a>
         <a class="import-action" href="${escapeHtml(happLink.iosImportUrl)}" data-client-link data-client="Happ iOS">Open Happ iOS</a>
@@ -286,7 +291,7 @@ export function renderSubscriptionPageHtml({ manifest, publicUrl }) {
         </div>
       </div>
       <div class="copy">
-        <p class="muted">Для ручного импорта используйте универсальный URL или нужный URL формата:</p>
+        <p class="muted">For manual import, copy the universal URL or a client-specific format URL:</p>
         <code>${escapeHtml(rawSubscriptionUrl)}</code>
         ${clientLinks.map((client) => `<code>${escapeHtml(client.targetUrl)}</code>`).join("")}
       </div>
