@@ -96,6 +96,10 @@ export {
   validateNodePolicy
 } from "./policy-runtime.js";
 export {
+  NODE_AGENT_HEALTHCHECK_VERSION,
+  runNodeAgentHealthcheck
+} from "./healthcheck.js";
+export {
   HEARTBEAT_PAYLOAD_VERSION,
   NODE_AGENT_DRY_RUN_REPORT_VERSION,
   NODE_AGENT_RUNTIME_CONFIG_VERSION,

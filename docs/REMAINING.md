@@ -1,8 +1,9 @@
 # Remaining work
 
-- Public release images must provide the CLI entrypoints used by the installer:
-  `lumen-api migrate`, `lumen-api bootstrap-admin`, `lumen-api healthcheck`,
-  and node-agent registration commands.
+- Public release images still need to be built, signed, and published from the
+  current source. The source image definitions now provide the installer
+  entrypoints: `lumen-api migrate`, `lumen-api bootstrap-admin`,
+  `lumen-api healthcheck`, and `lumen-node-agent healthcheck`.
 - Release manifests must be generated, signed, and published by the open-source
   release pipeline.
 - End-to-end install validation on fresh Debian/Ubuntu VPS images is still

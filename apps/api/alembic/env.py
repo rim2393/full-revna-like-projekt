@@ -19,7 +19,7 @@ target_metadata = Base.metadata
 
 
 def _database_url() -> str:
-    return get_settings().database_url
+    return get_settings().async_database_url
 
 
 def run_migrations_offline() -> None:
@@ -68,4 +68,3 @@ if context.is_offline_mode():
     run_migrations_offline()
 else:
     asyncio.run(run_async_migrations())
-

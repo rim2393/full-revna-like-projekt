@@ -173,7 +173,7 @@ test("apply command pauses node and skips mutating command while paused", () => 
       node_id: "node-1",
       command_type: COMMAND_TYPES.NODE_PAUSE,
       created_at: "2026-05-27T00:01:00.000Z",
-      payload_json: { reason: "license expired" }
+      payload_json: { reason: "operator maintenance window" }
     },
     active,
     {
@@ -184,7 +184,7 @@ test("apply command pauses node and skips mutating command while paused", () => 
 
   assert.equal(pausedResult.status, "succeeded");
   assert.equal(pausedResult.state.mode, NODE_PROVISIONING_MODES.PAUSED);
-  assert.equal(pausedResult.resultJson.outputs.reason, "license expired");
+  assert.equal(pausedResult.resultJson.outputs.reason, "operator maintenance window");
 
   const skippedResult = applyNodeCommand(
     {
@@ -266,7 +266,7 @@ test("apply command persists operator pause mode and reports it in heartbeat", a
   });
   const pausedResult = applyNodeCommand(
     {
-      id: "cmd-pause-license-1",
+      id: "cmd-pause-policy-1",
       node_id: "node-1",
       command_type: COMMAND_TYPES.NODE_PAUSE,
       created_at: "2026-05-27T00:01:00.000Z",
@@ -287,7 +287,7 @@ test("apply command persists operator pause mode and reports it in heartbeat", a
 
   const skippedResult = applyNodeCommand(
     {
-      id: "cmd-outbound-license-1",
+      id: "cmd-outbound-policy-1",
       node_id: "node-1",
       command_type: COMMAND_TYPES.OUTBOUND_APPLY,
       created_at: "2026-05-27T00:02:00.000Z",
@@ -379,7 +379,7 @@ test("run once polls command, completes it, persists state, and records metric",
             node_id: "node-1",
             command_type: COMMAND_TYPES.NODE_PAUSE,
             status: "claimed",
-            payload_json: { reason: "license expired" },
+            payload_json: { reason: "operator maintenance window" },
             created_at: "2026-05-27T00:01:00.000Z"
           });
         }
@@ -389,7 +389,7 @@ test("run once polls command, completes it, persists state, and records metric",
             node_id: "node-1",
             command_type: COMMAND_TYPES.NODE_PAUSE,
             status: JSON.parse(options.body).status,
-            payload_json: { reason: "license expired" },
+            payload_json: { reason: "operator maintenance window" },
             result_json: JSON.parse(options.body).result_json
           });
         }
@@ -765,7 +765,7 @@ test("run once applies managed OpenVPN-over-Shadowsocks config from outbound app
                   pki: {
                     ca_cert: "-----BEGIN CERTIFICATE-----\nca\n-----END CERTIFICATE-----",
                     server_cert: "-----BEGIN CERTIFICATE-----\nserver\n-----END CERTIFICATE-----",
-                    server_key: "-----BEGIN PRIVATE KEY-----\nserver\n-----END PRIVATE KEY-----"
+                    server_key: "synthetic-test-private-key-server"
                   },
                   users: [{ username: "lumen_sub_live", password: "openvpn-pass" }]
                 },
@@ -1567,7 +1567,7 @@ test("run once applies ikev2-eap outbound.apply via strongSwan runtime", async (
                 pki: {
                   ca_cert: "-----BEGIN CERTIFICATE-----\nca\n-----END CERTIFICATE-----",
                   server_cert: "-----BEGIN CERTIFICATE-----\nserver\n-----END CERTIFICATE-----",
-                  server_key: "-----BEGIN PRIVATE KEY-----\nkey\n-----END PRIVATE KEY-----"
+                  server_key: "synthetic-test-private-key"
                 },
                 users: [{ username: "lumen_sub_live", password: "ikev2-password" }]
               }

@@ -8,6 +8,14 @@ from app.domains.tools.router import router as tools_router
 from app.domains.users.router import router as users_router
 
 compat_router = APIRouter()
+
+
+@compat_router.get("/healthz", include_in_schema=False)
+@compat_router.get("/api/healthz", include_in_schema=False)
+async def healthz() -> dict[str, str]:
+    return {"status": "ok"}
+
+
 compat_router.include_router(admin_compat_router, tags=["admin-compat"])
 compat_router.include_router(users_router, prefix="/api/users", tags=["legacy-users-compat"])
 compat_router.include_router(hosts_router, prefix="/api/hosts", tags=["legacy-hosts-compat"])

@@ -4,9 +4,7 @@ upstream lumen_subscription {
 }
 
 limit_req_zone $binary_remote_addr zone=lumen_sub_api:10m rate=10r/s;
-limit_req_status 429;
 limit_conn_zone $binary_remote_addr zone=lumen_sub_conn:10m;
-limit_conn_status 429;
 
 server {
     listen 443 ssl http2;

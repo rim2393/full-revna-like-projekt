@@ -8,6 +8,12 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 Environment = Literal["local", "test", "staging", "production"]
 
 
+def normalize_async_database_url(database_url: str) -> str:
+    if database_url.startswith("postgresql://"):
+        return "postgresql+asyncpg://" + database_url.removeprefix("postgresql://")
+    return database_url
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix="LUMEN_",
@@ -187,6 +193,10 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.environment == "production"
+
+    @property
+    def async_database_url(self) -> str:
+        return normalize_async_database_url(self.database_url)
 
 
 @lru_cache(maxsize=1)

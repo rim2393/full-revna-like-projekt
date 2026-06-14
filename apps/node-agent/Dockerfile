@@ -44,6 +44,8 @@ RUN apk add --no-cache ca-certificates curl gcompat iproute2 iptables libev open
 
 COPY --chown=node:node package.json ./
 COPY --chown=node:node src ./src
+RUN chmod 0755 /srv/lumen-node-agent/src/cli.js \
+  && ln -s /srv/lumen-node-agent/src/cli.js /usr/local/bin/lumen-node-agent
 
 ENTRYPOINT ["node", "/srv/lumen-node-agent/src/cli.js"]
 CMD ["--run"]

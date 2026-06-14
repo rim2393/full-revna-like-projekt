@@ -595,6 +595,7 @@ async def apply_profile_to_node(session: AsyncSession, *, profile_id: UUID):
             message="Only active profiles can be applied to a node.",
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         )
+    _reject_redundant_profile_apply(profile)
     node = await _get_profile_node(session, profile)
     inbounds = await list_profile_inbounds(session, profile_id=profile.id)
     runtime_clients = await list_profile_runtime_clients(session, profile=profile)
@@ -1611,6 +1612,36 @@ def _mark_profile_apply_queued(profile: ProtocolProfile, *, command: NodeCommand
     profile.metadata_json = _metadata_with_runtime_sync(profile.metadata_json, runtime_sync)
 
 
+def _reject_redundant_profile_apply(profile: ProtocolProfile) -> None:
+    runtime_sync = _runtime_sync_from_metadata(profile.metadata_json)
+    sync_status = str(runtime_sync.get("status") or "")
+    pending_apply = runtime_sync.get("pending_apply") is True
+    changed_fields = runtime_sync.get("changed_fields")
+    has_changed_fields = isinstance(changed_fields, list) and any(
+        isinstance(field, str) and field.strip() for field in changed_fields
+    )
+    if sync_status == "apply_queued" and pending_apply:
+        raise APIError(
+            code="profile_apply_already_queued",
+            message=(
+                "Profile apply is already queued for this node. Wait for the node-agent "
+                "result before queueing another apply."
+            ),
+            status_code=status.HTTP_409_CONFLICT,
+            details=[str(profile.id)],
+        )
+    if sync_status == "applied" and not pending_apply and not has_changed_fields:
+        raise APIError(
+            code="profile_already_applied",
+            message=(
+                "Profile is already applied on its node. Change the profile, host, or "
+                "subscription binding before applying again."
+            ),
+            status_code=status.HTTP_409_CONFLICT,
+            details=[str(profile.id)],
+        )
+
+
 def _mark_host_apply_queued(host: Host, *, command: NodeCommand) -> None:
     current = _runtime_sync_from_metadata(host.metadata_json)
     runtime_sync: dict[str, object] = {
@@ -2190,7 +2221,7 @@ def _primary_host_string(inbound: ProfileInboundResponse, key: str) -> str | Non
 
 
 def _effective_inbound_transport(inbound: ProfileInboundResponse) -> str:
-    if str(inbound.transport).lower() == "xhttp" and _primary_host_dict(inbound, "xhttp_json"):
+    if _host_xhttp_enabled(inbound):
         return "xhttp"
     return inbound.transport
 
@@ -2214,9 +2245,18 @@ def _effective_config_with_host(inbound: ProfileInboundResponse) -> dict[str, ob
         security["serverName"] = host_sni
         config["security"] = security
     xhttp = _primary_host_dict(inbound, "xhttp_json")
-    if str(inbound.transport).lower() == "xhttp" and xhttp:
+    if _host_xhttp_enabled(inbound):
         config["xhttp"] = xhttp
     return config
+
+
+def _host_xhttp_enabled(inbound: ProfileInboundResponse) -> bool:
+    if not _primary_host_dict(inbound, "xhttp_json"):
+        return False
+    adapter = str(getattr(inbound, "adapter", ""))
+    if str(inbound.transport).lower() == "xhttp" or "xhttp" in adapter:
+        return True
+    return _effective_inbound_security(inbound) in {"reality", "tls"}
 
 
 def _xray_inbound_settings(

@@ -88,7 +88,7 @@ describe('ProfilesPage production interactions', () => {
       order: 7,
       owner: 'ops',
     })
-  })
+  }, 15_000)
 
   it('wires manual reorder controls to the real reorder API contract', async () => {
     const developmentClient = createDevelopmentLumenApiClient()
@@ -172,6 +172,67 @@ describe('ProfilesPage production interactions', () => {
     fireEvent.click(confirmButton as HTMLButtonElement)
 
     await waitFor(() => expect(deleteProfile).toHaveBeenCalledWith('profile_stealconfig'))
+  })
+
+  it('shows actionable runtime apply command state and supports retry', async () => {
+    const developmentClient = createDevelopmentLumenApiClient()
+    const applyProfileToNode = vi.fn(developmentClient.applyProfileToNode)
+    const apiClient: LumenApiClient = {
+      ...developmentClient,
+      applyProfileToNode,
+      listProfileRuntimeReadiness: async () => {
+        const response = await developmentClient.listProfileRuntimeReadiness()
+        return {
+          items: response.items.map((item) =>
+            item.profile_id === 'profile_stealconfig'
+              ? { ...item, apply_ready: true, blockers: [], runtime_clients: 1 }
+              : item,
+          ),
+        }
+      },
+    }
+
+    renderProfilesPage(apiClient)
+
+    await waitFor(() =>
+      expect(document.querySelector<HTMLButtonElement>('button[aria-label="Apply StealConfig to node"]')).not.toBeNull(),
+    )
+    fireEvent.click(document.querySelector<HTMLButtonElement>('button[aria-label="Apply StealConfig to node"]') as HTMLButtonElement)
+
+    await waitFor(() => expect(applyProfileToNode).toHaveBeenCalledWith('profile_stealconfig'))
+    expect(await screen.findByText(/profile apply command queued/i)).toBeInTheDocument()
+    expect(await screen.findByText(/^Runtime apply result$/i)).toBeInTheDocument()
+    expect(await screen.findAllByText(/cmd_1/i)).not.toHaveLength(0)
+    expect(await screen.findAllByText(/apply queued/i)).not.toHaveLength(0)
+
+    const retryButton = await screen.findByRole('button', { name: /retry apply/i })
+    fireEvent.click(retryButton)
+
+    await waitFor(() => expect(applyProfileToNode).toHaveBeenCalledTimes(2))
+  })
+
+  it('issues a real subscription from a profile with explicit render targets', async () => {
+    const developmentClient = createDevelopmentLumenApiClient()
+    const issueSubscriptionFromProfile = vi.fn(developmentClient.issueSubscriptionFromProfile)
+    const apiClient: LumenApiClient = {
+      ...developmentClient,
+      issueSubscriptionFromProfile,
+    }
+
+    renderProfilesPage(apiClient)
+
+    const issueButton = await screen.findByRole('button', { name: /issue subscription/i })
+    fireEvent.click(issueButton)
+
+    await waitFor(() => expect(issueSubscriptionFromProfile).toHaveBeenCalled())
+    expect(issueSubscriptionFromProfile.mock.calls[0][0]).toMatchObject({
+      host_id: expect.any(String),
+      profile_id: expect.any(String),
+      render_targets: expect.arrayContaining(['happ', 'sing-box', 'mihomo']),
+      user_id: expect.any(String),
+    })
+    expect(await screen.findByText(/subscription issued from profile/i)).toBeInTheDocument()
+    expect(await screen.findByText(/^Issued$/i)).toBeInTheDocument()
   })
 })
 

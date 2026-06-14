@@ -206,7 +206,7 @@ test("outbound apply permits resolved runtime credentials but still rejects stra
         pki: {
           ca_cert: "-----BEGIN CERTIFICATE-----\nca\n-----END CERTIFICATE-----",
           server_cert: "-----BEGIN CERTIFICATE-----\nserver\n-----END CERTIFICATE-----",
-          server_key: "-----BEGIN PRIVATE KEY-----\nserver\n-----END PRIVATE KEY-----"
+          server_key: "synthetic-test-private-key-server"
         },
         users: [{ username: "lumen_sub_live", password: "resolved-runtime-password" }]
       }
@@ -232,7 +232,7 @@ test("outbound apply permits resolved runtime credentials but still rejects stra
           pki: {
             ca_cert: "-----BEGIN CERTIFICATE-----\nca\n-----END CERTIFICATE-----",
             server_cert: "-----BEGIN CERTIFICATE-----\nserver\n-----END CERTIFICATE-----",
-            server_key: "-----BEGIN PRIVATE KEY-----\nserver\n-----END PRIVATE KEY-----"
+            server_key: "synthetic-test-private-key-server"
           },
           users: [{ username: "lumen_sub_live", password: "resolved-runtime-password" }]
         },

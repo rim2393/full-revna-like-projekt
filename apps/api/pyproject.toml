@@ -28,6 +28,9 @@ dev = [
     "ruff>=0.6.9",
 ]
 
+[project.scripts]
+lumen-api = "app.cli:main"
+
 [build-system]
 requires = ["hatchling>=1.25.0"]
 build-backend = "hatchling.build"

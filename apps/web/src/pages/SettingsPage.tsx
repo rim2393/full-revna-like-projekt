@@ -39,7 +39,7 @@ import { formatDateTime, parseKeyValueInput } from '../shared/utils/resourceForm
 const settingsSpec = {
   ...sectionSpecs.subscription,
   description:
-    'Manage subscription information, auth provider toggles, response headers, and panel-wide metadata.',
+    'Manage client import metadata, auth provider toggles, response headers, and panel-wide security settings.',
   eyebrow: 'Control plane settings',
   primaryAction: 'Save setting',
   status: 'Live settings',

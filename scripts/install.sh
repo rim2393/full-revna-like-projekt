@@ -154,6 +154,10 @@ issue_cert() {
   local domain="$1"
   local acme="/root/.acme.sh/acme.sh"
   [ -n "$domain" ] || return 0
+  if [ -s "$TLS_CERT_DIR/$domain/fullchain.pem" ] && [ -s "$TLS_CERT_DIR/$domain/privkey.pem" ]; then
+    log "certificate already installed for $domain"
+    return 0
+  fi
 
   run "$acme" --issue --webroot /var/www/lumen-acme -d "$domain" --keylength ec-256
   run mkdir -p "$TLS_CERT_DIR/$domain"

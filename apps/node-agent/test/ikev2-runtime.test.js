@@ -19,7 +19,7 @@ const IKEV2_CONFIG = Object.freeze({
   pki: {
     ca_cert: "-----BEGIN CERTIFICATE-----\nca\n-----END CERTIFICATE-----",
     server_cert: "-----BEGIN CERTIFICATE-----\nserver\n-----END CERTIFICATE-----",
-    server_key: "-----BEGIN PRIVATE KEY-----\nkey\n-----END PRIVATE KEY-----"
+    server_key: "synthetic-test-private-key"
   },
   users: [{ username: "lumen_sub_live", password: "ikev2-password" }]
 });

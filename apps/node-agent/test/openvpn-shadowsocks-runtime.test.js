@@ -12,7 +12,7 @@ import {
 const pki = Object.freeze({
   ca_cert: "-----BEGIN CERTIFICATE-----\nca\n-----END CERTIFICATE-----",
   server_cert: "-----BEGIN CERTIFICATE-----\nserver\n-----END CERTIFICATE-----",
-  server_key: "-----BEGIN PRIVATE KEY-----\nserver\n-----END PRIVATE KEY-----"
+  server_key: "synthetic-test-private-key-server"
 });
 
 function bridgeConfig(overrides = {}) {

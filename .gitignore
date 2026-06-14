@@ -61,6 +61,8 @@ ai_wiki/
 .obsidian/
 .research/
 .tooling/
+.omx/ultragoal/codex-goal*.json
+.omx/ultragoal/compose-test.env
 
 # IDE/OS
 .idea/

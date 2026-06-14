@@ -114,6 +114,25 @@ function getNodeState(status: string): NodeStatePresentation {
   }
 }
 
+function getCommandTone(status: string): MetricTone {
+  switch (normalizeStatus(status)) {
+    case 'applied':
+    case 'completed':
+    case 'success':
+    case 'succeeded':
+      return 'good'
+    case 'error':
+    case 'failed':
+      return 'danger'
+    case 'claimed':
+    case 'queued':
+    case 'running':
+      return 'info'
+    default:
+      return 'neutral'
+  }
+}
+
 function getJobTone(status: string): MetricTone {
   switch (normalizeStatus(status)) {
     case 'active':
@@ -317,6 +336,26 @@ function nodeActionResultFromCommand(
   }
 }
 
+function commandErrorSummary(command: NodeCommandRecord) {
+  return [command.error_code, command.error_message]
+    .filter((part): part is string => Boolean(part && part.trim()))
+    .join(': ')
+}
+
+function commandResultSummary(command: NodeCommandRecord) {
+  if (command.error_code || command.error_message) {
+    return commandErrorSummary(command)
+  }
+  if (!command.result_json) {
+    return '-'
+  }
+  const status = command.result_json.status
+  const message = command.result_json.message ?? command.result_json.summary
+  return [typeof status === 'string' ? status : null, typeof message === 'string' ? message : null]
+    .filter(Boolean)
+    .join(': ') || JSON.stringify(command.result_json)
+}
+
 function pluralize(count: number, singular: string, plural = `${singular}s`) {
   return count === 1 ? singular : plural
 }
@@ -425,11 +464,19 @@ function ProvisioningJobPanel({
               : 'pending node-agent exchange'}
           </span>
         </li>
-        <li>
-          <span aria-hidden="true">-</span>
-          <span>Heartbeat endpoint: /api/v1/nodes/{job.node_id}/heartbeat</span>
-        </li>
-      </ul>
+          <li>
+            <span aria-hidden="true">-</span>
+            <span>Heartbeat endpoint: /api/v1/nodes/{job.node_id}/heartbeat</span>
+          </li>
+          <li>
+            <span aria-hidden="true">-</span>
+            <span>Agent healthcheck: run lumen-node-agent healthcheck on the server after install.</span>
+          </li>
+          <li>
+            <span aria-hidden="true">-</span>
+            <span>Common failures: expired token, wrong panel URL, blocked outbound HTTPS, missing runtime binary, or port conflict.</span>
+          </li>
+        </ul>
       <div className="step-actions">
         <button
           type="button"
@@ -1271,25 +1318,36 @@ export function NodesPage() {
             <DataTable
               caption={t('Node command queue')}
               columns={[
+                t('ID'),
                 t('Command'),
                 t('Status'),
+                t('Error'),
                 t('Payload'),
                 t('Result'),
+                t('Claimed'),
+                t('Completed'),
                 t('Created'),
               ]}
               rows={(commandsQuery.data?.items ?? []).map((command) => ({
                 cells: [
+                  <span className="mono-value">{command.id}</span>,
                   command.command_type,
-                  <StatusBadge tone={getNodeState(command.status).tone}>
+                  <StatusBadge tone={getCommandTone(command.status)}>
                     {t(formatStatus(command.status))}
                   </StatusBadge>,
+                  commandErrorSummary(command) || '-',
                   JSON.stringify(command.payload_json),
-                  command.result_json ? JSON.stringify(command.result_json) : '-',
+                  commandResultSummary(command),
+                  formatTimestamp(command.claimed_at),
+                  formatTimestamp(command.completed_at),
                   formatTimestamp(command.created_at),
                 ],
                 id: command.id,
               }))}
             />
+            <p className="auth-card__note">
+              {t('For failed commands, inspect node-agent service logs around the command ID and completed timestamp.')}
+            </p>
             <DataTable
               caption={t('Node metrics')}
               columns={[t('Kind'), t('Values'), t('Observed')]}
@@ -1573,7 +1631,7 @@ export function NodesPage() {
           title="Node workflow"
           steps={[
             { detail: 'Start provisioning only with a vault credentials reference, never inline secrets.', label: 'Provision node' },
-            { detail: 'Wait until heartbeat is active before assigning customer traffic.', label: 'Verify heartbeat' },
+            { detail: 'Wait until heartbeat is active and lumen-node-agent healthcheck passes before assigning customer traffic.', label: 'Verify heartbeat' },
             { detail: 'Create a profile on the healthy node and reserve the protocol port.', label: 'Create profile', to: '/profiles' },
             { detail: 'Bind a public hostname after the profile exists.', label: 'Bind host', to: '/hosts' },
           ]}

@@ -50,6 +50,7 @@ import {
 import type {
   HostRecord,
   PortReservation,
+  ProfileLatestApplyCommandRecord,
   ProfileInboundRecord,
   ProfileRuntimeReadinessRecord,
   ProtocolProfileRecord,
@@ -1105,6 +1106,7 @@ export function ProfilesPage() {
                 }
                 onGoToNode={() => openNode(selectedProfile?.node_id ?? '')}
                 profile={selectedProfile}
+                readiness={selectedProfile ? readinessByProfile.get(selectedProfile.id) : undefined}
                 squadName={selectedSquad?.name ?? null}
                 t={t}
               />
@@ -1190,6 +1192,7 @@ function ProfileInventoryTable({
         t('Config'),
         t('Readiness'),
         t('Runtime'),
+        t('Last apply'),
         t('Status'),
         t('Actions'),
       ]}
@@ -1244,6 +1247,12 @@ function ProfileInventoryTable({
           <code key="config">{configSummary(profile)}</code>,
           <ProfileReadinessBadge key="readiness" readiness={readinessByProfile.get(profile.id)} t={t} />,
           <RuntimeSyncBadge key="runtime" status={runtimeSyncStatus(profile)} />,
+          <ProfileApplyCommandSummary
+            key="last-apply"
+            command={readinessByProfile.get(profile.id)?.latest_apply_command ?? null}
+            lastCommandId={readinessByProfile.get(profile.id)?.last_command_id ?? null}
+            t={t}
+          />,
           <StatusBadge key="status" tone={toneForStatus(profile.status)}>
             {t(profile.status)}
           </StatusBadge>,
@@ -1573,6 +1582,82 @@ function ProfileCard({
 
 function RuntimeSyncBadge({ status }: { status: { label: string; tone: 'danger' | 'good' | 'info' | 'neutral' | 'watch' } }) {
   return <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
+}
+
+function ProfileApplyCommandSummary({
+  command,
+  lastCommandId,
+  t,
+}: {
+  command: ProfileLatestApplyCommandRecord | null
+  lastCommandId: string | null
+  t: (value: string) => string
+}) {
+  if (!command && !lastCommandId) {
+    return <span>{t('No command')}</span>
+  }
+  const status = command?.status ?? 'unknown'
+  return (
+    <span>
+      <StatusBadge tone={commandStatusTone(status)}>{t(formatCommandStatus(status))}</StatusBadge>{' '}
+      <span className="mono-value">{command?.id ?? lastCommandId}</span>
+    </span>
+  )
+}
+
+function ProfileApplyCommandBadge({
+  command,
+  t,
+}: {
+  command: ProfileLatestApplyCommandRecord | null
+  t: (value: string) => string
+}) {
+  if (!command) {
+    return <StatusBadge tone="neutral">{t('No command')}</StatusBadge>
+  }
+  return <StatusBadge tone={commandStatusTone(command.status)}>{t(formatCommandStatus(command.status))}</StatusBadge>
+}
+
+function ProfileApplyCommandDetails({
+  command,
+  lastCommandId,
+  runtimeSyncStatus,
+  t,
+}: {
+  command: ProfileLatestApplyCommandRecord | null
+  lastCommandId: string | null
+  runtimeSyncStatus: string | null
+  t: (value: string) => string
+}) {
+  if (!command && !lastCommandId) {
+    return <p className="auth-card__note">{t('This profile has not queued an apply command yet.')}</p>
+  }
+
+  const errorSummary = commandErrorSummary(command)
+  return (
+    <dl className="profile-facts">
+      <div>
+        <dt>{t('Last command ID')}</dt>
+        <dd><span className="mono-value">{command?.id ?? lastCommandId}</span></dd>
+      </div>
+      <div>
+        <dt>{t('Runtime sync')}</dt>
+        <dd>{t(formatCommandStatus(runtimeSyncStatus ?? 'unknown'))}</dd>
+      </div>
+      <div>
+        <dt>{t('Claimed')}</dt>
+        <dd>{formatTimestamp(command?.claimed_at ?? null)}</dd>
+      </div>
+      <div>
+        <dt>{t('Completed')}</dt>
+        <dd>{formatTimestamp(command?.completed_at ?? null)}</dd>
+      </div>
+      <div>
+        <dt>{t('Error summary')}</dt>
+        <dd>{errorSummary ? <span className="auth-card__note">{errorSummary}</span> : t('No error reported')}</dd>
+      </div>
+    </dl>
+  )
 }
 
 function ProfileDeleteConfirm({
@@ -2057,6 +2142,7 @@ function ProfileDetailPanel({
   onToggle,
   onGoToNode,
   profile,
+  readiness,
   squadName,
   t,
 }: {
@@ -2080,6 +2166,7 @@ function ProfileDetailPanel({
   onToggle: (profile: ProtocolProfileRecord) => void
   onGoToNode: () => void
   profile: ProtocolProfileRecord | undefined
+  readiness: ProfileRuntimeReadinessRecord | undefined
   squadName: string | null
   t: (value: string, params?: Record<string, string | number>) => string
 }) {
@@ -2215,6 +2302,41 @@ function ProfileDetailPanel({
           <dd>{portRows.length === 0 ? t('None') : portRows.join(', ')}</dd>
         </div>
       </dl>
+
+      <section className="details-card" aria-label={t('Runtime apply result')}>
+        <div className="panel__header">
+          <div>
+            <p className="eyebrow">{t('Runtime apply result')}</p>
+            <h3>{t('Node command status')}</h3>
+          </div>
+          <ProfileApplyCommandBadge command={readiness?.latest_apply_command ?? null} t={t} />
+        </div>
+        <ProfileApplyCommandDetails
+          command={readiness?.latest_apply_command ?? null}
+          lastCommandId={readiness?.last_command_id ?? null}
+          runtimeSyncStatus={readiness?.runtime_sync_status ?? profile.runtime_sync?.status ?? null}
+          t={t}
+        />
+        <div className="inline-actions">
+          <button
+            type="button"
+            className="button button--secondary"
+            disabled={profile.status !== 'active'}
+            onClick={() => onApply(profile)}
+            title={t('Retry apply')}
+          >
+            <RotateCcw size={16} aria-hidden="true" />
+            {t('Retry apply')}
+          </button>
+          <button type="button" className="button button--secondary" onClick={onGoToNode} title={t('Open node logs')}>
+            <Server size={16} aria-hidden="true" />
+            {t('Open node logs')}
+          </button>
+        </div>
+        <p className="auth-card__note">
+          {t('For runtime failures, open the node and inspect the node-agent service logs around the command timestamp.')}
+        </p>
+      </section>
 
       <details className="details-card" open>
         <summary>
@@ -3142,6 +3264,45 @@ function runtimeSyncStatus(profile: ProtocolProfileRecord): { label: string; ton
     return { label: 'Pending apply', tone: 'watch' }
   }
   return { label: 'Never applied', tone: 'neutral' }
+}
+
+function commandStatusTone(status: string): 'danger' | 'good' | 'info' | 'neutral' | 'watch' {
+  const normalized = normalizeCommandStatus(status)
+  if (['applied', 'completed', 'succeeded', 'success'].includes(normalized)) {
+    return 'good'
+  }
+  if (['apply_failed', 'error', 'failed'].includes(normalized)) {
+    return 'danger'
+  }
+  if (['apply_queued', 'claimed', 'in_progress', 'queued', 'running'].includes(normalized)) {
+    return 'info'
+  }
+  if (['pending', 'pending_apply'].includes(normalized)) {
+    return 'watch'
+  }
+  return 'neutral'
+}
+
+function formatCommandStatus(status: string): string {
+  return normalizeCommandStatus(status).replace(/_/g, ' ')
+}
+
+function normalizeCommandStatus(status: string): string {
+  return status.trim().toLowerCase().replace(/[\s-]+/g, '_')
+}
+
+function commandErrorSummary(command: ProfileLatestApplyCommandRecord | null): string | null {
+  if (!command) {
+    return null
+  }
+  const parts = [
+    command.error_code,
+    command.status === 'failed' ? command.implementation_status : null,
+  ].filter((part): part is string => Boolean(part && part.trim()))
+  if (parts.length === 0) {
+    return null
+  }
+  return parts.join(': ')
 }
 
 function ProfileReadinessBadge({

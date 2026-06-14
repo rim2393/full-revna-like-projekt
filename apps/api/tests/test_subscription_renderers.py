@@ -86,7 +86,9 @@ def test_structured_subscription_targets_render_vless_profile() -> None:
     mihomo = render_subscription_for_target(manifest, settings=_settings(), target="mihomo")
     sing_box = render_subscription_for_target(manifest, settings=_settings(), target="sing-box")
     xray = render_subscription_for_target(manifest, settings=_settings(), target="xray-json")
+    amnezia = render_subscription_for_target(manifest, settings=_settings(), target="amnezia")
 
     assert "proxies:" in mihomo.body
     assert json.loads(sing_box.body)["outbounds"][0]["type"] == "vless"
     assert json.loads(xray.body)["outbounds"][0]["protocol"] == "vless"
+    assert json.loads(amnezia.body)["outbounds"][0]["protocol"] == "vless"

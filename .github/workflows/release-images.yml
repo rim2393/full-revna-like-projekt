@@ -1,0 +1,130 @@
+name: Release images
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release version tag, for example v0.1.0
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+  packages: write
+
+concurrency:
+  group: release-images-${{ inputs.version }}
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_OWNER: rim2393
+
+jobs:
+  build-sign-manifest:
+    name: Build, sign, and manifest
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+
+      - name: Validate version
+        run: |
+          set -euo pipefail
+          case "${{ inputs.version }}" in
+            v[0-9]*.[0-9]*.[0-9]*) ;;
+            *) echo "version must look like v0.1.0" >&2; exit 1 ;;
+          esac
+
+      - name: Login to GHCR
+        run: |
+          set -euo pipefail
+          printf '%s' "${{ secrets.GITHUB_TOKEN }}" \
+            | docker login "$REGISTRY" -u "${{ github.actor }}" --password-stdin
+
+      - name: Install cosign
+        run: |
+          set -euo pipefail
+          COSIGN_VERSION=v2.6.1
+          curl -fsSL -o /tmp/cosign \
+            "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign-linux-amd64"
+          sudo install -m 0755 /tmp/cosign /usr/local/bin/cosign
+          cosign version
+
+      - name: Build and push images
+        id: images
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p release/out
+
+          build_image() {
+            local key="$1"
+            local image="$2"
+            local context="$3"
+            local ref="${REGISTRY}/${IMAGE_OWNER}/${image}:${VERSION}"
+            docker buildx build --platform linux/amd64 --push --provenance=true --sbom=true -t "$ref" "$context"
+            local digest
+            digest="$(docker buildx imagetools inspect "$ref" --format '{{.Manifest.Digest}}')"
+            printf '%s=%s@%s\n' "$key" "$ref" "$digest" >> release/out/image-refs.env
+            printf '%s_digest=%s\n' "$key" "$digest" >> "$GITHUB_OUTPUT"
+            cosign sign --yes "$ref@$digest"
+          }
+
+          build_image api lumen-api apps/api
+          build_image web lumen-web apps/web
+          build_image node_agent lumen-node-agent apps/node-agent
+          build_image subscription lumen-subscription-page apps/lumen-edge
+
+      - name: Generate release manifest
+        env:
+          VERSION: ${{ inputs.version }}
+          API_DIGEST: ${{ steps.images.outputs.api_digest }}
+          WEB_DIGEST: ${{ steps.images.outputs.web_digest }}
+          NODE_AGENT_DIGEST: ${{ steps.images.outputs.node_agent_digest }}
+          SUBSCRIPTION_DIGEST: ${{ steps.images.outputs.subscription_digest }}
+        run: |
+          set -euo pipefail
+          manifest="release/out/manifest.${VERSION}.json"
+          compose_digest="sha256:$(sha256sum deploy/compose/lumen.yml deploy/compose/lumen-node.yml | sha256sum | awk '{print $1}')"
+          nginx_digest="sha256:$(find deploy/nginx -type f -print0 | sort -z | xargs -0 sha256sum | sha256sum | awk '{print $1}')"
+          jq \
+            --arg version "$VERSION" \
+            --arg released_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --arg api_digest "$API_DIGEST" \
+            --arg web_digest "$WEB_DIGEST" \
+            --arg node_agent_digest "$NODE_AGENT_DIGEST" \
+            --arg subscription_digest "$SUBSCRIPTION_DIGEST" \
+            --arg compose_digest "$compose_digest" \
+            --arg nginx_digest "$nginx_digest" \
+            '.version = $version
+             | .released_at = $released_at
+             | .installer_min_version = $version
+             | .images.api.tag = $version
+             | .images.web.tag = $version
+             | .images.node_agent.tag = $version
+             | .images.subscription.tag = $version
+             | .images.api.digest = $api_digest
+             | .images.web.digest = $web_digest
+             | .images.node_agent.digest = $node_agent_digest
+             | .images.subscription.digest = $subscription_digest
+             | .migrations.api.to = $version
+             | .checksums.compose = $compose_digest
+             | .checksums.nginx_templates = $nginx_digest
+             | .signature.alg = "cosign-keyless"
+             | .signature.kid = "github-actions-oidc"
+             | .signature.value = "see-ghcr-cosign-signatures"' \
+            release/manifest.template.json > "$manifest"
+          jq -e '.schema == "lumen.release.v1"' "$manifest"
+          sha256sum "$manifest" > "release/out/checksums.${VERSION}.txt"
+
+      - name: Upload release metadata
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: lumen-release-${{ inputs.version }}
+          path: |
+            release/out/manifest.${{ inputs.version }}.json
+            release/out/checksums.${{ inputs.version }}.txt
+            release/out/image-refs.env

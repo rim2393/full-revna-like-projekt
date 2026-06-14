@@ -9,10 +9,39 @@ scan_regex() {
   local pattern="$2"
   local output=""
 
-  if command -v rg >/dev/null 2>&1; then
-    output="$(rg -n --hidden --glob '!.git/**' --glob '!support-bundles/**' --glob '!backups/**' "$pattern" "$ROOT" || true)"
+  if command -v rg >/dev/null 2>&1 && rg --version >/dev/null 2>&1; then
+    output="$(
+      rg -n --hidden \
+        --glob '!.git/**' \
+        --glob '!support-bundles/**' \
+        --glob '!backups/**' \
+        --glob '!node_modules/**' \
+        --glob '!dist/**' \
+        --glob '!build/**' \
+        --glob '!.venv/**' \
+        "$pattern" "$ROOT" || true
+    )"
+  elif git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    output="$(
+      cd "$ROOT" &&
+        git ls-files -co --exclude-standard -z |
+        while IFS= read -r -d '' file; do
+          [ -f "$file" ] && printf '%s\0' "$file"
+        done |
+        xargs -0 -r grep -InE -- "$pattern" || true
+    )"
   else
-    output="$(grep -RInE --exclude-dir=.git --exclude-dir=support-bundles --exclude-dir=backups "$pattern" "$ROOT" || true)"
+    output="$(
+      grep -RInE \
+        --exclude-dir=.git \
+        --exclude-dir=support-bundles \
+        --exclude-dir=backups \
+        --exclude-dir=node_modules \
+        --exclude-dir=dist \
+        --exclude-dir=build \
+        --exclude-dir=.venv \
+        -- "$pattern" "$ROOT" || true
+    )"
   fi
 
   if [ -n "$output" ]; then
@@ -47,4 +76,3 @@ if [ "$FAIL" -ne 0 ]; then
 fi
 
 printf '[secret-scan] ok\n'
-

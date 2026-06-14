@@ -573,15 +573,27 @@ function SubscriptionGuide({ subscription }: { subscription: SubscriptionRecord 
           <ExternalLink size={20} aria-hidden="true" />
         </div>
         {subscription && baseUrl && renderability ? (
-          <div className="client-link-grid">
-            <StatusBadge tone="good">{t('Renderable')}</StatusBadge>
-            {buildRenderableLinks(subscription, baseUrl, renderability.formats).map(([label, href]) => (
-              <a key={href} className="client-link" href={href} target="_blank" rel="noreferrer">
-                <span>{t(label)}</span>
-                <ExternalLink size={15} aria-hidden="true" />
-              </a>
-            ))}
-          </div>
+          <>
+            <div className="client-link-grid">
+              <StatusBadge tone="good">{t('Renderable')}</StatusBadge>
+              {buildRenderableLinks(subscription, baseUrl, renderability.formats).map(([label, href]) => (
+                <a key={href} className="client-link" href={href} target="_blank" rel="noreferrer">
+                  <span>{t(label)}</span>
+                  <ExternalLink size={15} aria-hidden="true" />
+                </a>
+              ))}
+            </div>
+            <ul className="feature-list">
+              <li>
+                <span aria-hidden="true">-</span>
+                <span>Raw client links use the public subscription renderer and are safe for copy, QR, and deep-link import flows.</span>
+              </li>
+              <li>
+                <span aria-hidden="true">-</span>
+                <span>Device/HWID binding is visible from the Devices action and is enforced by the backend registry.</span>
+              </li>
+            </ul>
+          </>
         ) : (
           <p className="empty-inline">
             {subscription ? t(renderability?.reason ?? 'Subscription not active') : t('Create a subscription before sharing client links.')}

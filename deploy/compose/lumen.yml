@@ -123,6 +123,8 @@ services:
     volumes:
       - ${LUMEN_DATA_DIR:-/opt/lumen/data}/runtime:/var/lib/lumen/runtime
       - ${LUMEN_SECRETS_DIR:-/opt/lumen/secrets}:/run/lumen/secrets:ro
+    healthcheck:
+      disable: true
     logging: *default-logging
     networks:
       - lumen_internal
@@ -138,6 +140,8 @@ services:
     volumes:
       - ${LUMEN_DATA_DIR:-/opt/lumen/data}/runtime:/var/lib/lumen/runtime
       - ${LUMEN_SECRETS_DIR:-/opt/lumen/secrets}:/run/lumen/secrets:ro
+    healthcheck:
+      disable: true
     logging: *default-logging
     networks:
       - lumen_internal

@@ -446,6 +446,14 @@ export function createDevelopmentLumenApiClient(): LumenApiClient {
     return command
   }
 
+  function findLatestProfileApplyCommand(profile: ProtocolProfileRecord) {
+    return nodeCommands.find((command) => (
+      command.node_id === profile.node_id &&
+      command.command_type === 'outbound.apply' &&
+      command.payload_json.profileId === profile.id
+    ))
+  }
+
   function buildDevelopmentNodeOverview(nodeId: string): NodeOverviewResponse {
     const node = asNodeListResponse().items.find((item) => item.id === nodeId)
     if (!node) {
@@ -727,6 +735,14 @@ export function createDevelopmentLumenApiClient(): LumenApiClient {
           profileId: profile.id,
         },
       })
+      profile.runtime_sync = {
+        last_apply_queued_at: command.created_at,
+        last_command_id: command.id,
+        node_id: profile.node_id,
+        pending_apply: true,
+        profile_id: profile.id,
+        status: 'apply_queued',
+      }
       return {
         adapter: profile.adapter,
         command_id: command.id,
@@ -1116,13 +1132,28 @@ export function createDevelopmentLumenApiClient(): LumenApiClient {
           runtimeClients.length === 0 ? 'active_subscription_required' : null,
         ].filter((item): item is string => Boolean(item))
         const sync: Record<string, unknown> = profile.runtime_sync ?? {}
+        const latestApplyCommand = findLatestProfileApplyCommand(profile)
         return {
           active_hosts: activeHosts.length,
           adapter: profile.adapter,
           apply_ready: blockers.length === 0,
           blockers,
           last_command_id: typeof sync.last_command_id === 'string' ? sync.last_command_id : null,
-          latest_apply_command: null,
+          latest_apply_command: latestApplyCommand
+            ? {
+                adapter: profile.adapter,
+                claimed_at: latestApplyCommand.claimed_at,
+                completed_at: latestApplyCommand.completed_at,
+                created_at: latestApplyCommand.created_at,
+                error_code: latestApplyCommand.error_code,
+                id: latestApplyCommand.id,
+                implementation_status:
+                  typeof latestApplyCommand.result_json?.status === 'string'
+                    ? latestApplyCommand.result_json.status
+                    : null,
+                status: latestApplyCommand.status,
+              }
+            : null,
           name: profile.name,
           node_id: profile.node_id,
           pending_apply: typeof sync.pending_apply === 'boolean' ? sync.pending_apply : null,
